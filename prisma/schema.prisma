@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  TRAINER
+  INSTITUTE_ADMIN
+  PLATFORM_ADMIN
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EnrollmentStatus {
+  PRELIMINARY
+  PENDING_PAYMENT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum SessionType {
+  ONLINE
+  IN_PERSON
+  HYBRID
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  phone         String?
+  role          UserRole  @default(STUDENT)
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  trainerProfile TrainerProfile?
+  institute      Institute?      @relation(fields: [instituteId], references: [id])
+  instituteId    String?
+  
+  enrollments    Enrollment[]
+  reviews        Review[]
+  notifications  Notification[]
+  sentAnnouncements Announcement[]
+  
+  // For trainers
+  coursesTaught  Course[]        @relation("CourseTrainer")
+  sessionsTaught Session[]       @relation("SessionTrainer")
+  
+  // For admins
+  approvedBookings RoomBooking[] @relation("BookingApprover")
+  requestedBookings RoomBooking[] @relation("BookingRequester")
+
+  @@map("users")
+}
+
+model TrainerProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String?  @db.Text
+  cvUrl       String?
+  specialties String[]
+  rating      Float    @default(0)
+  
+  @@map("trainer_profiles")
+}
+
+model Institute {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  email       String
+  phone       String?
+  address     String?
+  logo        String?
+  website     String?
+  status      String   @default("pending") // pending, approved, suspended
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  courses     Course[]
+  rooms       Room[]
+  announcements Announcement[]
+
+  @@map("institutes")
+}
+
+model CourseCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  courses     Course[]
+
+  @@map("course_categories")
+}
+
+model Course {
+  id               String       @id @default(cuid())
+  title            String
+  description      String       @db.Text
+  shortDescription String?
+  price            Decimal      @db.Decimal(10, 2)
+  duration         Int          // in hours
+  startDate        DateTime
+  endDate          DateTime
+  maxStudents      Int
+  status           CourseStatus @default(DRAFT)
+  image            String?
+  prerequisites    String?      @db.Text
+  objectives       String[]
+  tags             String[]
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // Relations
+  trainerId        String
+  trainer          User         @relation("CourseTrainer", fields: [trainerId], references: [id])
+  instituteId      String?
+  institute        Institute?   @relation(fields: [instituteId], references: [id])
+  categoryId       String?
+  category         CourseCategory? @relation(fields: [categoryId], references: [id])
+  
+  sessions         Session[]
+  enrollments      Enrollment[]
+  materials        Material[]
+  reviews          Review[]
+  announcements    Announcement[]
+  certificates     Certificate[]
+
+  @@map("courses")
+}
+
+model Session {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  type        SessionType @default(ONLINE)
+  meetingLink String?
+  status      String      @default("scheduled") // scheduled, ongoing, completed, cancelled
+  
+  // Relations
+  courseId    String
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  roomId      String?
+  room        Room?       @relation(fields: [roomId], references: [id])
+  trainerId   String?
+  trainer     User?       @relation("SessionTrainer", fields: [trainerId], references: [id])
+  
+  attendances Attendance[]
+  bookings    RoomBooking[]
+
+  @@map("sessions")
+}
+
+model Enrollment {
+  id            String           @id @default(cuid())
+  enrolledAt    DateTime         @default(now())
+  status        EnrollmentStatus @default(ACTIVE)
+  progress      Int              @default(0)
+  
+  // Relations
+  studentId     String
+  student       User             @relation(fields: [studentId], references: [id])
+  courseId      String
+  course        Course           @relation(fields: [courseId], references: [id])
+  
+  payments      Payment[]
+  certificates  Certificate[]
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("YER")
+  status          PaymentStatus @default(PENDING)
+  method          String?       // card, bank_transfer, cash
+  transactionId   String?
+  createdAt       DateTime      @default(now())
+  
+  // Relations
+  enrollmentId    String
+  enrollment      Enrollment    @relation(fields: [enrollmentId], references: [id])
+
+  @@map("payments")
+}
+
+model Attendance {
+  id          String           @id @default(cuid())
+  status      AttendanceStatus @default(ABSENT)
+  markedAt    DateTime         @default(now())
+  
+  // Relations
+  sessionId   String
+  session     Session          @relation(fields: [sessionId], references: [id])
+  studentId   String
+  // Note: In a real app we might link to Enrollment instead of User directly for student
+  // but linking to User is flexible.
+  
+  @@unique([sessionId, studentId])
+  @@map("attendances")
+}
+
+model Material {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  type        String   // pdf, video, link, document
+  url         String
+  order       Int      @default(0)
+  isVisible   Boolean  @default(true)
+  uploadedAt  DateTime @default(now())
+  
+  // Relations
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("materials")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  
+  // Relations
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id])
+
+  @@map("reviews")
+}
+
+model Certificate {
+  id              String   @id @default(cuid())
+  certificateCode String   @unique
+  issuedAt        DateTime @default(now())
+  url             String
+  
+  // Relations
+  courseId        String
+  course          Course   @relation(fields: [courseId], references: [id])
+  enrollmentId    String
+  enrollment      Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  @@map("certificates")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   // payment, enrollment, session, announcement, system
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+  
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String
+  capacity    Int
+  facilities  String[]
+  isActive    Boolean  @default(true)
+  
+  // Relations
+  instituteId String
+  institute   Institute @relation(fields: [instituteId], references: [id])
+  sessions    Session[]
+  bookings    RoomBooking[]
+
+  @@map("rooms")
+}
+
+model RoomBooking {
+  id          String   @id @default(cuid())
+  startTime   DateTime
+  endTime     DateTime
+  status      String   // pending, approved, rejected, cancelled
+  purpose     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  sessionId   String?
+  session     Session? @relation(fields: [sessionId], references: [id])
+  
+  requestedById String
+  requestedBy   User     @relation("BookingRequester", fields: [requestedById], references: [id])
+  approvedById  String?
+  approvedBy    User?    @relation("BookingApprover", fields: [approvedById], references: [id])
+
+  @@map("room_bookings")
+}
+
+model Announcement {
+  id             String   @id @default(cuid())
+  title          String
+  message        String   @db.Text
+  targetAudience String   // all, students, trainers, institute_admins, course_students
+  createdAt      DateTime @default(now())
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  
+  // Relations
+  senderId       String
+  sender         User     @relation(fields: [senderId], references: [id])
+  courseId       String?
+  course         Course?  @relation(fields: [courseId], references: [id])
+  instituteId    String?
+  institute      Institute? @relation(fields: [instituteId], references: [id])
+
+  @@map("announcements")
+}
