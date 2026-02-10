@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { TrainerSidebar } from "@/components/layout/trainer-sidebar"
 import { TrainerHeader } from "@/components/layout/trainer-header"
 import { cn } from "@/lib/utils"
@@ -11,6 +12,8 @@ export default function TrainerLayout({
     children: React.ReactNode
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+    const pathname = usePathname()
+    const isHallsPage = pathname?.startsWith("/trainer/halls")
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-slate-950/50" dir="rtl">
@@ -27,9 +30,9 @@ export default function TrainerLayout({
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-                     <TrainerHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+                                <TrainerHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
                     
-                    <main className="flex-1 p-6 md:p-8">
+                    <main className={cn("flex-1", isHallsPage ? "px-6 pb-8 pt-0 md:px-8 md:pt-0" : "p-6 md:p-8")}>
                         <div className="container mx-auto max-w-7xl">
                             {children}
                         </div>

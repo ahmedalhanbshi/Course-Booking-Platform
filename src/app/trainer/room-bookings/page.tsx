@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +22,8 @@ const mockRoomBookings: RoomBooking[] = [
     endTime: new Date("2025-02-05T12:00:00"),
     status: "pending",
     requestedById: "2",
+    initialConfirmation: true,
+    paymentConfirmation: false,
     notes: "درس مهم تتطلب معدات عرض متقدمة",
     createdAt: new Date("2025-02-01"),
   },
@@ -86,19 +89,27 @@ export default function TrainerRoomBookingsPage() {
     return booking.status === filter
   })
 
-  const getStatusLabel = (status: RoomBooking['status']) => {
-    switch (status) {
-      case 'pending': return 'قيد المعالجة'
+  const getStatusLabel = (booking: RoomBooking) => {
+    if (booking.status === 'pending') {
+      if (!booking.initialConfirmation) return 'مراجعة الحجز المبدئي'
+      if (booking.initialConfirmation && !booking.paymentConfirmation) return 'مراجعة الدفع'
+      return 'بانتظار الموافقة النهائية'
+    }
+    switch (booking.status) {
       case 'approved': return 'مقبول'
       case 'rejected': return 'مرفوض'
       case 'cancelled': return 'ملغى'
-      default: return status
+      default: return booking.status
     }
   }
 
-  const getStatusColor = (status: RoomBooking['status']) => {
-    switch (status) {
-      case 'pending': return 'text-yellow-600'
+  const getStatusColor = (booking: RoomBooking) => {
+    if (booking.status === 'pending') {
+      if (!booking.initialConfirmation) return 'text-amber-600'
+      if (booking.initialConfirmation && !booking.paymentConfirmation) return 'text-blue-600'
+      return 'text-indigo-600'
+    }
+    switch (booking.status) {
       case 'approved': return 'text-green-600'
       case 'rejected': return 'text-red-600'
       case 'cancelled': return 'text-gray-600'
@@ -106,9 +117,9 @@ export default function TrainerRoomBookingsPage() {
     }
   }
 
-  const getStatusIcon = (status: RoomBooking['status']) => {
-    switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />
+  const getStatusIcon = (booking: RoomBooking) => {
+    if (booking.status === 'pending') return <Clock className="h-4 w-4" />
+    switch (booking.status) {
       case 'approved': return <CheckCircle className="h-4 w-4" />
       case 'rejected': return <X className="h-4 w-4" />
       case 'cancelled': return <AlertCircle className="h-4 w-4" />
@@ -132,6 +143,14 @@ export default function TrainerRoomBookingsPage() {
 
     setShowCancelDialog(false)
     setSelectedBooking(null)
+  }
+  
+  const handleConfirmPayment = (booking: RoomBooking) => {
+    setBookings(bookings.map(current =>
+      current.id === booking.id
+        ? { ...current, paymentConfirmation: true, status: 'pending' }
+        : current
+    ))
   }
 
   const getCourseTitle = (sessionId: string | undefined) => {
@@ -211,28 +230,24 @@ export default function TrainerRoomBookingsPage() {
       </div>
 
       {/* Filter */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-gray-500" />
-              <span className="font-medium">تصفية الطلبات:</span>
-            </div>
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الطلبات</SelectItem>
-                <SelectItem value="pending">قيد المعالجة</SelectItem>
-                <SelectItem value="approved">مقبولة</SelectItem>
-                <SelectItem value="rejected">مرفوضة</SelectItem>
-                <SelectItem value="cancelled">ملغاة</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-6 flex flex-wrap items-center justify-start gap-3 text-right border-b border-slate-100 pb-2">
+        <div className="flex items-center gap-2 text-slate-600">
+          <Filter className="h-5 w-5 text-slate-400" />
+          <span className="font-medium">تصفية الطلبات:</span>
+        </div>
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="h-11 w-48 rounded-full bg-white text-sm">
+            <SelectValue placeholder="جميع الطلبات" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">جميع الطلبات</SelectItem>
+            <SelectItem value="pending">قيد المعالجة</SelectItem>
+            <SelectItem value="approved">مقبولة</SelectItem>
+            <SelectItem value="rejected">مرفوضة</SelectItem>
+            <SelectItem value="cancelled">ملغاة</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Bookings Table */}
       <Card>
@@ -252,7 +267,7 @@ export default function TrainerRoomBookingsPage() {
               <p className="text-gray-500">
                 {filter === "all"
                   ? "لم تقم بطلب حجز أي قاعة بعد"
-                  : `لا توجد طلبات ${getStatusLabel(filter as RoomBooking['status'])}`
+                  : `لا توجد طلبات ${getStatusLabel({ status: filter as RoomBooking['status'], initialConfirmation: false, paymentConfirmation: false } as RoomBooking)}`
                 }
               </p>
             </div>
@@ -264,7 +279,6 @@ export default function TrainerRoomBookingsPage() {
                   <TableHead>التاريخ والوقت</TableHead>
                   <TableHead>القاعة المطلوبة</TableHead>
                   <TableHead>الحالة</TableHead>
-                  <TableHead>ملاحظات المعهد</TableHead>
                   <TableHead>الإجراءات</TableHead>
                 </TableRow>
               </TableHeader>
@@ -292,31 +306,33 @@ export default function TrainerRoomBookingsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <Link
+                        href={`/trainer/halls/hall-${booking.roomId}`}
+                        className="inline-flex items-center gap-2 text-blue-700 hover:text-blue-900"
+                      >
                         <MapPin className="h-4 w-4 text-gray-500" />
-                        <span>{getRoomName(booking.roomId)}</span>
-                      </div>
+                        <span className="font-medium">{getRoomName(booking.roomId)}</span>
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <div className={`flex items-center gap-2 ${getStatusColor(booking.status)}`}>
-                        {getStatusIcon(booking.status)}
-                        <Badge variant="outline" className={getStatusColor(booking.status)}>
-                          {getStatusLabel(booking.status)}
+                      <div className={`flex items-center gap-2 ${getStatusColor(booking)}`}>
+                        {getStatusIcon(booking)}
+                        <Badge variant="outline" className={getStatusColor(booking)}>
+                          {getStatusLabel(booking)}
                         </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="max-w-xs">
-                        {booking.notes ? (
-                          <p className="text-sm text-gray-600 truncate" title={booking.notes}>
-                            {booking.notes}
-                          </p>
-                        ) : (
-                          <span className="text-gray-400 text-sm">-</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                      {booking.status === 'pending' && booking.initialConfirmation && !booking.paymentConfirmation && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={() => handleConfirmPayment(booking)}
+                        >
+                          تأكيد الدفع
+                        </Button>
+                      )}
                       {booking.status === 'pending' && (
                         <Dialog open={showCancelDialog && selectedBooking?.id === booking.id} onOpenChange={setShowCancelDialog}>
                           <DialogTrigger asChild>

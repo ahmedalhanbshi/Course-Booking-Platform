@@ -1,591 +1,1820 @@
-"use client"
+﻿"use client"
 
-import { useParams, useSearchParams } from "next/navigation"
-import Image from "next/image"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Clock,
-  Users,
-  PlayCircle,
-  FileText,
-  Award,
-  CheckCircle, // Changed from CheckCircle2
-  Edit,
-  Settings,
-  CreditCard,
-  Upload,
-  Check,
-  Phone,
-  Loader2,
-  AlertCircle,
-  User,
-} from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState, useEffect } from "react"
+import { formatDate } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronDown,
+  Check,
+  Clock,
+  FileText,
+  Globe,
+  Heart,
+  MapPin,
+  Tag,
+  UploadCloud,
+  Users,
+  X
+} from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 
-// Mock data database
-const coursesDatabase: Record<string, any> = {
-  "1": {
-    id: "1",
-    title: "تعلم React من الصفر",
-    description: "دورة شاملة لتعلم مكتبة React وبناء تطبيقات ويب حديثة وتفاعلية. ستتعلم في هذه الدورة كل ما تحتاجه لتصبح مطور واجهات أمامية محترف.",
-    longDescription: `
-      تعتبر React واحدة من أكثر مكتبات JavaScript شعبية لبناء واجهات المستخدم. في هذه الدورة، سنبدأ من الأساسيات وننتقل تدريجياً إلى المفاهيم المتقدمة.
-      
-      ماذا ستتعلم:
-      - أساسيات React و JSX
-      - التعامل مع State و Props
-      - استخدام Hooks (useState, useEffect, etc.)
-      - إدارة الحالة باستخدام Context API و Redux
-      - التعامل مع النماذج والتحقق من البيانات
-      - الاتصال بالخوادم واستجلاب البيانات
-      - بناء مشروع كامل من الصفر
-    `,
-    price: 29900,
-    originalPrice: 45000,
-    reviewCount: 156,
-    studentsCount: 1250,
-    duration: "40 ساعة",
-    lessonsCount: 85,
-    level: "مبتدئ - متوسط",
-    lastUpdated: "2025-02-15",
-    language: "العربية",
-    image: "/images/course-web.png", 
-    category: "تطوير الويب",
-    instructor: {
-      id: "101",
-      name: "أحمد محمد",
-      role: "Senior Frontend Developer",
-      avatar: "/images/avatar-1.png",
-      students: 5000,
-      courses: 12
-    },
-    curriculum: [
-      {
-        title: "مقدمة في React",
-        lessons: [
-          { title: "ما هي React ولماذا نستخدمها؟", duration: "10:00" },
-          { title: "إعداد بيئة التطوير", duration: "15:00" }
-        ]
-      },
-      {
-        title: "الأساسيات",
-        lessons: [
-          { title: "فهم JSX", duration: "18:00" },
-          { title: "التعامل مع Props", duration: "20:00" }
-        ]
-      }
-    ],
-    features: ["شهادة إتمام معتمدة", "وصول مدى الحياة", "ملفات ومشاريع عملية", "دعم مباشر من المدرب"]
+interface CourseScheduleItem {
+  date: string
+  startTime: string
+  endTime: string
+}
+
+interface CourseHall {
+  name: string
+  location: string
+}
+
+interface CourseView {
+  id: string
+  title: string
+  category: string
+  shortDescription: string
+  description: string
+  image: string
+  price: number
+  startDate: string
+  endDate: string
+  startTime?: string
+  endTime?: string
+  maxStudents: number
+  deliveryType: "online" | "in_person" | "hybrid" | "capacity_based"
+  onlinePlatform?: string
+  meetingLink?: string
+  surveyLink?: string
+  surveyRequired?: boolean
+  hall?: CourseHall
+  prerequisites: string[]
+  objectives: string[]
+  tags: string[]
+  schedule: CourseScheduleItem[]
+  instructor: {
+    name: string
+    title: string
+    bio: string
+    avatar: string
+    bankName: string
+    iban: string
+    bankAccounts?: Array<{
+      id: string
+      bankName: string
+      iban: string
+      beneficiary: string
+      accountNumber?: string
+    }>
+    email?: string
+    linkedin?: string
   }
 }
 
-const defaultCourse = coursesDatabase["1"]
+type RegistrationStatus =
+  | "NONE"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "PAYMENT_PENDING"
+  | "PAYMENT_CONFIRMED"
+  | "PAYMENT_REJECTED"
+  | "ENROLLED"
+  | "REJECTED"
 
-// Enrollment Steps
+const FAVORITES_KEY = "courseFavorites"
+const REGISTRATION_KEY_PREFIX = "exploreRegistration"
+const ENROLLMENTS_KEY = "myCoursesEnrollments"
+const RECEIPT_KEY_PREFIX = "exploreReceipt"
 const steps = [
-    { number: 1, title: 'تسجيل مبدئي', statusKey: 'preliminary' },
-    { number: 2, title: 'موافقة المدرب', statusKey: 'pending_approval' }, // UI term for flow
-    { number: 3, title: 'تأكيد ودفع', statusKey: 'pending_payment' },
-    { number: 4, title: 'تم التسجيل', statusKey: 'active' },
+  { id: 1, label: "تسجيل مبدئي" },
+  { id: 2, label: "انتظار موافقة المدرب" },
+  { id: 3, label: "تأكيد الدفع" },
+  { id: 4, label: "تم التسجيل" }
 ]
 
-export default function CourseDetailsPage() {
-  const params = useParams()
-  const searchParams = useSearchParams() // Added searchParams
-  const { user } = useAuth()
-  
-  const courseId = typeof params.id === 'string' ? params.id : '1'
-
-  // Expanded Mock Data
-  const courseData = {
-    id: '1',
-    title: 'تعلم React من الصفر حتى الاحتراف 2024',
-    subtitle: 'دورة شاملة لتعلم مكتبة React وبناء تطبيقات ويب حديثة وتفاعلية. ستتعلم في هذه الدورة كل ما تحتاجه لتصبح مطور واجهات أمامية محترف.',
-    description: `
-      تعتبر React واحدة من أكثر مكتبات JavaScript شعبية لبناء واجهات المستخدم. في هذه الدورة، سنبدأ من الأساسيات وننتقل تدريجياً إلى المفاهيم المتقدمة.
-      
-      ستتعلم كيفية التفكير بطريقة React، وكيفية بناء مكونات قابلة لإعادة الاستخدام، وكيفية إدارة الحالة بفعالية. سنقوم ببناء عدة مشاريع عملية خلال الدورة لترسيخ المفاهيم.
-    `,
-    image: '/images/course-web.png', 
-    rating: 4.8,
-    reviewsCount: 1240,
-    studentsCount: 3500,
-    lastUpdated: 'ديسمبر 2024',
-    language: 'العربية',
-    level: 'مبتدئ - متوسط',
-    price: 29900,
-    instructor: {
-      id: 'inst1',
-      name: 'أحمد محمد',
-      title: 'Senior Frontend Developer',
-      bio: 'مطور برمجيات بخبرة تزيد عن 10 سنوات في تطوير تطبيقات الويب. عملت مع شركات عالمية وساهمت في العديد من المشاريع مفتوحة المصدر. شغوف بالتعليم ونقل الخبرة.',
-      image: '/images/avatar-1.png', 
-      rating: 4.9,
-      coursesCount: 5,
-      studentsCount: 15000,
-      reviewsCount: 1200
-    },
-    objectives: [
-      'فهم أساسيات React و JSX وكيفية عملها تحت الغطاء',
-      'التعامل مع State و Props بثقة لبناء تطبيقات ديناميكية',
-      'احتراف استخدام React Hooks (useState, useEffect, useContext, etc.)',
-      'إدارة الحالة المتقدمة باستخدام Redux Toolkit و Context API',
-      'التعامل مع النماذج (Forms) والتحقق من صحة البيانات',
-      'بناء تطبيقات متعددة الصفحات باستخدام React Router',
-      'التعامل مع واجهات برمجة التطبيقات (APIs) وجلب البيانات',
-      'أفضل الممارسات (Best Practices) لكتابة كود نظيف وقابل للصيانة'
-    ],
+const coursesDatabase: Record<string, CourseView> = {
+  "6": {
+    id: "6",
+    title: "تحليل البيانات باستخدام SQL",
+    category: "قواعد البيانات",
+    shortDescription: "دورة عملية تركز على مهارات SQL الأساسية والمتقدمة لتحليل البيانات وبناء التقارير.",
+    description:
+      "ستتعلم في هذه الدورة كيفية كتابة استعلامات SQL بكفاءة، وتنظيم البيانات، وبناء تقارير قابلة للمشاركة. الدورة مصممة بأسلوب عملي مع أمثلة واقعية وتمارين قصيرة.",
+    image: "/images/course-web.png",
+    price: 19900,
+    startDate: "2025-02-10",
+    endDate: "2025-03-20",
+    startTime: "18:00",
+    endTime: "20:00",
+    maxStudents: 25,
+    deliveryType: "online",
+    onlinePlatform: "Google Meet",
+    meetingLink: "https://meet.google.com/abc-defg-hij",
+    surveyLink: "https://forms.gle/example-survey",
+    surveyRequired: true,
     prerequisites: [
-      'معرفة أساسية بـ HTML و CSS',
-      'معرفة جيدة بـ JavaScript (ES6+ features like Arrow Functions, Destructuring, etc.)',
-      'جهاز كمبيوتر واتصال بالإنترنت'
+      "معرفة أساسية بالحاسب والإنترنت",
+      "يفضل الإلمام بالمفاهيم العامة للبيانات"
     ],
-    curriculum: [
+    objectives: [
+      "كتابة استعلامات SQL دقيقة وسريعة",
+      "تنظيم البيانات باستخدام التصفية والتجميع",
+      "إنشاء تقارير بسيطة من البيانات",
+      "قراءة المخططات وفهم العلاقات بين الجداول"
+    ],
+    tags: ["SQL", "تحليل البيانات", "قواعد البيانات"],
+    schedule: [
+      { date: "2025-02-10", startTime: "18:00", endTime: "20:00" },
+      { date: "2025-02-13", startTime: "18:00", endTime: "20:00" },
+      { date: "2025-02-17", startTime: "18:00", endTime: "20:00" }
+    ],
+    instructor: {
+      name: "أحمد محمد",
+      title: "مدرب برمجة – SQL وتحليل البيانات",
+      bio: "خبرة في بناء حلول بيانات عملية وتدريب فرق تقنية على كتابة الاستعلامات وتحليل البيانات.",
+      avatar: "/images/avatar-1.png",
+      bankName: "بنك اليمن الدولي",
+      iban: "YE12 0001 2345 6789 0000 12",
+      bankAccounts: [
+        {
+          id: "ycb",
+          bankName: "بنك اليمن الدولي",
+          iban: "YE12 0001 2345 6789 0000 12",
+          beneficiary: "أحمد محمد",
+          accountNumber: "00123456"
+        },
+        {
+          id: "cby",
+          bankName: "البنك المركزي اليمني",
+          iban: "YE34 0002 9876 5432 1000 98",
+          beneficiary: "أحمد محمد",
+          accountNumber: "76543210"
+        }
+      ],
+      email: "instructor@example.com",
+      linkedin: "https://www.linkedin.com/in/ahmed"
+    }
+  },
+  "1": {
+    id: "1",
+    title: "تعلم React من الصفر",
+    category: "تطوير الويب",
+    shortDescription: "دورة مكثفة لبناء واجهات تفاعلية باستخدام React خطوة بخطوة.",
+    description:
+      "تركز الدورة على بناء أساس قوي في React من خلال تطبيقات صغيرة وتمارين عملية، مع توضيح المفاهيم الأساسية بطريقة مبسطة.",
+    image: "/images/course-web.png",
+    price: 29900,
+    startDate: "2025-02-01",
+    endDate: "2025-03-15",
+    startTime: "19:00",
+    endTime: "21:00",
+    maxStudents: 30,
+    deliveryType: "hybrid",
+    onlinePlatform: "Zoom",
+    meetingLink: "https://zoom.us/j/000000000",
+    surveyLink: "https://forms.gle/example-survey-2",
+    surveyRequired: false,
+    hall: {
+      name: "القاعة التدريبية (ج)",
+      location: "الدور الأول - الجناح الشرقي"
+    },
+    prerequisites: ["أساسيات HTML و CSS", "معرفة عامة بـ JavaScript"],
+    objectives: [
+      "فهم هيكل React ومكونات الواجهة",
+      "بناء مكونات قابلة لإعادة الاستخدام",
+      "إدارة الحالة والتعامل مع الأحداث"
+    ],
+    tags: ["React", "Frontend", "JavaScript"],
+    schedule: [
+      { date: "2025-02-01", startTime: "19:00", endTime: "21:00" },
+      { date: "2025-02-04", startTime: "19:00", endTime: "21:00" }
+    ],
+    instructor: {
+      name: "أحمد محمد",
+      title: "مدرب برمجة – React",
+      bio: "خبرة عملية في تطوير الواجهات وبناء منتجات تعليمية تفاعلية لمؤسسات محلية وعالمية.",
+      avatar: "/images/avatar-1.png",
+      bankName: "بنك اليمن الدولي",
+      iban: "YE12 0001 2345 6789 0000 12",
+      bankAccounts: [
+        {
+          id: "ycb-react",
+          bankName: "بنك اليمن الدولي",
+          iban: "YE12 0001 2345 6789 0000 12",
+          beneficiary: "أحمد محمد",
+          accountNumber: "00123456"
+        },
+        {
+          id: "alqura",
+          bankName: "بنك القُرى الإسلامي",
+          iban: "YE55 0003 1122 3344 5566 77",
+          beneficiary: "أحمد محمد",
+          accountNumber: "99887766"
+        }
+      ],
+      email: "instructor@example.com",
+      linkedin: "https://www.linkedin.com/in/ahmed"
+    }
+  },
+  "2": {
+    id: "2",
+    title: "تصميم واجهات المستخدم الاحترافية",
+    category: "تصميم وجرافيك",
+    shortDescription: "أسس تصميم واجهات واضحة وتجربة مستخدم عملية لمنتجات الويب والتطبيقات.",
+    description:
+      "تغطي الدورة مبادئ التصميم المرئي، بناء الأنظمة المرنة، وتطبيق معايير تجربة المستخدم في مشاريع واقعية.",
+    image: "/images/course-design.png",
+    price: 25000,
+    startDate: "2025-03-05",
+    endDate: "2025-04-10",
+    startTime: "18:00",
+    endTime: "20:00",
+    maxStudents: 24,
+    deliveryType: "online",
+    onlinePlatform: "Google Meet",
+    meetingLink: "https://meet.google.com/ui-ux-design",
+    surveyLink: "https://forms.gle/example-survey-ui",
+    surveyRequired: false,
+    prerequisites: ["معرفة أساسية بالتصميم", "اهتمام بتجربة المستخدم"],
+    objectives: [
+      "تصميم واجهات متوازنة وواضحة",
+      "تحسين تجربة المستخدم عبر تدفقات مبسطة",
+      "بناء مكتبة مكونات قابلة لإعادة الاستخدام"
+    ],
+    tags: ["UI", "UX", "Design"],
+    schedule: [
+      { date: "2025-03-05", startTime: "18:00", endTime: "20:00" },
+      { date: "2025-03-09", startTime: "18:00", endTime: "20:00" },
+      { date: "2025-03-12", startTime: "18:00", endTime: "20:00" }
+    ],
+    instructor: {
+      name: "سارة خالد",
+      title: "مصممة تجربة مستخدم",
+      bio: "خبرة في تصميم منتجات رقمية وتبسيط الرحلات للمستخدمين.",
+      avatar: "/images/avatar-2.png",
+      bankName: "بنك القُرى الإسلامي",
+      iban: "YE55 0003 1122 3344 5566 77",
+      bankAccounts: [
+        {
+          id: "alqura-ui",
+          bankName: "بنك القُرى الإسلامي",
+          iban: "YE55 0003 1122 3344 5566 77",
+          beneficiary: "سارة خالد",
+          accountNumber: "44556677"
+        },
+        {
+          id: "ycb-ui",
+          bankName: "بنك اليمن الدولي",
+          iban: "YE12 0001 2345 6789 0000 12",
+          beneficiary: "سارة خالد",
+          accountNumber: "22334455"
+        }
+      ],
+      email: "sara@example.com",
+      linkedin: "https://www.linkedin.com/in/sara"
+    }
+  },
+  "3": {
+    id: "3",
+    title: "أساسيات تحليل البيانات",
+    category: "إدارة أعمال",
+    shortDescription: "تعلم تحليل البيانات وبناء التقارير لاتخاذ قرارات أفضل.",
+    description:
+      "دورة عملية لبناء مهارات تحليل البيانات باستخدام جداول البيانات وأدوات التصور.",
+    image: "/images/course-web.png",
+    price: 18000,
+    startDate: "2025-03-15",
+    endDate: "2025-04-20",
+    startTime: "19:00",
+    endTime: "21:00",
+    maxStudents: 30,
+    deliveryType: "hybrid",
+    onlinePlatform: "Zoom",
+    meetingLink: "https://zoom.us/j/111222333",
+    surveyLink: "https://forms.gle/example-survey-data",
+    surveyRequired: false,
+    hall: {
+      name: "قاعة التدريب (ب)",
+      location: "الدور الثاني - الجناح الغربي"
+    },
+    prerequisites: ["معرفة أساسية بالجداول", "اهتمام بالأرقام"],
+    objectives: [
+      "تحليل البيانات وبناء مؤشرات",
+      "استخدام جداول محورية",
+      "تصميم تقارير بسيطة"
+    ],
+    tags: ["Data", "Analytics", "Business"],
+    schedule: [
+      { date: "2025-03-15", startTime: "19:00", endTime: "21:00" },
+      { date: "2025-03-18", startTime: "19:00", endTime: "21:00" },
+      { date: "2025-03-22", startTime: "19:00", endTime: "21:00" }
+    ],
+    instructor: {
+      name: "محمد علي",
+      title: "محلل بيانات",
+      bio: "متخصص في التحليل وبناء لوحات البيانات للمؤسسات.",
+      avatar: "/images/avatar-3.png",
+      bankName: "البنك المركزي اليمني",
+      iban: "YE34 0002 9876 5432 1000 98",
+      bankAccounts: [
+        {
+          id: "cby-data",
+          bankName: "البنك المركزي اليمني",
+          iban: "YE34 0002 9876 5432 1000 98",
+          beneficiary: "محمد علي",
+          accountNumber: "88990011"
+        }
+      ],
+      email: "mohamed@example.com",
+      linkedin: "https://www.linkedin.com/in/mohamed"
+    }
+  },
+  "4": {
+    id: "4",
+    title: "إدارة المشاريع بأسلوب عملي",
+    category: "إدارة أعمال",
+    shortDescription: "من التخطيط إلى التنفيذ، تعلم إدارة المشاريع خطوة بخطوة.",
+    description:
+      "يغطي المسار أدوات التخطيط، إدارة المخاطر، والتواصل مع أصحاب المصلحة.",
+    image: "/images/course-abstract.svg",
+    price: 22000,
+    startDate: "2025-04-01",
+    endDate: "2025-05-05",
+    startTime: "17:00",
+    endTime: "19:00",
+    maxStudents: 28,
+    deliveryType: "online",
+    onlinePlatform: "Microsoft Teams",
+    meetingLink: "https://teams.microsoft.com/l/meetup-join/project",
+    surveyLink: "https://forms.gle/example-survey-pm",
+    surveyRequired: false,
+    prerequisites: ["خبرة عامة بالعمل الجماعي"],
+    objectives: [
+      "وضع خطة عمل واضحة",
+      "تحديد المخاطر وإدارتها",
+      "متابعة تقدم الفريق بفعالية"
+    ],
+    tags: ["PM", "Management", "Leadership"],
+    schedule: [
+      { date: "2025-04-01", startTime: "17:00", endTime: "19:00" },
+      { date: "2025-04-05", startTime: "17:00", endTime: "19:00" },
+      { date: "2025-04-08", startTime: "17:00", endTime: "19:00" }
+    ],
+    instructor: {
+      name: "ليلى حسن",
+      title: "مديرة مشاريع",
+      bio: "تقود فرق متعددة التخصصات وتبني خطط تنفيذ عملية.",
+      avatar: "/images/avatar-2.png",
+      bankName: "بنك اليمن الدولي",
+      iban: "YE12 0001 2345 6789 0000 12",
+      bankAccounts: [
+        {
+          id: "ycb-pm",
+          bankName: "بنك اليمن الدولي",
+          iban: "YE12 0001 2345 6789 0000 12",
+          beneficiary: "ليلى حسن",
+          accountNumber: "55443322"
+        }
+      ],
+      email: "layla@example.com",
+      linkedin: "https://www.linkedin.com/in/layla"
+    }
+  }
+}
+
+const deliveryLabels: Record<CourseView["deliveryType"], string> = {
+  online: "أونلاين",
+  in_person: "حضوري",
+  hybrid: "مدمج",
+  capacity_based: "تحديد القاعة عند اكتمال العدد"
+}
+
+export default function CourseDetailsPage() {
+  const { user } = useAuth()
+  const params = useParams()
+  const router = useRouter()
+  const courseId = typeof params.id === "string" ? params.id : "6"
+  const course = coursesDatabase[courseId] ?? coursesDatabase["6"]
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+  const [isFavorite, setIsFavorite] = useState(false)
+  const [registrationStatus, setRegistrationStatus] =
+    useState<RegistrationStatus>("NONE")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingRegistration, setIsLoadingRegistration] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptInfo, setReceiptInfo] = useState<{ name: string; note: string }>({
+    name: "",
+    note: ""
+  })
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const [paymentError, setPaymentError] = useState("")
+  const [expandedBankId, setExpandedBankId] = useState<string | null>(null)
+  const paymentFileRef = useRef<HTMLInputElement | null>(null)
+  const [formErrors, setFormErrors] = useState<{
+    name?: string
+    email?: string
+    phone?: string
+    submit?: string
+  }>({})
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: ""
+  })
+  const [registrationId, setRegistrationId] = useState<string | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+
+  const shouldShowSurvey = Boolean(course.surveyLink)
+  const bankAccounts = useMemo(() => {
+    if (course.instructor.bankAccounts?.length) {
+      return course.instructor.bankAccounts
+    }
+    return [
       {
-        title: 'مقدمة في React',
-        duration: '45 دقيقة',
-        lessons: [
-          { title: 'ما هي React ولماذا نستخدمها؟', type: 'video', duration: '10:00' },
-          { title: 'إعداد بيئة التطوير', type: 'video', duration: '15:00' },
-          { title: 'أول تطبيق React', type: 'video', duration: '20:00' }
-        ]
-      },
-      {
-        title: 'الأساسيات: Components & JSX',
-        duration: '1 ساعة و 30 دقيقة',
-        lessons: [
-          { title: 'فهم Components', type: 'video', duration: '20:00' },
-          { title: 'كتابة JSX', type: 'video', duration: '25:00' },
-          { title: 'تمرين عملي', type: 'assignment', duration: '45:00' }
-        ]
-      },
-       {
-        title: 'إدارة الحالة (State Management)',
-        duration: '2 ساعة',
-        lessons: [
-          { title: 'مفهوم State', type: 'video', duration: '30:00' },
-          { title: 'استخدام useState Hook', type: 'video', duration: '40:00' },
-          { title: 'مشروع صغير: عداد', type: 'project', duration: '50:00' }
-        ]
+        id: "primary",
+        bankName: course.instructor.bankName,
+        iban: course.instructor.iban,
+        beneficiary: course.instructor.name
       }
     ]
+  }, [course.instructor])
+
+  const formatFileSize = (size?: number) => {
+    if (!size || Number.isNaN(size)) return ""
+    if (size < 1024) return `${size} B`
+    const kb = size / 1024
+    if (kb < 1024) return `${kb.toFixed(1)} KB`
+    const mb = kb / 1024
+    return `${mb.toFixed(1)} MB`
   }
 
-  // --- Enrollment Logic ---
-  const [enrollmentStatus, setEnrollmentStatus] = useState<'none' | 'preliminary' | 'pending_payment' | 'active' | 'cancelled' | 'completed'>('none')
-  const [formData, setFormData] = useState({
-      name: user?.name || 'عبدالله محمد',
-      email: user?.email || 'student@example.com',
-      phone: '0500000000'
-  })
-  const [isRegDialogOpen, setIsRegDialogOpen] = useState(false)
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+  const registrationStorageKey = useMemo(
+    () => `${REGISTRATION_KEY_PREFIX}:${user?.id ?? "guest"}:${courseId}`,
+    [courseId, user?.id]
+  )
+  const registrationFormKey = useMemo(
+    () => `${REGISTRATION_KEY_PREFIX}:form:${user?.id ?? "guest"}:${courseId}`,
+    [courseId, user?.id]
+  )
+  const receiptStorageKey = useMemo(
+    () => `${RECEIPT_KEY_PREFIX}:${user?.id ?? "guest"}:${courseId}`,
+    [courseId, user?.id]
+  )
 
-  // Initialization mock logic
-  useEffect(() => {
-    // Mock logic: Simulating enrollment for specific courses or via URL param for testing
-    // Course 1 is the default enrolled mock
-    // Course 4 is what the user was testing with
-    if (courseId === '1' || courseId === '3' || courseId === '4' || searchParams.get('enrolled') === 'true') {
-         setEnrollmentStatus('active')
+  const formatYER = (value: number) =>
+    `${new Intl.NumberFormat("en-US").format(value)} ر.ي`
+
+  const readFavorites = () => {
+    if (typeof window === "undefined") return [] as string[]
+    try {
+      const stored = window.localStorage.getItem(FAVORITES_KEY)
+      return stored ? (JSON.parse(stored) as string[]) : []
+    } catch {
+      return []
     }
-  }, [courseId, searchParams])
-
-
-  const steps = [
-        { status: 'preliminary', label: 'تسجيل مبدئي' },
-        { status: 'approval', label: 'انتظار موافقة المدرب' },
-        { status: 'pending_payment', label: 'تأكيد الدفع' },
-        { status: 'active', label: 'تم التسجيل' },
-  ]
-
-  const handlePreliminaryRegister = () => {
-    // API Call Mock
-    setTimeout(() => {
-        setEnrollmentStatus('preliminary')
-        setIsRegDialogOpen(false)
-        toast.success("تم إرسال طلب التسجيل المبدئي بنجاح", { description: "سيقوم المدرب بمراجعة طلبك قريباً" })
-    }, 1000)
   }
 
-  const DEBUG_simulateTrainerApproval = () => {
-      toast.info("محاكاة: المدرب وافق على الطلب")
-      setEnrollmentStatus('pending_payment')
+  const writeFavorites = (items: string[]) => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(items))
+    window.dispatchEvent(new Event("favorites-updated"))
   }
 
-  const handlePayment = () => {
-      // API Call Mock
-      setTimeout(() => {
-        setEnrollmentStatus('active')
-        setIsPaymentDialogOpen(false)
-        toast.success("تم تأكيد التسجيل بنجاح!", { description: "يمكنك الآن البدء في مشاهدة محتوى الدورة" })
-      }, 1500)
+  const readRegistrationForm = () => {
+    if (typeof window === "undefined") return null
+    try {
+      const stored = window.localStorage.getItem(registrationFormKey)
+      if (!stored) return null
+      return JSON.parse(stored) as typeof formData
+    } catch {
+      return null
+    }
   }
-  
-  const getCurrentStepIndex = () => {
-      if (enrollmentStatus === 'none') return -1
-      if (enrollmentStatus === 'preliminary') return 1 // Step 2: Waiting for approval
-      if (enrollmentStatus === 'pending_payment') return 2 // Step 3: Pending Payment
-      if (enrollmentStatus === 'active') return 3 // Step 4: Active
-      return 0
+
+  const persistRegistrationForm = (data: typeof formData) => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(registrationFormKey, JSON.stringify(data))
   }
-  const currentStepIndex = getCurrentStepIndex()
+
+  const openRegistrationDialog = async (mode: "create" | "edit") => {
+    setIsEditMode(mode === "edit")
+    setFormErrors({})
+    setIsDialogOpen(true)
+    if (mode === "create") {
+      setRegistrationId(null)
+    }
+    if (mode === "edit") {
+      setIsLoadingRegistration(true)
+      const stored = readRegistrationForm()
+      if (stored) {
+        setFormData(stored)
+        setIsLoadingRegistration(false)
+        return
+      }
+      if (!user?.id) {
+        setIsLoadingRegistration(false)
+        return
+      }
+      try {
+        const response = await fetch(`/api/enrollments/${courseId}/me`, {
+          method: "GET",
+          cache: "no-store"
+        })
+        if (!response.ok) {
+          setIsLoadingRegistration(false)
+          return
+        }
+        const payload = await response.json()
+        setRegistrationId(payload?.id ?? null)
+        setFormData({
+          name: payload?.fullName ?? "",
+          email: payload?.email ?? "",
+          phone: payload?.phone ?? ""
+        })
+      } catch {
+        // ignore fetch errors, allow manual edit
+      } finally {
+        setIsLoadingRegistration(false)
+      }
+    }
+  }
+
+  const toggleFavorite = () => {
+    const favorites = readFavorites()
+    const nextFavorites = favorites.includes(course.id)
+      ? favorites.filter((id) => id !== course.id)
+      : [...favorites, course.id]
+    writeFavorites(nextFavorites)
+    setIsFavorite(nextFavorites.includes(course.id))
+  }
+
+  const handleReceiptFile = (file: File | null) => {
+    setReceiptFile(file)
+    if (file) {
+      setReceiptInfo((prev) => ({ ...prev, name: file.name }))
+    }
+    setPaymentError("")
+  }
+
+  const readReceiptInfo = () => {
+    if (typeof window === "undefined") return null
+    try {
+      const stored = window.localStorage.getItem(receiptStorageKey)
+      if (!stored) return null
+      return JSON.parse(stored) as { name?: string; note?: string }
+    } catch {
+      return null
+    }
+  }
+
+  const persistReceiptInfo = (info: { name: string; note: string }) => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(receiptStorageKey, JSON.stringify(info))
+  }
+
+  const handleCopyValue = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`تم نسخ ${label}`)
+    } catch {
+      toast.error(`تعذر نسخ ${label}`)
+    }
+  }
+
+  const persistRegistrationStatus = (status: RegistrationStatus) => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(registrationStorageKey, status)
+  }
+
+  const saveEnrollment = () => {
+    if (typeof window === "undefined") return
+    try {
+      const stored = window.localStorage.getItem(ENROLLMENTS_KEY)
+      const list = stored ? (JSON.parse(stored) as any[]) : []
+      const exists = list.some((item) => item?.courseId === course.id)
+      if (exists) return
+
+      list.unshift({
+        courseId: course.id,
+        title: course.title,
+        description: course.description,
+        shortDescription: course.shortDescription,
+        category: course.category,
+        price: course.price,
+        image: course.image,
+        startDate: course.startDate,
+        endDate: course.endDate,
+        maxStudents: course.maxStudents,
+        instructorName: course.instructor.name,
+        instructorAvatar: course.instructor.avatar,
+        createdAt: new Date().toISOString()
+      })
+
+      window.localStorage.setItem(ENROLLMENTS_KEY, JSON.stringify(list))
+      window.dispatchEvent(new Event("enrollments-updated"))
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  const getStepState = (stepId: number) => {
+    if (registrationStatus === "NONE") {
+      return stepId === 1 ? "active" : "upcoming"
+    }
+    if (registrationStatus === "PENDING_APPROVAL") {
+      if (stepId === 1) return "completed"
+      if (stepId === 2) return "active"
+      return "upcoming"
+    }
+    if (registrationStatus === "APPROVED") {
+      if (stepId <= 2) return "completed"
+      if (stepId === 3) return "active"
+      return "upcoming"
+    }
+    if (registrationStatus === "PAYMENT_PENDING") {
+      if (stepId <= 2) return "completed"
+      if (stepId === 3) return "active"
+      return "upcoming"
+    }
+    if (registrationStatus === "PAYMENT_CONFIRMED") {
+      if (stepId <= 3) return "completed"
+      if (stepId === 4) return "active"
+      return "upcoming"
+    }
+    if (registrationStatus === "PAYMENT_REJECTED") {
+      if (stepId <= 2) return "completed"
+      if (stepId === 3) return "rejected"
+      return "upcoming"
+    }
+    if (registrationStatus === "ENROLLED") {
+      return "completed"
+    }
+    if (registrationStatus === "REJECTED") {
+      if (stepId === 1) return "completed"
+      if (stepId === 2) return "rejected"
+      return "upcoming"
+    }
+    return "upcoming"
+  }
+
+  const getConnectorClass = (stepId: number) => {
+    const state = getStepState(stepId)
+    if (state === "completed") return "bg-emerald-500"
+    if (state === "rejected") return "bg-red-500"
+    return "bg-white/20"
+  }
+
+
+  const updateRegistrationStatus = async (
+    status: RegistrationStatus,
+    endpoint: string,
+    payload?: Record<string, unknown>
+  ) => {
+    if (!user?.id) {
+      toast.error("يرجى تسجيل الدخول أولًا")
+      return false
+    }
+
+    setIsUpdatingStatus(true)
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          courseId,
+          status,
+          ...payload
+        })
+      })
+
+      if (response.ok) {
+        const payload = await response.json()
+        const nextStatus = (payload?.status as RegistrationStatus) || status
+        setRegistrationStatus(nextStatus)
+        persistRegistrationStatus(nextStatus)
+        return true
+      }
+
+      if (response.status === 401) {
+        toast.error("يرجى تسجيل الدخول أولًا")
+        return false
+      }
+
+      // Fallback to local state for demo flow if API fails.
+      setRegistrationStatus(status)
+      persistRegistrationStatus(status)
+      return true
+    } catch {
+      // Network error fallback for demo flow.
+      setRegistrationStatus(status)
+      persistRegistrationStatus(status)
+      return true
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  const handlePaymentConfirmation = async () => {
+    if (!receiptFile && !receiptInfo.name) {
+      setPaymentError("يرجى رفع سند الدفع قبل التأكيد.")
+      return
+    }
+    setPaymentError("")
+    const success = await updateRegistrationStatus(
+      "PAYMENT_PENDING",
+      "/api/payment-proof"
+    )
+    if (success) {
+      const nextInfo = {
+        name: receiptFile?.name ?? receiptInfo.name,
+        note: receiptInfo.note
+      }
+      setReceiptInfo(nextInfo)
+      persistReceiptInfo(nextInfo)
+      setIsPaymentDialogOpen(false)
+      toast.success("تم رفع سند الدفع وسيتم مراجعته من المدرب.")
+    }
+  }
+
+  const handlePaymentApprovalSimulation = async () => {
+    const success = await updateRegistrationStatus(
+      "ENROLLED",
+      "/api/payment-approve"
+    )
+    if (success) {
+      saveEnrollment()
+      toast.success("تم تأكيد الدفع بنجاح، تم تسجيلك بالدورة 🎉")
+    }
+  }
+
+  const handlePaymentRejectionSimulation = () => {
+    setRegistrationStatus("PAYMENT_REJECTED")
+    persistRegistrationStatus("PAYMENT_REJECTED")
+    toast.error("تم رفض الدفع، يرجى تعديل السند.")
+  }
+
+  const handleTrainerApprovalSimulation = async () => {
+    const success = await updateRegistrationStatus(
+      "APPROVED",
+      "/api/trainer-approve"
+    )
+    if (success) {
+      toast.success("تمت الموافقة المبدئية على التسجيل")
+    }
+  }
+
+  const handleRegister = async () => {
+    if (isEditMode) {
+      const errors: typeof formErrors = {}
+      if (!formData.name.trim()) {
+        errors.name = "الاسم الكامل مطلوب"
+      }
+      if (!formData.email.trim()) {
+        errors.email = "البريد الإلكتروني مطلوب"
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        errors.email = "البريد الإلكتروني غير صالح"
+      }
+      if (!formData.phone.trim()) {
+        errors.phone = "رقم الهاتف مطلوب"
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors)
+        return
+      }
+
+      if (!user?.id) {
+        setFormErrors({ submit: "يرجى تسجيل الدخول أولًا." })
+        return
+      }
+
+      setIsSubmitting(true)
+      setFormErrors({})
+      try {
+        const response = await fetch(`/api/enrollments/${courseId}/me`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            enrollmentId: registrationId,
+            userId: user.id,
+            courseId,
+            fullName: formData.name,
+            email: formData.email,
+            phone: formData.phone
+          })
+        })
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}))
+          setFormErrors({
+            submit: payload?.message || "تعذر تحديث البيانات الآن"
+          })
+          return
+        }
+      } catch {
+        // ignore network error for demo flow
+      } finally {
+        setIsSubmitting(false)
+      }
+
+      persistRegistrationForm(formData)
+      setIsDialogOpen(false)
+      toast.success("تم تحديث بيانات التسجيل المبدئي")
+      return
+    }
+
+    const errors: typeof formErrors = {}
+    if (!formData.name.trim()) {
+      errors.name = "الاسم الكامل مطلوب"
+    }
+    if (!formData.email.trim()) {
+      errors.email = "البريد الإلكتروني مطلوب"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = "البريد الإلكتروني غير صالح"
+    }
+    if (!formData.phone.trim()) {
+      errors.phone = "رقم الهاتف مطلوب"
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      return
+    }
+
+    if (!user?.id) {
+      setFormErrors({ submit: "يرجى تسجيل الدخول لإرسال الطلب." })
+      return
+    }
+
+    setIsSubmitting(true)
+    setFormErrors({})
+    try {
+      const response = await fetch("/api/pre-register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          fullName: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          userId: user?.id
+        })
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        setFormErrors({
+          submit: payload?.message || "تعذر إرسال الطلب الآن"
+        })
+        return
+      }
+
+      const payload = await response.json()
+      const nextStatus = payload?.status || "PENDING_APPROVAL"
+      persistRegistrationForm(formData)
+      setRegistrationStatus(nextStatus)
+      persistRegistrationStatus(nextStatus)
+      setIsDialogOpen(false)
+      toast.success("تم إرسال طلب التسجيل المبدئي", {
+        description: "سيتم التواصل معك لتأكيد الحجز"
+      })
+    } catch (error) {
+      setFormErrors({
+        submit: "حدث خطأ غير متوقع. حاول مرة أخرى."
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const loadStatus = async () => {
+      if (typeof window !== "undefined") {
+        const savedStatus = window.localStorage.getItem(registrationStorageKey)
+        if (savedStatus) {
+          setRegistrationStatus(savedStatus as RegistrationStatus)
+          return
+        }
+      }
+      try {
+        const params = new URLSearchParams()
+        if (user?.id) {
+          params.set("userId", user.id)
+        }
+        params.set("courseId", courseId)
+        const response = await fetch(`/api/enrollment-status?${params.toString()}`, {
+          signal: controller.signal,
+          cache: "no-store"
+        })
+        if (!response.ok) return
+        const payload = await response.json()
+        if (payload?.status) {
+          setRegistrationStatus(payload.status)
+          persistRegistrationStatus(payload.status)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loadStatus()
+    return () => controller.abort()
+  }, [courseId, registrationStorageKey, user?.id])
+
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setIsEditMode(false)
+      setIsLoadingRegistration(false)
+    }
+  }, [isDialogOpen])
+
+  useEffect(() => {
+    if (
+      registrationStatus !== "APPROVED" &&
+      registrationStatus !== "PAYMENT_PENDING" &&
+      registrationStatus !== "PAYMENT_REJECTED"
+    ) {
+      setReceiptFile(null)
+      setPaymentError("")
+    }
+  }, [registrationStatus])
+
+  useEffect(() => {
+    if (!isPaymentDialogOpen) return
+    const stored = readReceiptInfo()
+    if (stored) {
+      setReceiptInfo({
+        name: stored?.name ?? "",
+        note: stored?.note ?? ""
+      })
+    } else {
+      setReceiptInfo({ name: "", note: "" })
+    }
+    if (!expandedBankId && bankAccounts.length) {
+      setExpandedBankId(bankAccounts[0].id)
+    }
+  }, [bankAccounts, expandedBankId, isPaymentDialogOpen])
+
+  useEffect(() => {
+    const syncFavorite = () => {
+      const favorites = readFavorites()
+      setIsFavorite(favorites.includes(course.id))
+    }
+
+    syncFavorite()
+    if (typeof window === "undefined") return
+
+    const handleUpdate = () => syncFavorite()
+    window.addEventListener("favorites-updated", handleUpdate)
+    window.addEventListener("storage", handleUpdate)
+    return () => {
+      window.removeEventListener("favorites-updated", handleUpdate)
+      window.removeEventListener("storage", handleUpdate)
+    }
+  }, [course.id])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
+    if (reduceMotion.matches) return
+
+    const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"))
+    if (!elements.length) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-revealed")
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.15 }
+    )
+
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [])
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 pb-12 font-sans">
-      {/* 1. Hero Section (Header) */}
-      <div className="bg-slate-900 text-white py-10">
-        <div className="container mx-auto px-4">
-            <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left Content (Course Info) */}
-                <div className="lg:w-2/3 space-y-4">
-                    {/* Breadcrumbs */}
-                    <div className="flex items-center text-sm text-slate-400 gap-2 mb-4">
-                        <span className="cursor-pointer hover:text-white transition">الرئيسية</span> <span className="text-slate-600">/</span>
-                        <span className="cursor-pointer hover:text-white transition">البرمجة</span> <span className="text-slate-600">/</span>
-                        <span className="text-white font-medium">{courseData.title}</span>
-                    </div>
-                    
-                    <h1 className="text-3xl md:text-4xl font-bold leading-tight">{courseData.title}</h1>
-                    <p className="text-lg text-slate-300 line-clamp-2">{courseData.subtitle}</p>
-                    
-                    <div className="flex items-center gap-4 text-sm flex-wrap">
-                        <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full font-bold text-xs">الأكثر مبيعاً</div>
-                        
-                        <div className="flex items-center gap-1 text-slate-300">
-                             <Users className="w-4 h-4" /> <span>{courseData.studentsCount} طالب</span>
-                        </div>
-                    </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="relative overflow-hidden bg-gradient-to-l from-blue-950 via-blue-900 to-slate-900 text-white">
+        <div className="container mx-auto px-4 pt-6 pb-16">
+          <div className="flex items-center gap-3 mb-6">
+            <Button
+              variant="secondary"
+              size="sm"
+              asChild
+              className="rounded-full transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950"
+            >
+              <Link href="/student/explore">
+                <ArrowLeft className="ml-2 h-4 w-4" />
+                العودة للاستكشاف
+              </Link>
+            </Button>
+            <Badge className="bg-white/10 text-white border border-white/20">
+              {course.category}
+            </Badge>
+          </div>
 
-                    <div className="flex items-center gap-6 text-sm pt-4 border-t border-slate-800/50 mt-4 text-slate-300">
-                        <div className="flex items-center gap-2">
-                             <img src={courseData.instructor.image} className="w-8 h-8 rounded-full border border-slate-600" alt={courseData.instructor.name} />
-                             <span className="text-slate-400">تم الإنشاء بواسطة:</span>
-                             <a href="#" className="text-blue-400 hover:text-blue-300 transition font-medium">{courseData.instructor.name}</a>
-                        </div>
-
-                    </div>
+          <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr] items-start">
+            <div className="flex flex-col gap-4 text-right">
+              <h1 className="text-3xl md:text-4xl font-bold leading-tight motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300">
+                {course.title}
+              </h1>
+              <p className="text-lg text-blue-100 leading-relaxed motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:delay-100">
+                {course.shortDescription}
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-blue-200">سعر الدورة</span>
+                <span className="text-2xl font-bold">{formatYER(course.price)}</span>
+              </div>
+              <div className="grid gap-3 text-sm text-blue-100 sm:grid-cols-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {formatDate(course.startDate)} - {formatDate(course.endDate)}
+                  </span>
                 </div>
+                {(course.startTime || course.endTime) && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {course.startTime ?? ""} {course.endTime ? `- ${course.endTime}` : ""}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span>المقاعد المتاحة: {course.maxStudents}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {course.deliveryType === "online" ? <Globe className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                  <span>{deliveryLabels[course.deliveryType]}</span>
+                </div>
+                {course.onlinePlatform && (
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <span>المنصة: {course.onlinePlatform}</span>
+                  </div>
+                )}
+                {course.hall && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    <span>{course.hall.name}</span>
+                  </div>
+                )}
+              </div>
+              {(course.meetingLink ||
+                registrationStatus === "PAYMENT_PENDING" ||
+                registrationStatus === "PENDING_APPROVAL" ||
+                registrationStatus === "PAYMENT_REJECTED") && (
+                <div className="flex flex-wrap items-center gap-4">
+                  {course.meetingLink && (
+                    <a
+                      href={course.meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-200 underline underline-offset-4 self-start"
+                    >
+                      رابط الاجتماع
+                    </a>
+                  )}
+                  {registrationStatus === "PENDING_APPROVAL" && (
+                    <button
+                      type="button"
+                      onClick={handleTrainerApprovalSimulation}
+                      disabled={isUpdatingStatus}
+                      className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
+                    >
+                      محاكاة الموافقة المبدئية
+                    </button>
+                  )}
+                  {registrationStatus === "PAYMENT_PENDING" && (
+                    <button
+                      type="button"
+                      onClick={handlePaymentApprovalSimulation}
+                      disabled={isUpdatingStatus}
+                      className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
+                    >
+                      محاكاة تأكيد الدفع
+                    </button>
+                  )}
+                  {registrationStatus === "PAYMENT_PENDING" && (
+                    <button
+                      type="button"
+                      onClick={handlePaymentRejectionSimulation}
+                      className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white"
+                    >
+                      محاكاة رفض الدفع
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {course.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="bg-white/10 text-white border border-white/10 transition-all duration-150 hover:bg-white/15 hover:-translate-y-0.5"
+                  >
+                    <Tag className="ml-1 h-3 w-3" />
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              {registrationStatus === "NONE" && (
+                <Button
+                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
+                  onClick={() => openRegistrationDialog("create")}
+                >
+                  التسجيل
+                </Button>
+              )}
+              {registrationStatus === "PENDING_APPROVAL" && (
+                <Button
+                  variant="outline"
+                  disabled
+                  className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                >
+                  تم التسجيل مبدئيًا
+                </Button>
+              )}
+              {registrationStatus === "REJECTED" && (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-full border-white/60 bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                  onClick={() => openRegistrationDialog("edit")}
+                >
+                  تعديل التسجيل المبدئي
+                </Button>
+              )}
+              {registrationStatus === "APPROVED" && (
+                <Button
+                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                  onClick={() => setIsPaymentDialogOpen(true)}
+                >
+                  تأكيد الدفع
+                </Button>
+              )}
+              {registrationStatus === "PAYMENT_PENDING" && (
+                <Button
+                  variant="outline"
+                  disabled
+                  className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                >
+                  تم إرسال الدفع
+                </Button>
+              )}
+              {registrationStatus === "PAYMENT_REJECTED" && (
+                <Button
+                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                  onClick={() => setIsPaymentDialogOpen(true)}
+                >
+                  تعديل سند الدفع
+                </Button>
+              )}
+              {registrationStatus === "ENROLLED" && (
+                <Button
+                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                  onClick={() => {
+                    saveEnrollment()
+                    router.push(`/student/courses/${courseId}`)
+                  }}
+                >
+                  الانتقال إلى الدورة
+                </Button>
+              )}
+                <DialogContent
+                  dir="rtl"
+                  className="[&>button[data-dialog-close='default']]:hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4"
+                >
+                  <DialogClose className="absolute left-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">إغلاق</span>
+                  </DialogClose>
+                  <DialogHeader className="space-y-3 text-right sm:text-right">
+                    <DialogTitle>
+                      {isEditMode ? "تعديل التسجيل المبدئي" : "التسجيل المبدئي"}
+                    </DialogTitle>
+                    <DialogDescription className="text-right">
+                      {isEditMode
+                        ? "حدّث بيانات التسجيل المبدئي قبل إكمال الخطوات."
+                        : "أدخل بياناتك للتواصل وتأكيد التسجيل المبدئي."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  {formErrors.submit && (
+                    <p className="text-sm text-red-500 text-right">{formErrors.submit}</p>
+                  )}
+                  {isLoadingRegistration ? (
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-2">
+                        <div className="h-4 w-24 rounded bg-slate-200/60" />
+                        <div className="h-10 w-full rounded-lg bg-slate-200/60 animate-pulse" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 w-28 rounded bg-slate-200/60" />
+                        <div className="h-10 w-full rounded-lg bg-slate-200/60 animate-pulse" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 w-24 rounded bg-slate-200/60" />
+                        <div className="h-10 w-full rounded-lg bg-slate-200/60 animate-pulse" />
+                      </div>
+                    </div>
+                  ) : (
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">الاسم الكامل</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="اكتب اسمك"
+                      />
+                      {formErrors.name && (
+                        <p className="text-xs text-red-500 text-right">{formErrors.name}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">البريد الإلكتروني</Label>
+                      <Input
+                        id="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="name@email.com"
+                      />
+                      {formErrors.email && (
+                        <p className="text-xs text-red-500 text-right">{formErrors.email}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">رقم الهاتف</Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        placeholder="05xxxxxxxx"
+                      />
+                      {formErrors.phone && (
+                        <p className="text-xs text-red-500 text-right">{formErrors.phone}</p>
+                      )}
+                    </div>
+                    {shouldShowSurvey && (
+                      <div className="space-y-2">
+                        <Label>الاستبيان (اختياري)</Label>
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3">
+                          <p className="text-sm text-slate-600">
+                          الاستبيان اختياري، لكنه يساعدنا في تحسين تجربتك التعليمية.
+                          </p>
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-full px-4"
+                          >
+                            <a href={course.surveyLink} target="_blank" rel="noopener noreferrer">
+                              فتح الاستبيان
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  )}
+                  <DialogFooter>
+                    <Button
+                      onClick={handleRegister}
+                      disabled={isLoadingRegistration || isSubmitting}
+                      className="w-full transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2"
+                    >
+                      {isSubmitting
+                        ? "جارٍ الإرسال..."
+                        : isEditMode
+                          ? "حفظ التعديلات"
+                          : "تأكيد التسجيل"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {registrationStatus === "PENDING_APPROVAL" && (
+                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-right text-sm text-white/90 shadow-[0_8px_20px_rgba(15,23,42,0.18)] backdrop-blur">
+                  <p className="font-semibold">طلبك قيد المراجعة</p>
+                  <p className="mt-1 text-xs text-white/70">
+                    سيتم إشعارك عند اعتماد التسجيل من المدرب.
+                  </p>
+                </div>
+              )}
+              {registrationStatus === "PAYMENT_PENDING" && (
+                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-right text-sm text-white/90 shadow-[0_8px_20px_rgba(15,23,42,0.18)] backdrop-blur">
+                  <p className="font-semibold">تم إرسال سند الدفع</p>
+                  <p className="mt-1 text-xs text-white/70">
+                    جاري مراجعة الدفع من المدرب. سيتم إشعارك بعد التأكيد.
+                  </p>
+                </div>
+              )}
+              {registrationStatus === "PAYMENT_REJECTED" && (
+                <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-right text-sm text-white/90 shadow-[0_8px_20px_rgba(15,23,42,0.18)] backdrop-blur">
+                  <p className="font-semibold text-red-200">تم رفض الدفع</p>
+                  <p className="mt-1 text-xs text-red-100/80">
+                    يرجى تعديل سند الدفع وإعادة الإرسال.
+                  </p>
+                </div>
+              )}
+
+              {registrationStatus !== "NONE" && (
+                <div
+                  key={registrationStatus}
+                  dir="rtl"
+                  className={`mt-4 rounded-2xl border p-4 text-right text-sm backdrop-blur animate-stepper-reveal ${
+                    registrationStatus === "PENDING_APPROVAL"
+                      ? "border-white/10 bg-white/5 text-white/70 shadow-none opacity-75"
+                      : "border-white/15 bg-white/10 text-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
+                  }`}
+                >
+                  <div className="relative flex flex-nowrap items-start gap-0 overflow-x-auto pb-1">
+                    {steps.map((step, index) => {
+                      const state = getStepState(step.id)
+                      const isLast = index === steps.length - 1
+                      const circleClass =
+                        state === "completed"
+                          ? "bg-emerald-500 text-white"
+                          : state === "active"
+                            ? "bg-blue-500 text-white ring-4 ring-blue-400/30"
+                            : state === "rejected"
+                              ? "bg-red-500 text-white"
+                              : "border border-white/30 bg-slate-900/80 text-white/70"
+
+                      return (
+                        <Fragment key={step.id}>
+                          <div className="relative z-10 flex min-w-[88px] flex-col items-center text-center">
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all duration-300 ease-in-out ${circleClass} ${
+                                state === "active" ? "animate-stepper-pop" : ""
+                              }`}
+                            >
+                              {state === "completed" && <Check className="h-4 w-4" />}
+                              {state === "rejected" && <X className="h-4 w-4" />}
+                              {state !== "completed" && state !== "rejected" && step.id}
+                            </div>
+                            <span className="mt-2 text-xs font-medium text-white/90">
+                              {step.label}
+                            </span>
+                          </div>
+                          {!isLast && (
+                            <div className="relative z-0 flex-1 -mx-5">
+                              <div
+                                className={`pointer-events-none absolute top-5 h-1 w-full -translate-y-1/2 rounded-full transition-colors duration-300 ${getConnectorClass(step.id)}`}
+                                aria-hidden="true"
+                              />
+                            </div>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </div>
+
+                </div>
+              )}
             </div>
+
+            <div className="relative -mt-4 aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-white/5 shadow-lg animate-image-reveal">
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                aria-label="إضافة إلى المفضلة"
+                aria-pressed={isFavorite}
+                className={`absolute left-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 text-slate-200 backdrop-blur transition-all duration-200 hover:scale-105 hover:text-white ${
+                  isFavorite ? "text-red-500 hover:text-red-500" : ""
+                }`}
+              >
+                <Heart
+                  className={`h-5 w-5 transition-all duration-200 ${
+                    isFavorite ? "fill-current scale-110" : ""
+                  }`}
+                />
+              </button>
+              <Image
+                src={course.image}
+                alt={course.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 360px, 420px"
+              />
+            </div>
+          </div>
         </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-slate-50" />
       </div>
 
-      {/* 2. Main Grid Layout */}
-      <div className="container mx-auto px-4 mt-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative">
-            
-            {/* Left Column (Content) - 8 Cols */}
-            <div className="lg:col-span-8 order-2 lg:order-1 space-y-10">
-                
-                {/* Objectives (What you'll learn) */}
-                <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-slate-900 shadow-sm">
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        <CheckCircle className="w-6 h-6 text-green-600" />
-                        ماذا ستتعلم في هذه الدورة؟
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
-                        {courseData.objectives.map((obj, i) => (
-                            <div key={i} className="flex gap-3 items-start p-2 rounded hover:bg-gray-50 dark:hover:bg-slate-800 transition">
-                                <Check className="w-4 h-4 text-gray-800 dark:text-gray-200 shrink-0 mt-1" />
-                                <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{obj}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Course Content (Curriculum) */}
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        <FileText className="w-6 h-6 text-blue-600" />
-                        محتوى الدورة
-                    </h2>
-                    <div className="flex items-center justify-between text-sm text-gray-500 mb-2 px-1">
-                        <span>{courseData.curriculum.length} أقسام • {courseData.curriculum.reduce((acc, curr) => acc + curr.lessons.length, 0)} درس • إجمالي 5 ساعات</span>
-                        <button className="text-blue-600 font-medium hover:underline">توسيع الكل</button>
-                    </div>
-
-                    <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden divide-y divide-gray-200 dark:divide-gray-800 shadow-sm bg-white dark:bg-slate-900">
-                        {courseData.curriculum.map((section, idx) => (
-                             <details key={idx} className="group" open={idx === 0}>
-                                <summary className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-950 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-900 transition select-none">
-                                    <div className="flex items-center gap-3 font-medium text-gray-900 dark:text-gray-100">
-                                        <div className="w-4 h-4 flex items-center justify-center transition-transform group-open:rotate-180">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m6 9 6 6 6-6"/></svg>
-                                        </div>
-                                        <span>{section.title}</span>
-                                    </div>
-                                    <span className="text-xs text-gray-500">{section.lessons.length} دروس • {section.duration}</span>
-                                </summary>
-                                <div className="bg-white dark:bg-slate-900 p-0 border-t border-gray-100 dark:border-slate-800">
-                                    {section.lessons.map((lesson, lIdx) => (
-                                        <div key={lIdx} className="flex items-center justify-between p-3 pl-8 hover:bg-slate-50 dark:hover:bg-slate-800 transition group/lesson cursor-pointer">
-                                            <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                                                {lesson.type === 'video' ? <PlayCircle className="w-4 h-4 text-gray-400 group-hover/lesson:text-blue-600" /> : <FileText className="w-4 h-4 text-gray-400 group-hover/lesson:text-blue-600" />}
-                                                <span className="group-hover/lesson:text-blue-600 transition">{lesson.title}</span>
-                                                {/* <span className="text-[10px] text-blue-600 border border-blue-200 bg-blue-50 px-1 rounded hidden group-hover/lesson:inline-block">معاينة</span> */}
-                                            </div>
-                                            <span className="text-xs text-gray-400">{lesson.duration}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                             </details>
-                        ))}
-                    </div>
-                </div>
-
-                 {/* Requirements */}
-                 <div className="space-y-4">
-                    <h2 className="text-xl font-bold">المتطلبات</h2>
-                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 ml-4 marker:text-blue-500">
-                        {courseData.prerequisites.map((req, i) => (
-                            <li key={i} className="pl-2">{req}</li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold">الوصف</h2>
-                    <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line text-sm leading-relaxed">
-                        {courseData.description}
-                    </div>
-                </div>
-
-                {/* Instructor */}
-                <div className="space-y-6 pt-6 border-t border-gray-100">
-                    <h2 className="text-xl font-bold">المدرب</h2>
-                    <div>
-                        <div className="flex items-start gap-4 mb-4">
-                            <img src={courseData.instructor.image} alt={courseData.instructor.name} className="w-20 h-20 rounded-full object-cover border-4 border-gray-100 shadow-sm" />
-                            <div>
-                                <h3 className="text-lg font-bold text-blue-600 underline cursor-pointer hover:text-blue-800">{courseData.instructor.name}</h3>
-                                <p className="text-gray-500 text-sm mb-3 font-medium">{courseData.instructor.title}</p>
-                                <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
-                                    <div className="flex items-center gap-1"><User className="w-4 h-4 text-gray-400" /> {courseData.instructor.studentsCount} طالب</div>
-                                    <div className="flex items-center gap-1"><PlayCircle className="w-4 h-4 text-gray-400" /> {courseData.instructor.coursesCount} دورات</div>
-                                </div>
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100">{courseData.instructor.bio}</p>
-                    </div>
-                </div>
+      <div className="container mx-auto px-4 py-10">
+        <Card
+          dir="rtl"
+          className="mb-6 w-full rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
+          data-reveal
+          style={{ "--reveal-delay": "0ms" } as CSSProperties}
+        >
+          <div className="text-right space-y-4">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              معلومات المدرب
+            </h3>
+            <div className="flex items-start gap-4">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200">
+                <Image
+                  src={course.instructor.avatar}
+                  alt={course.instructor.name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-lg font-bold text-slate-900">
+                  {course.instructor.name}
+                </h4>
+                <p className="text-sm text-slate-600">{course.instructor.title}</p>
+                <p className="text-sm text-slate-500 line-clamp-2 max-w-[560px]">
+                  {course.instructor.bio}
+                </p>
+              </div>
             </div>
+          </div>
+        </Card>
 
-            {/* Right Column (Sticky Sidebar) - 4 Cols */}
-            <div className="lg:col-span-4 order-1 lg:order-2 relative">
-                <div className="sticky top-24 space-y-6">
-                    {/* The Buy Card */}
-                    <Card className="overflow-hidden border-0 shadow-xl ring-1 ring-gray-200 dark:ring-gray-800 rounded-xl">
-                         {/* Video Placeholder */}
-                        <div className="relative h-56 bg-slate-900 group cursor-pointer flex items-center justify-center overflow-hidden">
-                            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition duration-500" />
-                             <img src="/images/course-web.png" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition duration-700" alt="Preview"/>
-                             <div className="relative z-10 w-16 h-16 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition duration-300">
-                                <PlayCircle className="w-8 h-8 text-black ml-1 fill-black/10" />
-                             </div>
-                             <div className="absolute bottom-4 text-white font-bold text-sm bg-black/50 px-3 py-1 rounded backdrop-blur-sm">معاينة هذه الدورة</div>
-                        </div>
-                        
-                        <CardContent className="p-6 space-y-6">
-                            <div className="text-center md:text-start border-b border-gray-100 pb-4">
-                                <div className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1">{courseData.price.toLocaleString()} <span className="text-lg font-normal text-gray-500">ريال</span></div>
-                                <div className="text-sm text-gray-400 line-through">45,000 ريال</div>
-                            </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+            <Card
+              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+              data-reveal
+              style={{ "--reveal-delay": "0ms" } as CSSProperties}
+            >
+              <CardHeader>
+                <CardTitle>عن الدورة</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm leading-7 text-slate-700">
+                {course.description}
+              </CardContent>
+            </Card>
 
-                             {/* Enrollment Logic / Progress Tracker */}
-                            {enrollmentStatus !== 'none' && enrollmentStatus !== 'cancelled' ? (
-                                <div className="space-y-5 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                    {/* 4-Step Progress Stepper */}
-                                    <div className="mb-6">
-                                        <div className="flex items-center justify-between relative">
-                                            {/* Connecting Line */}
-                                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-200 -z-10 -translate-y-1/2" />
-                                            
-                                            {steps.map((step, idx) => {
-                                                const isCompleted = idx < currentStepIndex
-                                                const isCurrent = idx === currentStepIndex
-                                                
-                                                return (
-                                                    <div key={idx} className="flex flex-col items-center gap-2 bg-white px-2">
-                                                        <div className={cn(
-                                                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all border-2",
-                                                            isCompleted ? "bg-green-600 border-green-600 text-white" :
-                                                            isCurrent ? "bg-blue-600 border-blue-600 text-white ring-4 ring-blue-50" :
-                                                            "bg-white border-gray-300 text-gray-400"
-                                                        )}>
-                                                            {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
-                                                        </div>
-                                                        <span className={cn(
-                                                            "text-[10px] whitespace-nowrap font-medium",
-                                                            isCurrent ? "text-blue-600" : 
-                                                            isCompleted ? "text-green-600" : "text-gray-400"
-                                                        )}>
-                                                            {step.label}
-                                                        </span>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
+            <Card
+              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+              data-reveal
+              style={{ "--reveal-delay": "100ms" } as CSSProperties}
+            >
+              <CardHeader>
+                <CardTitle>أهداف الدورة</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 text-sm">
+                {course.objectives.map((item) => (
+                  <div key={item} className="flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blue-600" />
+                    <span className="text-slate-700">{item}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-                                    {/* Status Text & Actions */}
-                                    <div className="space-y-4">
-                                        
-                                        {enrollmentStatus === 'preliminary' && (
-                                            <div className="text-center py-6 bg-blue-50 rounded-xl border border-blue-100">
-                                                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                                    <Clock className="w-6 h-6 animate-pulse" />
-                                                </div>
-                                                <h3 className="font-bold text-gray-900 mb-1">طلبك قيد المراجعة</h3>
-                                                <p className="text-sm text-gray-600">بانتظار موافقة المدرب على طلب انضمامك</p>
-                                                
-                                                {/* Debug Button kept for flow testing */}
-                                                <button onClick={DEBUG_simulateTrainerApproval} className="text-xs text-blue-400 underline mt-4 hover:text-blue-600">
-                                                    (Test: قبول الطلب)
-                                                </button>
-                                            </div>
-                                        )}
+            <Card
+              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+              data-reveal
+              style={{ "--reveal-delay": "200ms" } as CSSProperties}
+            >
+              <CardHeader>
+                <CardTitle>المتطلبات</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {course.prerequisites.map((item) => (
+                  <div key={item} className="flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+                    <span className="text-slate-700">{item}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-                                     {enrollmentStatus === 'pending_payment' && (
-                                       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button className="w-full bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200 h-12 text-base font-bold">
-                                                    إتمام الدفع واستلام الدورة
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>إتمام عملية الدفع</DialogTitle>
-                                                    <DialogDescription>اختر وسيلة الدفع المناسبة.</DialogDescription>
-                                                </DialogHeader>
-                                                <Tabs defaultValue="card" className="w-full">
-                                                    <TabsList className="grid w-full grid-cols-2">
-                                                        <TabsTrigger value="card">دفع إلكتروني</TabsTrigger>
-                                                        <TabsTrigger value="receipt">إرفاق صورة السند</TabsTrigger>
-                                                    </TabsList>
-                                                    <TabsContent value="card">
-                                                        <div className="space-y-4 py-4">
-                                                            <div className="space-y-2">
-                                                                <Label htmlFor="card-number">رقم البطاقة</Label>
-                                                                <Input id="card-number" placeholder="0000 0000 0000 0000" />
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div className="space-y-2">
-                                                                    <Label htmlFor="expiry">تاريخ الانتهاء</Label>
-                                                                    <Input id="expiry" placeholder="MM/YY" />
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Label htmlFor="cvv">CVV</Label>
-                                                                    <Input id="cvv" placeholder="123" />
-                                                                </div>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <Label htmlFor="name">الاسم على البطاقة</Label>
-                                                                <Input id="name" placeholder="الاسم بالكامل" />
-                                                            </div>
-                                                            <Button onClick={handlePayment} className="w-full bg-blue-600 hover:bg-blue-700">ادفع الآن</Button>
-                                                        </div>
-                                                    </TabsContent>
-                                                    <TabsContent value="receipt">
-                                                        <div className="space-y-4 py-4">
-                                                            <div className="bg-muted p-4 rounded text-sm border"><p className="font-mono">حساب الراجحي: SA00000000</p></div>
-                                                            <Label>رفع الإيصال</Label>
-                                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-50">
-                                                                <Upload className="w-8 h-8 mb-2" />
-                                                                <span className="text-xs">اضغط لرفع الصورة</span>
-                                                                <Input type="file" className="hidden" />
-                                                            </div>
-                                                            <Button onClick={handlePayment} className="w-full">تأكيد الطلب</Button>
-                                                        </div>
-                                                    </TabsContent>
-                                                </Tabs>
-                                            </DialogContent>
-                                       </Dialog>
-                                    )}
+            <Card
+              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+              data-reveal
+              style={{ "--reveal-delay": "300ms" } as CSSProperties}
+            >
+              <CardHeader>
+                <CardTitle>الجدول الزمني</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {course.schedule.map((item, index) => (
+                  <div key={`${item.date}-${index}`} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Calendar className="h-4 w-4 text-blue-600" />
+                      <span>{formatDate(item.date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Clock className="h-4 w-4" />
+                      <span>{item.startTime} - {item.endTime}</span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+        </div>
 
-                                    {enrollmentStatus === 'active' && (
-                                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 text-center space-y-4">
-                                            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                                                <CheckCircle className="w-8 h-8" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-lg text-emerald-900">أنت مسجل في هذه الدورة</h3>
-                                                <p className="text-emerald-700 text-sm mt-1">يمكنك الوصول لجميع محتويات الدورة الآن</p>
-                                            </div>
-                                            <Button asChild className="w-full h-11 text-base font-bold bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200">
-                                                <Link href={`/student/courses/${courseId}`}>
-                                                    الذهاب لمحتوى الدورة
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    )}
+      </div>
 
-                                </div>
-                                </div>
-
-                            ) : (
-                                <Dialog open={isRegDialogOpen} onOpenChange={setIsRegDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button size="lg" className="w-full font-bold text-lg h-12 bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all hover:scale-[1.02]">
-                                            سجل الآن
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>التسجيل المبدئي في الدورة</DialogTitle>
-                                            <DialogDescription>
-                                                الخطوة الأولى: يرجى تأكيد بياناتك لإرسال طلب الانضمام للمدرب.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="name">الاسم الكامل</Label>
-                                                <Input id="name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="email">البريد الإلكتروني</Label>
-                                                <Input id="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="phone">رقم الهاتف</Label>
-                                                <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button onClick={handlePreliminaryRegister} className="w-full">تأكيد التسجيل المبدئي</Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent
+          dir="rtl"
+          className="max-w-3xl [&>button[data-dialog-close='default']]:hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4"
+        >
+          <DialogClose className="absolute left-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">
+            <X className="h-4 w-4" />
+            <span className="sr-only">إغلاق</span>
+          </DialogClose>
+          <DialogHeader className="space-y-2 text-right">
+            <DialogTitle className="text-right">
+              {registrationStatus === "PAYMENT_REJECTED" ? "تعديل سند الدفع" : "تأكيد الدفع"}
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              يرجى تحويل المبلغ وإرفاق سند الدفع لإكمال الخطوة.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 pt-4 lg:grid-cols-2">
+            <div className="order-2 space-y-4 text-right lg:order-1">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-semibold text-slate-900">رفع سند الدفع</h4>
+                  <span className="text-xs text-slate-500">صور أو PDF</span>
+                </div>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setIsDraggingFile(true)
+                  }}
+                  onDragLeave={() => setIsDraggingFile(false)}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    setIsDraggingFile(false)
+                    const file = event.dataTransfer.files?.[0] ?? null
+                    handleReceiptFile(file)
+                  }}
+                  onClick={() => paymentFileRef.current?.click()}
+                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${
+                    isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
+                  }`}
+                >
+                  <UploadCloud className="h-6 w-6 text-blue-600" />
+                  <span className="font-medium text-slate-700">اسحب الملف هنا</span>
+                  <span className="text-xs text-slate-500">أو اختر ملفًا من جهازك</span>
+                  <Button type="button" size="sm" className="rounded-full">
+                    اختيار ملف
+                  </Button>
+                  <Input
+                    ref={paymentFileRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      handleReceiptFile(file)
+                    }}
+                  />
+                </div>
+                {(receiptFile?.name || receiptInfo.name) && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600">
+                    <div className="flex items-start gap-2">
+                      <FileText className="mt-0.5 h-4 w-4 text-slate-500" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900">
+                          {receiptFile?.name ?? receiptInfo.name}
+                        </p>
+                        {receiptFile && (
+                          <p className="text-[11px] text-slate-500">
+                            {receiptFile.type || "ملف"} · {formatFileSize(receiptFile.size)}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setReceiptFile(null)
+                          setReceiptInfo((prev) => ({ ...prev, name: "" }))
+                        }}
+                        className="h-7 rounded-full px-3 text-xs"
+                      >
+                        إزالة الملف
+                      </Button>
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => paymentFileRef.current?.click()}
+                        className="h-7 rounded-full px-3 text-xs"
+                      >
+                        تغيير الملف
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {!receiptFile?.name && !receiptInfo.name && (
+                  <p className="mt-3 text-xs text-slate-500">
+                    ارفع سند الدفع أولاً حتى تتمكن من التأكيد.
+                  </p>
+                )}
+                {paymentError && <p className="mt-2 text-xs text-red-500">{paymentError}</p>}
+              </div>
+            </div>
+            <div className="order-1 space-y-4 text-right lg:order-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-semibold text-slate-900">الحسابات البنكية</h4>
+                  <span className="text-xs text-slate-500">اختر بنكًا لعرض التفاصيل</span>
+                </div>
+                <div className="mt-4 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                  {bankAccounts.map((bank) => {
+                    const isOpen = expandedBankId === bank.id
+                    const hasIban = Boolean(bank.iban)
+                    const hasAccountNumber = Boolean(bank.accountNumber)
+                    return (
+                      <div key={bank.id} className="rounded-xl border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedBankId((prev) => (prev === bank.id ? null : bank.id))
+                          }
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right"
+                          aria-expanded={isOpen}
+                        >
+                          <span className="text-sm font-semibold text-slate-900">
+                            {bank.bankName}
+                          </span>
+                          <ChevronDown
+                            className={`h-4 w-4 text-slate-400 transition-transform ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {isOpen && (
+                          <div className="border-t border-slate-200 px-4 py-3 text-right text-sm">
+                            <p className="text-xs text-slate-500">
+                              اسم المستفيد: {bank.beneficiary}
+                            </p>
+                            {hasIban && (
+                              <div className="mt-3 space-y-2">
+                                <p className="text-xs text-slate-500">رقم IBAN</p>
+                                <p className="font-mono text-sm font-semibold text-slate-900">
+                                  {bank.iban}
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCopyValue(bank.iban, "رقم الآيبان")}
+                                  className="h-7 rounded-full px-3 text-xs"
+                                >
+                                  نسخ IBAN
+                                </Button>
+                              </div>
                             )}
-                            
-                            <div className="space-y-3 pt-2 text-sm text-gray-600 dark:text-gray-400">
-                                <h4 className="font-bold text-gray-900 dark:text-gray-100">هذه الدورة تتضمن:</h4>
-                                <div className="flex items-center gap-3"><PlayCircle className="w-4 h-4 text-gray-400" /> 40 ساعة فيديو حسب الطلب</div>
-                                <div className="flex items-center gap-3"><FileText className="w-4 h-4 text-gray-400" /> 3 مقالات</div>
-                                <div className="flex items-center gap-3"><Upload className="w-4 h-4 text-gray-400" /> 5 مصادر قابلة للتحميل</div>
-                                <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-gray-400" /> الوصول على الهاتف والتلفاز</div>
-                                <div className="flex items-center gap-3"><Award className="w-4 h-4 text-gray-400" /> شهادة إتمام</div>
-                            </div>
-                            
-
-                        </CardContent>
-                    </Card>
+                            {!hasIban && hasAccountNumber && (
+                              <div className="mt-3 space-y-2">
+                                <p className="text-xs text-slate-500">رقم الحساب</p>
+                                <p className="font-mono text-sm font-semibold text-slate-900">
+                                  {bank.accountNumber}
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleCopyValue(bank.accountNumber ?? "", "رقم الحساب")
+                                  }
+                                  className="h-7 rounded-full px-3 text-xs"
+                                >
+                                  نسخ رقم الحساب
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
+              </div>
             </div>
+          </div>
+          <DialogFooter className="mt-2">
+            <Button
+              onClick={handlePaymentConfirmation}
+              disabled={isUpdatingStatus || (!receiptFile?.name && !receiptInfo.name)}
+              className="w-full"
+            >
+              تأكيد الدفع
+            </Button>
+            {!receiptFile?.name && !receiptInfo.name && (
+              <p className="mt-2 text-xs text-red-500 text-right">
+                ارفع السند أولاً لتفعيل زر التأكيد.
+              </p>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        </div>
-      </div>
+      <style jsx global>{`
+        @keyframes cta-pop {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
+        }
+
+        @keyframes image-reveal {
+          0% { opacity: 0; transform: scale(0.98); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+
+        .animate-cta-pop {
+          animation: cta-pop 260ms ease-out 1;
+        }
+
+        .animate-image-reveal {
+          animation: image-reveal 320ms ease-out 1;
+        }
+
+        .reveal-card {
+          opacity: 0;
+          transform: translateY(12px);
+          transition: opacity 260ms ease, transform 260ms ease, box-shadow 200ms ease;
+          transition-delay: var(--reveal-delay, 0ms);
+        }
+
+        .reveal-card.is-revealed {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        @keyframes stepper-reveal {
+          0% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-stepper-reveal {
+          animation: stepper-reveal 320ms ease-out 1;
+        }
+
+        @keyframes stepper-pop {
+          0% { transform: scale(1); }
+          60% { transform: scale(1.06); }
+          100% { transform: scale(1); }
+        }
+
+        .animate-stepper-pop {
+          animation: stepper-pop 320ms ease-in-out 1;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .reveal-card {
+            opacity: 1;
+            transform: none;
+            transition: none;
+          }
+          .animate-cta-pop,
+          .animate-image-reveal {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   )
 }

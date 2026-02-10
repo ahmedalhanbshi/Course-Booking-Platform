@@ -188,37 +188,33 @@ export default function TrainerStudentsPage() {
       </div>
 
       {/* Filters and Search */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="البحث في الطلاب..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pr-10"
-              />
-            </div>
-
-            <Select value={courseFilter} onValueChange={setCourseFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="الدورة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الدورات</SelectItem>
-                {courses.map(course => (
-                  <SelectItem key={course} value={course}>
-                    {course}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center justify-start gap-3 text-right border-b border-slate-100 pb-2">
+          <div className="relative flex-1 min-w-[260px] max-w-[520px]">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="البحث في الطلاب..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-11 rounded-full bg-white pr-4 pl-10 text-sm text-right"
+            />
           </div>
-        </CardContent>
-      </Card>
+
+          <Select value={courseFilter} onValueChange={setCourseFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="الدورة" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">جميع الدورات</SelectItem>
+              {courses.map(course => (
+                <SelectItem key={course} value={course}>
+                  {course}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* Students Table */}
       <Card>

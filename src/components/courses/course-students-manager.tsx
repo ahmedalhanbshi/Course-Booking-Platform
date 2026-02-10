@@ -480,7 +480,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
         <CardHeader>
           <CardTitle>قائمة الطلاب المسجّلين</CardTitle>
           <CardDescription>
-            جميع الطلاب المسجّلين في الدورة مع حالة التسجيل
+            جميع الطلاب المسجّلين في الدورة
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -498,8 +498,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                 </TableHead>
                 <TableHead>الطالب</TableHead>
                 <TableHead>تاريخ التسجيل</TableHead>
-                <TableHead>حالة التسجيل</TableHead>
-                <TableHead>الشهادة</TableHead>
                 <TableHead>الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
@@ -529,25 +527,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                   <TableCell>
                     {formatDate(enrollment.enrolledAt)}
                   </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(enrollment.status)}>
-                      {getStatusLabel(enrollment.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                      onClick={() => {
-                          console.log("Open certificate modal for student", enrollment.student.id)
-                      }}
-                    >
-                        <Award className="h-4 w-4 mr-2" />
-                        إضافة شهادة
-                    </Button>
-                  </TableCell>
-
                   <TableCell>
                     <div className="flex gap-2">
                       <Button

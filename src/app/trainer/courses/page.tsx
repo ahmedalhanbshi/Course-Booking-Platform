@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,15 +8,22 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { BookOpen, Plus, Search, Users, Calendar, Eye, Edit, MoreHorizontal, Star, Clock, DollarSign } from "lucide-react"
+import { BookOpen, Plus, Search, Users, Calendar, Eye, Edit, MoreHorizontal, Star, Clock, DollarSign, UploadCloud, FileText, ChevronDown, X } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatDate } from "@/lib/utils"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Upload, CreditCard, Banknote } from "lucide-react"
 import { toast } from "sonner"
+
+const bankAccounts = [
+  {
+    id: "inma",
+    bankName: "بنك الإنماء",
+    iban: "SA56 0500 0012 3456 7890 1234",
+    beneficiary: "معهد التدريب المتقدم"
+  }
+]
 
 // Mock courses data
 const courses = [
@@ -134,7 +141,15 @@ export default function TrainerCoursesPage() {
 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState<typeof courses[0] | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'receipt'>('online')
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptInfo, setReceiptInfo] = useState<{ name: string; note: string }>({
+    name: "",
+    note: ""
+  })
+  const [paymentError, setPaymentError] = useState("")
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const [expandedBankId, setExpandedBankId] = useState<string | null>(bankAccounts[0]?.id ?? null)
+  const paymentFileRef = useRef<HTMLInputElement | null>(null)
 
   const handlePaymentClick = (course: typeof courses[0]) => {
       setSelectedCourse(course)
@@ -142,65 +157,222 @@ export default function TrainerCoursesPage() {
   }
 
   const handlePaymentSubmit = () => {
+      if (!receiptFile && !receiptInfo.name) {
+        setPaymentError("يرجى رفع سند الدفع قبل التأكيد.")
+        return
+      }
+      setPaymentError("")
       setPaymentModalOpen(false)
-      toast.success(paymentMethod === 'online' ? "تمت عملية الدفع بنجاح" : "تم رفع السند بنجاح وبانتظار المراجعة")
+      toast.success("تم رفع السند بنجاح وبانتظار المراجعة")
+  }
+
+  const formatYER = (value: number) =>
+    `${new Intl.NumberFormat("en-US").format(value)} ر.ي`
+
+  const formatFileSize = (size?: number) => {
+    if (!size || Number.isNaN(size)) return ""
+    if (size < 1024) return `${size} B`
+    const kb = size / 1024
+    if (kb < 1024) return `${kb.toFixed(1)} KB`
+    const mb = kb / 1024
+    return `${mb.toFixed(1)} MB`
+  }
+
+  const handleReceiptFile = (file: File | null) => {
+    setReceiptFile(file)
+    if (file) {
+      setReceiptInfo((prev) => ({ ...prev, name: file.name }))
+    }
+    setPaymentError("")
   }
 
   return (
     <div className="max-w-7xl mx-auto">
       {/* Payment Modal */}
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>إتمام عملية دفع رسوم القاعة</DialogTitle>
-                <DialogDescription>
-                    {selectedCourse?.title} - {new Intl.NumberFormat('en-US').format(5000)} ريال يمني
-                </DialogDescription>
-            </DialogHeader>
-            
-            <Tabs defaultValue="card" className="w-full" onValueChange={(v) => setPaymentMethod(v as any)}>
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="card">دفع إلكتروني</TabsTrigger>
-                    <TabsTrigger value="receipt">إرفاق صورة السند</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="card">
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="card-number">رقم البطاقة</Label>
-                            <Input id="card-number" placeholder="0000 0000 0000 0000" dir="ltr" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="expiry">تاريخ الانتهاء</Label>
-                                <Input id="expiry" placeholder="MM/YY" dir="ltr" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="cvv">CVV</Label>
-                                <Input id="cvv" placeholder="123" dir="ltr" />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="name">الاسم على البطاقة</Label>
-                            <Input id="name" placeholder="الاسم بالكامل" />
-                        </div>
-                        <Button onClick={handlePaymentSubmit} className="w-full bg-blue-600 hover:bg-blue-700">ادفع الآن</Button>
+        <DialogContent
+          dir="rtl"
+          className="max-w-3xl [&>button[data-dialog-close='default']]:hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4"
+        >
+          <DialogClose className="absolute left-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">
+            <X className="h-4 w-4" />
+            <span className="sr-only">إغلاق</span>
+          </DialogClose>
+          <DialogHeader className="space-y-2 text-right">
+            <DialogTitle className="text-right">إتمام عملية دفع رسوم القاعة</DialogTitle>
+            <DialogDescription className="text-right">
+              {selectedCourse ? `${selectedCourse.title} - ${formatYER(5000)}` : formatYER(5000)}
+              <br />
+              يرجى تحويل المبلغ وإرفاق سند الدفع لإكمال الخطوة.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 pt-4 lg:grid-cols-2">
+            <div className="order-2 space-y-4 text-right lg:order-1">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-semibold text-slate-900">رفع سند الدفع</h4>
+                  <span className="text-xs text-slate-500">صور أو PDF</span>
+                </div>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setIsDraggingFile(true)
+                  }}
+                  onDragLeave={() => setIsDraggingFile(false)}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    setIsDraggingFile(false)
+                    const file = event.dataTransfer.files?.[0] ?? null
+                    handleReceiptFile(file)
+                  }}
+                  onClick={() => paymentFileRef.current?.click()}
+                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${
+                    isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
+                  }`}
+                >
+                  <UploadCloud className="h-6 w-6 text-blue-600" />
+                  <span className="font-medium text-slate-700">اسحب الملف هنا</span>
+                  <span className="text-xs text-slate-500">أو اختر ملفًا من جهازك</span>
+                  <Button type="button" size="sm" className="rounded-full">
+                    اختيار ملف
+                  </Button>
+                  <Input
+                    ref={paymentFileRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      handleReceiptFile(file)
+                    }}
+                  />
+                </div>
+                {(receiptFile?.name || receiptInfo.name) && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600">
+                    <div className="flex items-start gap-2">
+                      <FileText className="mt-0.5 h-4 w-4 text-slate-500" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900">
+                          {receiptFile?.name ?? receiptInfo.name}
+                        </p>
+                        {receiptFile && (
+                          <p className="text-[11px] text-slate-500">
+                            {receiptFile.type || "ملف"} · {formatFileSize(receiptFile.size)}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setReceiptFile(null)
+                          setReceiptInfo((prev) => ({ ...prev, name: "" }))
+                        }}
+                        className="h-7 rounded-full px-3 text-xs"
+                      >
+                        إزالة الملف
+                      </Button>
                     </div>
-                </TabsContent>
-
-                <TabsContent value="receipt">
-                     <div className="space-y-4 py-4">
-                         <div className="bg-muted p-4 rounded text-sm border"><p className="font-mono">حساب الراجحي: SA00000000</p></div>
-                         <Label>رفع الإيصال</Label>
-                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-50">
-                             <Upload className="w-8 h-8 mb-2" />
-                             <span className="text-xs">اضغط لرفع الصورة</span>
-                             <Input type="file" className="hidden" />
-                         </div>
-                         <Button onClick={handlePaymentSubmit} className="w-full">تأكيد الطلب</Button>
-                     </div>
-                </TabsContent>
-            </Tabs>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => paymentFileRef.current?.click()}
+                        className="h-7 rounded-full px-3 text-xs"
+                      >
+                        تغيير الملف
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {!receiptFile?.name && !receiptInfo.name && (
+                  <p className="mt-3 text-xs text-slate-500">
+                    ارفع سند الدفع أولاً حتى تتمكن من التأكيد.
+                  </p>
+                )}
+                {paymentError && <p className="mt-2 text-xs text-red-500">{paymentError}</p>}
+              </div>
+            </div>
+            <div className="order-1 space-y-4 text-right lg:order-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-semibold text-slate-900">الحسابات البنكية</h4>
+                  <span className="text-xs text-slate-500">اختر بنكًا لعرض التفاصيل</span>
+                </div>
+                <div className="mt-4 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                  {bankAccounts.map((bank) => {
+                    const isOpen = expandedBankId === bank.id
+                    return (
+                      <div key={bank.id} className="rounded-xl border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedBankId((prev) => (prev === bank.id ? null : bank.id))
+                          }
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right"
+                          aria-expanded={isOpen}
+                        >
+                          <span className="text-sm font-semibold text-slate-900">
+                            {bank.bankName}
+                          </span>
+                          <ChevronDown
+                            className={`h-4 w-4 text-slate-400 transition-transform ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {isOpen && (
+                          <div className="border-t border-slate-200 px-4 py-3 text-right text-sm">
+                            <p className="text-xs text-slate-500">
+                              اسم المستفيد: {bank.beneficiary}
+                            </p>
+                            <div className="mt-3 space-y-2">
+                              <p className="text-xs text-slate-500">رقم IBAN</p>
+                              <p className="font-mono text-sm font-semibold text-slate-900">
+                                {bank.iban}
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(bank.iban)
+                                    toast.success("تم نسخ رقم الآيبان")
+                                  } catch {
+                                    toast.error("تعذر نسخ رقم الآيبان")
+                                  }
+                                }}
+                                className="h-7 rounded-full px-3 text-xs"
+                              >
+                                نسخ IBAN
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-2">
+            <Button
+              onClick={handlePaymentSubmit}
+              disabled={!receiptFile?.name && !receiptInfo.name}
+              className="w-full"
+            >
+              تأكيد الدفع بإرسال السند
+            </Button>
+            {!receiptFile?.name && !receiptInfo.name && (
+              <p className="mt-2 text-xs text-red-500 text-right">
+                ارفع السند أولاً لتفعيل زر التأكيد.
+              </p>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -208,9 +380,6 @@ export default function TrainerCoursesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">إدارة الدورات</h1>
-          <p className="text-gray-600">
-            إدارة ومتابعة جميع الدورات التدريبية التي تقدمها
-          </p>
         </div>
         <Button asChild>
           <Link href="/trainer/courses/create">
@@ -252,50 +421,48 @@ export default function TrainerCoursesPage() {
       </div>
 
       {/* Filters and Search */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="البحث في الدورات..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pr-10"
-              />
-            </div>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="حالة الدورة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الحالات</SelectItem>
-                <SelectItem value="active">مستمر</SelectItem>
-                <SelectItem value="pending_approval">بانتظار الموافقة</SelectItem>
-                <SelectItem value="payment_required">بانتظار الدفع</SelectItem>
-                 <SelectItem value="processing_payment">التحقق من الدفع</SelectItem>
-                <SelectItem value="draft">مسودة</SelectItem>
-                <SelectItem value="completed">مكتمل</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="الترتيب" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">الأحدث</SelectItem>
-                <SelectItem value="title">الاسم</SelectItem>
-                <SelectItem value="students">عدد الطلاب</SelectItem>
-                <SelectItem value="rating">التقييم</SelectItem>
-                <SelectItem value="price-low">السعر: من الأقل</SelectItem>
-                <SelectItem value="price-high">السعر: من الأعلى</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="البحث في الدورات..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10"
+            />
           </div>
-        </CardContent>
-      </Card>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="حالة الدورة" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">جميع الحالات</SelectItem>
+              <SelectItem value="active">مستمر</SelectItem>
+              <SelectItem value="pending_approval">بانتظار الموافقة</SelectItem>
+              <SelectItem value="payment_required">بانتظار الدفع</SelectItem>
+              <SelectItem value="processing_payment">التحقق من الدفع</SelectItem>
+              <SelectItem value="draft">مسودة</SelectItem>
+              <SelectItem value="completed">مكتمل</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="الترتيب" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">الأحدث</SelectItem>
+              <SelectItem value="title">الاسم</SelectItem>
+              <SelectItem value="students">عدد الطلاب</SelectItem>
+              <SelectItem value="rating">التقييم</SelectItem>
+              <SelectItem value="price-low">السعر: من الأقل</SelectItem>
+              <SelectItem value="price-high">السعر: من الأعلى</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* Courses Table */}
       <Card>

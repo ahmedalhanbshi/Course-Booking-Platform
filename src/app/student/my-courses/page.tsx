@@ -1,17 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { BookOpen, Calendar, Clock, Award, FileText, Download, X, CheckCircle, AlertCircle, Play, ArrowLeft, Users } from "lucide-react"
 import { Course, Enrollment, User } from "@/types"
 import { formatDate, formatTime } from "@/lib/utils"
+
+const ENROLLMENTS_KEY = "myCoursesEnrollments"
+type EnrollmentWithCourse = Enrollment & { course: Course & { image: string } }
+
+const statusVariants = {
+  active: {
+    label: "سارية",
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
+  },
+  completed: {
+    label: "مكتملة",
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
+  },
+  cancelled: {
+    label: "ملغاة",
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
+  }
+} as const
+
+type StatusKey = keyof typeof statusVariants
+
+function StatusPill({
+  status,
+  isActive,
+  onClick
+}: {
+  status: StatusKey
+  isActive: boolean
+  onClick?: () => void
+}) {
+  const styles = statusVariants[status]
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-9 w-full rounded-full px-4 text-sm font-medium text-center transition ${
+        isActive ? styles.activeClass : styles.inactiveClass
+      }`}
+    >
+      {styles.label}
+    </button>
+  )
+}
 
 // Mock user data
 const mockUser: User = {
@@ -25,7 +69,7 @@ const mockUser: User = {
 }
 
 // Mock enrolled courses with different statuses
-const mockEnrollments: (Enrollment & { course: Course & { image: string } })[] = [
+const mockEnrollments: EnrollmentWithCourse[] = [
   {
     id: "1",
     studentId: "1",
@@ -260,27 +304,82 @@ export default function MyCoursesPage() {
   const [activeTab, setActiveTab] = useState("active")
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  const [enrollments, setEnrollments] = useState<EnrollmentWithCourse[]>(mockEnrollments)
+
+  const buildLocalEnrollment = (item: any): EnrollmentWithCourse => {
+    const now = new Date()
+    return {
+      id: `local-${item.courseId}`,
+      studentId: mockUser.id,
+      courseId: item.courseId,
+      enrolledAt: new Date(item.createdAt ?? now.toISOString()),
+      status: 'active',
+      progress: 0,
+      course: {
+        id: item.courseId,
+        title: item.title,
+        description: item.description || item.shortDescription || "",
+        shortDescription: item.shortDescription || item.description || "",
+        trainerId: "local-trainer",
+        trainer: {
+          id: "local-trainer",
+          name: item.instructorName || "مدرب الدورة",
+          email: "trainer@example.com",
+          role: 'trainer' as const,
+          status: 'active',
+          avatar: item.instructorAvatar || "/images/avatar-1.png",
+          createdAt: now,
+          updatedAt: now,
+        },
+        price: item.price || 0,
+        duration: 0,
+        startDate: item.startDate ? new Date(item.startDate) : now,
+        endDate: item.endDate ? new Date(item.endDate) : now,
+        maxStudents: item.maxStudents || 0,
+        enrolledStudents: 0,
+        rating: 0,
+        reviewCount: 0,
+        status: 'active',
+        category: item.category || "",
+        image: item.image || "/images/course-web.png",
+        createdAt: now,
+        updatedAt: now,
+      }
+    }
+  }
+
+  useEffect(() => {
+    const loadLocalEnrollments = () => {
+      if (typeof window === "undefined") return
+      try {
+        const stored = window.localStorage.getItem(ENROLLMENTS_KEY)
+        const list = stored ? (JSON.parse(stored) as any[]) : []
+        const localEnrollments = list.map(buildLocalEnrollment)
+        const merged = [
+          ...localEnrollments,
+          ...mockEnrollments.filter(
+            (enrollment) => !localEnrollments.some((item) => item.courseId === enrollment.courseId)
+          )
+        ]
+        setEnrollments(merged)
+      } catch {
+        setEnrollments(mockEnrollments)
+      }
+    }
+
+    loadLocalEnrollments()
+    if (typeof window === "undefined") return
+
+    window.addEventListener("enrollments-updated", loadLocalEnrollments)
+    window.addEventListener("storage", loadLocalEnrollments)
+    return () => {
+      window.removeEventListener("enrollments-updated", loadLocalEnrollments)
+      window.removeEventListener("storage", loadLocalEnrollments)
+    }
+  }, [])
 
   const getEnrollmentsByStatus = (status: Enrollment['status']) => {
-    return mockEnrollments.filter(enrollment => enrollment.status === status)
-  }
-
-  const getStatusLabel = (status: Enrollment['status']) => {
-    switch (status) {
-      case 'active': return 'سارية'
-      case 'completed': return 'مكتملة'
-      case 'cancelled': return 'ملغاة'
-      default: return status
-    }
-  }
-
-  const getStatusColor = (status: Enrollment['status']) => {
-    switch (status) {
-      case 'active': return 'bg-blue-600 text-white border-blue-600'
-      case 'completed': return 'bg-green-600 text-white border-green-600'
-      case 'cancelled': return 'bg-red-600 text-white border-red-600'
-      default: return 'bg-gray-600 text-white border-gray-600'
-    }
+    return enrollments.filter(enrollment => enrollment.status === status)
   }
 
   const handleCancelEnrollment = (courseId: string) => {
@@ -297,126 +396,89 @@ export default function MyCoursesPage() {
 
   const renderCourseCard = (enrollment: Enrollment & { course: Course & { image: string } }) => {
     const nextSession = new Date() // Mock next session
-    const hasCertificate = enrollment.status === 'completed' && enrollment.progress === 100
+    const courseLink = `/student/courses/${enrollment.course.id}${enrollment.status === 'completed' ? '?status=completed' : enrollment.status === 'cancelled' ? '?status=cancelled' : ''}`
+    const nextSessionLabel =
+      enrollment.status === 'active'
+        ? `${formatDate(nextSession)} • ${formatTime(nextSession)}`
+        : 'لا توجد جلسات قادمة'
 
     return (
-      <Card key={enrollment.id} className="flex flex-col md:flex-row overflow-hidden hover:shadow-lg transition-shadow mb-6">
-        {/* Image Section */}
-        <div className="w-full md:w-1/4 relative aspect-square md:aspect-auto group cursor-pointer">
-          <Link 
-            href={`/student/courses/${enrollment.course.id}${enrollment.status === 'completed' ? '?status=completed' : enrollment.status === 'cancelled' ? '?status=cancelled' : ''}`} 
-            className="block h-full w-full"
-          >
-            <Image
-              src={enrollment.course.image}
-              alt={enrollment.course.title}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          </Link>
-        </div>
+      <Card key={enrollment.id} className="w-full overflow-hidden border border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
+        <CardContent className="p-5 sm:p-6">
+          <div className="flex flex-col md:flex-row-reverse gap-6 items-stretch">
+            <Link
+              href={courseLink}
+              className="group relative w-full aspect-square md:w-[240px] md:h-[240px] rounded-xl overflow-hidden bg-muted shrink-0"
+            >
+              <Image
+                src={enrollment.course.image}
+                alt={enrollment.course.title}
+                fill
+                sizes="(min-width: 768px) 240px, 100vw"
+                className="object-cover transition-transform duration-200 group-hover:scale-105"
+              />
+            </Link>
 
-        {/* Content Section */}
-        <CardContent className="flex-1 p-6">
-          <div className="flex flex-col h-full justify-between">
-            <div>
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="hidden md:inline-flex">
-                      {enrollment.course.category}
-                    </Badge>
-                    <Badge className={`hidden md:inline-flex ${getStatusColor(enrollment.status)}`}>
-                      {getStatusLabel(enrollment.status)}
-                    </Badge>
-                  </div>
-                  <Link 
-                    href={`/student/courses/${enrollment.course.id}${enrollment.status === 'completed' ? '?status=completed' : enrollment.status === 'cancelled' ? '?status=cancelled' : ''}`} 
-                    className="hover:text-primary transition-colors"
-                  >
-                    <h3 className="font-bold text-xl mb-1">{enrollment.course.title}</h3>
-                  </Link>
-                  <p className="text-muted-foreground text-sm flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    المدرب: {enrollment.course.trainer.name}
-                  </p>
-                </div>
-
-                <div className="text-left hidden md:block">
-                  <p className="text-xs text-muted-foreground mb-1">تاريخ التسجيل</p>
-                  <p className="font-medium text-sm bg-muted px-2 py-1 rounded">
-                    {formatDate(enrollment.enrolledAt)}
-                  </p>
-                </div>
+            <div className="flex-1 flex flex-col gap-4 text-right">
+              <div className="space-y-2">
+                <Link href={courseLink} className="hover:text-primary transition-colors">
+                  <h3 className="text-lg sm:text-xl font-bold leading-snug">{enrollment.course.title}</h3>
+                </Link>
+                <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
+                  {enrollment.course.shortDescription || enrollment.course.description}
+                </p>
+                <p className="text-muted-foreground text-sm flex items-center justify-end gap-2">
+                  <Users className="h-4 w-4" />
+                  المدرب: {enrollment.course.trainer.name}
+                </p>
               </div>
 
-              {/* Progress Bar */}
-              {enrollment.status === 'active' && (
-                <div className="my-6">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="font-medium">التقدم في الدورة</span>
-                    <span className="text-primary font-bold">{enrollment.progress}%</span>
-                  </div>
-                  <Progress value={enrollment.progress} className="h-2.5 bg-muted" />
+              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm space-y-1">
+                <div className="flex items-center justify-end gap-2 text-primary">
+                  <Calendar className="h-4 w-4" />
+                  <span className="font-medium">الدرس القادم</span>
                 </div>
-              )}
+                <p className="text-foreground">{nextSessionLabel}</p>
+              </div>
 
-              {/* Next Session */}
-              {enrollment.status === 'active' && (
-                <div className="bg-primary/5 border border-primary/10 p-4 rounded-xl mb-6 flex items-center gap-3">
-                  <div className="bg-primary/10 p-2 rounded-full text-primary">
-                    <Calendar className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">الدرس القادم</p>
-                    <p className="text-sm font-semibold">
-                      {formatDate(nextSession)} <span className="mx-1 text-muted-foreground">|</span> {formatTime(nextSession)}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className="flex flex-col sm:flex-row-reverse gap-2 pt-1">
+                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
+                  <Link href={courseLink}>تفاصيل الدورة</Link>
+                </Button>
 
-            {/* Actions */}
-            <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-border/50">
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 w-full" asChild>
-                <Link href={`/student/courses/${enrollment.course.id}${enrollment.status === 'completed' ? '?status=completed' : enrollment.status === 'cancelled' ? '?status=cancelled' : ''}`}>
-                  تفاصيل الدورة
-                </Link>
-              </Button>
-
-              {enrollment.status === 'active' && (
-                <Dialog open={showCancelDialog && selectedCourse === enrollment.course.id} onOpenChange={setShowCancelDialog}>
-                  <DialogTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 mr-auto"
-                      onClick={() => handleCancelEnrollment(enrollment.course.id)}
-                    >
-                      <X className="ml-2 h-4 w-4" />
-                      إلغاء
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>تأكيد إلغاء التسجيل</DialogTitle>
-                      <DialogDescription>
-                        هل أنت متأكد من رغبتك في إلغاء تسجيلك في دورة {enrollment.course.title}؟
-                        سيتم استرداد المبلغ وفقاً لسياسة الاسترداد.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex gap-2 justify-end mt-4">
-                      <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
-                        تراجع
+                {enrollment.status === 'active' && (
+                  <Dialog open={showCancelDialog && selectedCourse === enrollment.course.id} onOpenChange={setShowCancelDialog}>
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleCancelEnrollment(enrollment.course.id)}
+                      >
+                        <X className="ml-2 h-4 w-4" />
+                        إلغاء
                       </Button>
-                      <Button variant="destructive" onClick={confirmCancellation}>
-                        تأكيد الإلغاء
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>تأكيد إلغاء التسجيل</DialogTitle>
+                        <DialogDescription>
+                          هل أنت متأكد من رغبتك في إلغاء تسجيلك في دورة {enrollment.course.title}؟
+                          سيتم استرداد المبلغ وفقًا لسياسة الاسترداد.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex gap-2 justify-end mt-4">
+                        <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+                          تراجع
+                        </Button>
+                        <Button variant="destructive" onClick={confirmCancellation}>
+                          تأكيد الإلغاء
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -429,10 +491,10 @@ export default function MyCoursesPage() {
   const cancelledCourses = getEnrollmentsByStatus('cancelled')
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
+    <div className="max-w-6xl mx-auto pb-20">
       {/* Header */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold text-foreground mb-2">دوراتي التعليمية</h1>
+      <div className="mb-8 space-y-2">
+        <h1 className="text-3xl font-bold text-foreground">دوراتي التعليمية</h1>
         <p className="text-muted-foreground">
           تابع تقدمك في الدورات وقم بإدارة رحلتك التعليمية
         </p>
@@ -440,50 +502,62 @@ export default function MyCoursesPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <div className="glass-card p-6 rounded-xl flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-            <Play className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">دورات سارية</p>
-            <p className="text-2xl font-bold">{activeCourses.length}</p>
-          </div>
-        </div>
+        <Card className="border border-border/60 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+              <Play className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground font-medium">دورات سارية</p>
+              <p className="text-2xl font-bold">{activeCourses.length}</p>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="glass-card p-6 rounded-xl flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-            <CheckCircle className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">دورات مكتملة</p>
-            <p className="text-2xl font-bold">{completedCourses.length}</p>
-          </div>
-        </div>
+        <Card className="border border-border/60 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground font-medium">دورات مكتملة</p>
+              <p className="text-2xl font-bold">{completedCourses.length}</p>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="glass-card p-6 rounded-xl flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">دورات ملغاة</p>
-            <p className="text-2xl font-bold">{cancelledCourses.length}</p>
-          </div>
-        </div>
+        <Card className="border border-border/60 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground font-medium">دورات ملغاة</p>
+              <p className="text-2xl font-bold">{cancelledCourses.length}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Courses Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
-          <TabsTrigger value="active" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            سارية
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            مكتملة
-          </TabsTrigger>
-          <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            ملغاة
-          </TabsTrigger>
-        </TabsList>
+        <div className="grid w-full grid-cols-3 gap-2 rounded-full bg-muted/50 p-1 mb-8">
+          <StatusPill
+            status="active"
+            isActive={activeTab === "active"}
+            onClick={() => setActiveTab("active")}
+          />
+          <StatusPill
+            status="completed"
+            isActive={activeTab === "completed"}
+            onClick={() => setActiveTab("completed")}
+          />
+          <StatusPill
+            status="cancelled"
+            isActive={activeTab === "cancelled"}
+            onClick={() => setActiveTab("cancelled")}
+          />
+        </div>
 
         <TabsContent value="active" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {activeCourses.length === 0 ? (
@@ -547,3 +621,5 @@ function EmptyState({ icon: Icon, title, description, actionLabel, actionLink }:
     </Card>
   )
 }
+
+

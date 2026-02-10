@@ -1,23 +1,36 @@
 export type UserRole = 'student' | 'trainer' | 'institute_admin' | 'platform_admin';
+export type UserStatus = 'pending' | 'active' | 'approved' | 'rejected' | 'suspended';
+export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type InstituteStatus = VerificationStatus;
 
 export type CourseStatus = 'draft' | 'pending' | 'approved' | 'active' | 'completed' | 'cancelled';
-export type EnrollmentStatus = 'active' | 'completed' | 'cancelled' | 'refunded';
-export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
+export type BookingTrigger = 'none' | 'manual' | 'auto';
+
 export type SessionType = 'online' | 'in_person' | 'hybrid';
-export type AttendanceStatus = 'present' | 'absent' | 'excused';
+export type SessionStatus = 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
+
+export type EnrollmentStatus = 'preliminary' | 'pending_payment' | 'active' | 'completed' | 'cancelled' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'refunded' | 'failed';
+
+export type BookingMode = 'single' | 'batch' | 'recurring';
 export type RoomBookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export type NotificationType = 'payment' | 'enrollment' | 'session' | 'announcement' | 'booking' | 'system' | 'review';
+export type AuditAction = 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'cancel';
 
 export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   phone?: string;
   role: UserRole;
-  status: 'active' | 'suspended' | 'pending';
+  status: UserStatus;
   avatar?: string;
+  instituteId?: string;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt?: Date;
-  instituteId?: string;
   trainerProfile?: TrainerProfile;
 }
 
@@ -27,7 +40,10 @@ export interface TrainerProfile {
   bio?: string;
   cvUrl?: string;
   specialties: string[];
-  rating: number;
+  certificatesUrls?: string[];
+  verificationStatus?: VerificationStatus;
+  rejectionReason?: string;
+  rating?: number;
 }
 
 export interface Institute {
@@ -39,7 +55,12 @@ export interface Institute {
   address?: string;
   logo?: string;
   website?: string;
-  status: 'pending' | 'approved' | 'suspended';
+  licenseNumber?: string;
+  licenseDocumentUrl?: string;
+  verificationStatus?: VerificationStatus;
+  rejectionReason?: string;
+  status: InstituteStatus;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,7 +70,6 @@ export interface CourseCategory {
   name: string;
   slug: string;
   description?: string;
-  type: 'pdf' | 'video' | 'link' | 'document';
 }
 
 export interface Course {
@@ -58,19 +78,24 @@ export interface Course {
   description: string;
   shortDescription?: string;
   price: number;
-  deliveryType: 'online' | 'in_person' | 'hybrid' | 'capacity_based';
-  isCapacityBased?: boolean;
   duration: number; // in hours
   startDate: Date;
   endDate: Date;
+  minStudents?: number;
   maxStudents: number;
   status: CourseStatus | 'pending_approval' | 'payment_required' | 'processing_payment';
+  bookingTrigger?: BookingTrigger;
   image?: string;
   prerequisites?: string;
   objectives?: string[];
   tags?: string[];
   createdAt: Date;
   updatedAt: Date;
+  deactivatedAt?: Date;
+
+  // UI-only helpers
+  deliveryType?: 'online' | 'in_person' | 'hybrid' | 'capacity_based';
+  isCapacityBased?: boolean;
 
   category: string;
   categoryId?: string;
@@ -82,22 +107,24 @@ export interface Course {
   instituteId?: string;
   institute?: Institute;
 
-  enrolledStudents: number; // Computed or count
-  rating: number; // Computed
-  reviewCount: number; // Computed
+  enrolledStudents?: number; // Computed
+  rating?: number; // Computed
+  reviewCount?: number; // Computed
 }
 
 export interface Session {
   id: string;
-  title: string;
-  description?: string;
   startTime: Date;
   endTime: Date;
   type: SessionType;
+  status: SessionStatus;
   meetingLink?: string;
-  status: 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
 
   courseId: string;
+
+  // Legacy/UI-only fields
+  title?: string;
+  description?: string;
   roomId?: string;
   trainerId?: string;
 }
@@ -109,6 +136,8 @@ export interface Enrollment {
   enrolledAt: Date;
   status: EnrollmentStatus;
   progress: number; // percentage
+  cancellationReason?: string;
+  deletedAt?: Date;
 }
 
 export interface Payment {
@@ -118,13 +147,19 @@ export interface Payment {
   status: PaymentStatus;
   method?: string;
   transactionId?: string;
+  depositSlipImage?: string;
+  notes?: string;
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  rejectionReason?: string;
   createdAt: Date;
-  enrollmentId: string;
+  enrollmentId?: string;
+  roomBookingId?: string;
 }
 
 export interface Attendance {
   id: string;
-  status: AttendanceStatus;
+  status: 'present' | 'absent' | 'excused';
   markedAt: Date;
   sessionId: string;
   studentId: string;
@@ -162,20 +197,23 @@ export interface Certificate {
 
 export interface Notification {
   id: string;
-  title: string;
-  message: string;
-  type: 'payment' | 'enrollment' | 'session' | 'announcement' | 'system' | 'review';
+  type: NotificationType;
   isRead: boolean;
-  actionUrl?: string;
   createdAt: Date;
+  relatedEntityId?: string;
   userId: string;
+  title?: string;
+  message?: string;
+  actionUrl?: string;
 }
 
 export interface Room {
   id: string;
   name: string;
   capacity: number;
+  pricePerHour?: number;
   facilities: string[];
+  image?: string;
   isActive: boolean;
   instituteId: string;
   institute?: Institute;
@@ -183,11 +221,15 @@ export interface Room {
 
 export interface RoomBooking {
   id: string;
+  batchId?: string;
+  bookingMode?: BookingMode;
   startTime: Date;
   endTime: Date;
   status: RoomBookingStatus;
   purpose?: string;
   notes?: string;
+  rejectionReason?: string;
+  totalPrice?: number;
   createdAt: Date;
 
   roomId: string;
@@ -204,12 +246,28 @@ export interface Announcement {
   id: string;
   title: string;
   message: string;
-  targetAudience: 'all' | 'students' | 'trainers' | 'institute_admins' | 'platform_admins' | 'course_students';
   createdAt: Date;
   scheduledAt?: Date;
   sentAt?: Date;
-
-  senderId: string;
   courseId?: string;
+  senderId: string;
   instituteId?: string;
+  targetAudience?: 'all' | 'students' | 'trainers' | 'institute_admins' | 'platform_admins' | 'course_students';
+}
+
+export interface Wishlist {
+  id: string;
+  createdAt: Date;
+  studentId: string;
+  courseId: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: AuditAction;
+  entityName: string;
+  entityId: string;
+  description?: string;
+  performedBy?: string;
+  performedAt: Date;
 }

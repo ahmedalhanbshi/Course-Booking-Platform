@@ -1,8 +1,9 @@
-"use client"
+﻿"use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, Upload, X, MapPin, Users, Building, Globe, HelpCircle, FileText, Plus, Calendar, Clock, CheckCircle, AlertCircle } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, Banknote, Lock } from "lucide-react"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -43,46 +44,88 @@ const platforms = [
   { value: "other", label: "أخرى" }
 ]
 
+const pricingHalls = [
+  { id: "hall-1", name: "القاعة الرئيسية", capacity: 80 },
+  { id: "hall-2", name: "قاعة الاجتماعات الذكية", capacity: 18 },
+  { id: "hall-3", name: "معمل الحاسب المتقدم", capacity: 30 },
+  { id: "hall-4", name: "قاعة التدريب (ج)", capacity: 40 }
+]
+
+const timeSlots = [
+  "08:00 - 09:00",
+  "09:00 - 10:00",
+  "10:00 - 11:00",
+  "11:00 - 12:00",
+  "12:00 - 13:00",
+  "13:00 - 14:00",
+  "14:00 - 15:00",
+  "15:00 - 16:00",
+  "16:00 - 17:00",
+  "17:00 - 18:00",
+  "18:00 - 19:00",
+  "19:00 - 20:00"
+]
+
+const hallAvailability: Record<string, number[]> = {
+  "hall-1": [2, 5, 7, 10, 12, 15, 18, 22, 25, 28],
+  "hall-2": [1, 3, 6, 9, 13, 16, 20, 23, 27],
+  "hall-3": [4, 8, 11, 14, 17, 19, 24, 26, 29],
+  "hall-4": [2, 6, 9, 12, 15, 18, 21, 24, 27]
+}
+
+const weekDaysShort = ["أحد", "اثن", "ثلا", "أرب", "خم", "جم", "سبت"]
+const COURSE_CARD_IMAGE_WIDTH = 260
+const COURSE_CARD_IMAGE_HEIGHT = 260
+
 // Mock data for halls (Shared with Halls Page)
 const mockHalls = [
   {
-    id: "1",
-    name: "القاعة الرئيسية (أ)",
-    capacity: 50,
-    location: "الدور الأول - الجناح الشرقي"
+    id: "hall-1",
+    name: "القاعة الرئيسية",
+    capacity: 80,
+    location: "الدور الأرضي • الجناح الشرقي",
+    type: "قاعة محاضرات",
+    hourlyRate: 18000,
+    description: "قاعة واسعة للمحاضرات والفعاليات الكبرى مع تجهيزات عرض متكاملة.",
+    image: "https://images.unsplash.com/photo-1760121788536-9797394e210e?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
   },
   {
-    id: "2",
-    name: "معمل الحاسب (1)",
-    capacity: 25,
-    location: "الدور الثاني - الجناح الغربي"
+    id: "hall-2",
+    name: "قاعة الاجتماعات الذكية",
+    capacity: 18,
+    location: "الدور الأول • الجناح الغربي",
+    type: "قاعة اجتماعات",
+    hourlyRate: 12000,
+    description: "مساحة مريحة لاجتماعات الفرق مع شاشة تفاعلية وإضاءة هادئة.",
+    image: "https://images.unsplash.com/photo-1766802981801-4b4a9a1d8f1c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
   },
   {
-    id: "3",
-    name: "قاعة الاجتماعات (ب)",
-    capacity: 15,
-    location: "الدور الأرضي - قرب الإدارة"
-  },
-  {
-    id: "4",
-    name: "القاعة التدريبية (ج)",
+    id: "hall-3",
+    name: "معمل الحاسب المتقدم",
     capacity: 30,
-    location: "الدور الأول - الجناح الشرقي"
+    location: "الدور الثاني • الجناح الشرقي",
+    type: "معمل",
+    hourlyRate: 15000,
+    description: "معمل مجهز لأعمال التدريب العملي مع أجهزة حديثة وشبكة قوية.",
+    image: "https://images.unsplash.com/photo-1725274032244-9a8f0fa1e9a7?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
+  },
+  {
+    id: "hall-4",
+    name: "قاعة التدريب (ج)",
+    capacity: 40,
+    location: "الدور الأول • الجناح الشرقي",
+    type: "قاعة محاضرات",
+    hourlyRate: 14000,
+    description: "قاعة متوسطة مناسبة للدورات وورش العمل القصيرة.",
+    image: "https://images.unsplash.com/photo-1670348060135-d4c6662b4138?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
   }
 ]
-
-interface Lesson {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-}
 
 export default function CreateCoursePage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState("info")
+  const [activeTab, setActiveTab] = useState("pricing")
   
   const [courseData, setCourseData] = useState({
     title: "",
@@ -91,170 +134,211 @@ export default function CreateCoursePage() {
     description: "",
     deliveryType: "", // in_person, online, hybrid, capacity_based (risk-free)
     price: "",
+    minStudents: "",
     maxStudents: "",
+    isFree: false,
     startDate: "",
     endDate: "",
     instituteId: "",
     prerequisites: "",
     objectives: [] as string[],
     tags: [] as string[],
-    hallId: "", 
+    hallId: "",
+    hallName: "",
     onlinePlatform: "",
     meetingLink: "",
     startTime: "",
-    endTime: ""
+    endTime: "",
+    imageFile: null as File | null,
+    imagePreviewUrl: ""
   })
 
-  // Curriculum State
-  const [lessons, setLessons] = useState<Lesson[]>([])
-  const [newLesson, setNewLesson] = useState({ title: "", date: "", time: "" })
-  const [files, setFiles] = useState<string[]>([]) // Mock files
+  const courseImageInputRef = useRef<HTMLInputElement>(null)
+  const [courseImageError, setCourseImageError] = useState("")
+  const [isImageDragging, setIsImageDragging] = useState(false)
+  const [selectedSessions, setSelectedSessions] = useState<{ date: string, slot: string }[]>([])
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [calendarOffset, setCalendarOffset] = useState(0)
+  const [unavailableMessage, setUnavailableMessage] = useState("")
+  const [onlineSchedule, setOnlineSchedule] = useState({
+    startDate: "",
+    startTime: "",
+    duration: "",
+    platform: "",
+    meetingLink: ""
+  })
 
   const [currentObjective, setCurrentObjective] = useState("")
   const [currentTag, setCurrentTag] = useState("")
 
-  // --- Session Scheduler State ---
-  const [scheduleType, setScheduleType] = useState<'unified' | 'custom'>('unified')
-  const [sessions, setSessions] = useState<{ id: string, date: string, startTime: string, endTime: string, duration: number }[]>([])
+  useEffect(() => {
+    return () => {
+      if (courseData.imagePreviewUrl) {
+        URL.revokeObjectURL(courseData.imagePreviewUrl)
+      }
+    }
+  }, [courseData.imagePreviewUrl])
 
-  const [unifiedSettings, setUnifiedSettings] = useState({
-    startDate: "",
-    endDate: "",
-    startTime: "",
-    endTime: "",
-    selectedDays: [] as number[] // 0 = Sunday, 1 = Monday, etc.
-  })
+  useEffect(() => {
+    setSelectedDate(null)
+    setSelectedSessions([])
+    setUnavailableMessage("")
+    setCalendarOffset(0)
+  }, [courseData.hallId])
 
-  const [customSession, setCustomSession] = useState({
-    date: "",
-    startTime: "",
-    endTime: ""
-  })
+  useEffect(() => {
+    setSelectedDate(null)
+    setUnavailableMessage("")
+  }, [calendarOffset])
 
-  // Weekdays for selection
-  const weekDays = [
-    { id: 0, label: "الأحد" },
-    { id: 1, label: "الاثنين" },
-    { id: 2, label: "الثلاثاء" },
-    { id: 3, label: "الأربعاء" },
-    { id: 4, label: "الخميس" },
-    { id: 5, label: "الجمعة" },
-    { id: 6, label: "السبت" },
-  ]
+  useEffect(() => {
+    const handleHallMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      const data = event.data as
+        | {
+            type?: string
+            payload?: { id?: string; name?: string }
+          }
+        | null
+      if (!data || data.type !== "hall-selected" || !data.payload?.id) return
 
-  // --- Scheduler Logic ---
+      setCourseData((prev) => ({
+        ...prev,
+        hallId: data.payload?.id ?? prev.hallId,
+        hallName: data.payload?.name ?? prev.hallName
+      }))
+    }
 
-  // derived statistics
-  const totalHours = sessions.reduce((acc, curr) => acc + curr.duration, 0)
+    window.addEventListener("message", handleHallMessage)
+    return () => window.removeEventListener("message", handleHallMessage)
+  }, [])
 
-  // Auto-calculate Course Start/End Dates
-  const updateCourseDates = (currentSessions: typeof sessions) => {
-    if (currentSessions.length === 0) return
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const maxMonthsAhead = 5
 
-    // sort sessions by date
-    const sorted = [...currentSessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    
-    const newStartDate = sorted[0].date
-    const newEndDate = sorted[sorted.length - 1].date
-
-    setCourseData(prev => ({
-      ...prev,
-      startDate: newStartDate,
-      endDate: newEndDate,
-    }))
+  const formatDateLabel = (dateKey: string) => {
+    const [year, month, day] = dateKey.split("-")
+    return `${day}-${month}-${year}`
+  }
+  const formatDateKey = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
   }
 
-  const toggleDay = (dayId: number) => {
-    setUnifiedSettings(prev => {
-      const exists = prev.selectedDays.includes(dayId)
-      if (exists) return { ...prev, selectedDays: prev.selectedDays.filter(d => d !== dayId) }
-      return { ...prev, selectedDays: [...prev.selectedDays, dayId] }
-    })
+  const monthDate = new Date(todayStart.getFullYear(), todayStart.getMonth() + calendarOffset, 1)
+  const year = monthDate.getFullYear()
+  const month = monthDate.getMonth()
+  const monthLabel = monthDate.toLocaleDateString("ar-SA", { month: "long", year: "numeric" })
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstDay = new Date(year, month, 1).getDay()
+  const base = hallAvailability[courseData.hallId] ?? []
+  const availableDaysSet = new Set(
+    base.map((day) => ((day + calendarOffset * 2 - 1) % daysInMonth) + 1)
+  )
+
+  const calendarDays: Array<{ day: number; dateKey: string; isPast: boolean } | null> = []
+  for (let i = 0; i < firstDay; i += 1) {
+    calendarDays.push(null)
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    const dateValue = new Date(year, month, day)
+    const isPast = dateValue < todayStart
+    calendarDays.push({ day, dateKey, isPast })
+  }
+  while (calendarDays.length % 7 !== 0) {
+    calendarDays.push(null)
   }
 
-  const generateUnifiedSessions = () => {
-    if (!unifiedSettings.startDate || !unifiedSettings.endDate || !unifiedSettings.startTime || !unifiedSettings.endTime || unifiedSettings.selectedDays.length === 0) {
-      toast.error("يرجى تعبئة جميع حقول الجدول الموحد")
+  const isPastDate = (dateKey: string) => {
+    const [year, month, day] = dateKey.split("-")
+    return new Date(Number(year), Number(month) - 1, Number(day)) < todayStart
+  }
+
+  const getDayMeta = (day: number, dateKey: string, isPast: boolean) => {
+    if (isPast) {
+      return { isSelectable: false, reason: "اليوم في الماضي", availableSlots: [] as string[], bookedSlots: [] as string[] }
+    }
+
+    const isBaseAvailable = availableDaysSet.has(day)
+    if (day % 5 === 0) {
+      return { isSelectable: false, reason: "القاعة مغلقة", availableSlots: [], bookedSlots: [] }
+    }
+    if (day % 7 === 0) {
+      return { isSelectable: false, reason: "خارج ساعات العمل", availableSlots: [], bookedSlots: [] }
+    }
+    if (day % 6 === 0) {
+      return { isSelectable: false, reason: "لا يوجد وقت كافٍ لمدة الجلسة", availableSlots: [], bookedSlots: [] }
+    }
+    if (!isBaseAvailable || day % 4 === 0) {
+      return { isSelectable: false, reason: "محجوز بالكامل", availableSlots: [], bookedSlots: [...timeSlots] }
+    }
+    if (day % 3 === 0) {
+      const bookedSlots = [timeSlots[0]]
+      const availableSlots = timeSlots.filter((slot) => !bookedSlots.includes(slot))
+      return { isSelectable: true, reason: "", availableSlots, bookedSlots }
+    }
+
+    return { isSelectable: true, reason: "", availableSlots: [...timeSlots], bookedSlots: [] }
+  }
+
+  const hasAvailability = calendarDays.some((cell) => {
+    if (!cell) return false
+    const meta = getDayMeta(cell.day, cell.dateKey, cell.isPast)
+    return meta.isSelectable
+  })
+
+  const selectedSessionsForDay = selectedDate ? selectedSessions.filter((s) => s.date === selectedDate) : []
+  const selectedDay = selectedDate ? Number(selectedDate.split("-")[2]) : null
+  const selectedMeta = selectedDate && selectedDay ? getDayMeta(selectedDay, selectedDate, isPastDate(selectedDate)) : null
+  const slotsForSelectedDate = selectedMeta?.availableSlots ?? []
+  const bookedSlotsForSelectedDate = selectedMeta?.bookedSlots ?? []
+  const sortedSessions = [...selectedSessions].sort((a, b) => {
+    if (a.date === b.date) return a.slot.localeCompare(b.slot)
+    return a.date.localeCompare(b.date)
+  })
+
+  const handleSelectDay = (dateKey: string, isAvailable: boolean, reason: string) => {
+    if (!isAvailable) {
+      setUnavailableMessage(`لا يمكن الحجز في هذا اليوم لأن: ${reason}`)
+      setSelectedDate(null)
       return
     }
-
-    const start = new Date(unifiedSettings.startDate)
-    const end = new Date(unifiedSettings.endDate)
-    const newSessions = []
-    
-    // Calculate duration per session (approx in hours)
-    const sTime = new Date(`2000-01-01T${unifiedSettings.startTime}`)
-    const eTime = new Date(`2000-01-01T${unifiedSettings.endTime}`)
-    const duration = (eTime.getTime() - sTime.getTime()) / (1000 * 60 * 60)
-
-    if (duration <= 0) {
-        toast.error("وقت النهاية يجب أن يكون بعد وقت البداية")
-        return
-    }
-
-    // Loop through dates
-    for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
-        if (unifiedSettings.selectedDays.includes(dt.getDay())) {
-            newSessions.push({
-                id: Math.random().toString(36).substr(2, 9),
-                date: dt.toISOString().split('T')[0], // YYYY-MM-DD
-                startTime: unifiedSettings.startTime,
-                endTime: unifiedSettings.endTime,
-                duration: Number(duration.toFixed(1))
-            })
-        }
-    }
-
-    if (newSessions.length === 0) {
-        toast.warning("لم يتم العثور على أيام مطابقة في الفترة المحددة")
-        return
-    }
-
-    const updatedSessions = [...sessions, ...newSessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    setSessions(updatedSessions)
-    updateCourseDates(updatedSessions)
-    toast.success(`تم إضافة ${newSessions.length} جلسة بنجاح`)
+    setUnavailableMessage("")
+    setSelectedDate(dateKey)
   }
 
-  const addCustomSession = () => {
-    if (!customSession.date || !customSession.startTime || !customSession.endTime) {
-         toast.error("يرجى تعبئة بيانات الجلسة")
-         return
+  const toggleSessionSlot = (date: string, slot: string) => {
+    const exists = selectedSessions.some((s) => s.date === date && s.slot === slot)
+    if (exists) {
+      setSelectedSessions((prev) => prev.filter((s) => !(s.date === date && s.slot === slot)))
+      return
     }
-
-    const sTime = new Date(`2000-01-01T${customSession.startTime}`)
-    const eTime = new Date(`2000-01-01T${customSession.endTime}`)
-    const duration = (eTime.getTime() - sTime.getTime()) / (1000 * 60 * 60)
-
-     if (duration <= 0) {
-        toast.error("وقت النهاية يجب أن يكون بعد وقت البداية")
-        return
-    }
-
-    const newS = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: customSession.date,
-        startTime: customSession.startTime,
-        endTime: customSession.endTime,
-        duration: Number(duration.toFixed(1))
-    }
-
-    const updatedSessions = [...sessions, newS].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    setSessions(updatedSessions)
-    updateCourseDates(updatedSessions)
-    setCustomSession({ date: "", startTime: "", endTime: "" })
-    toast.success("تم إضافة الجلسة")
+    setSelectedSessions((prev) => [...prev, { date, slot }])
   }
 
-  const removeSession = (id: string) => {
-    const updated = sessions.filter(s => s.id !== id)
-    setSessions(updated)
-    updateCourseDates(updated)
+  const handleOpenHallPicker = () => {
+    if (typeof window === "undefined") return
+    window.open("/trainer/halls?mode=select", "_blank")
   }
   
 
   const handleSubmit = async (action: 'draft' | 'submit') => {
     setIsSubmitting(true)
+
+    const payloadData = {
+      ...courseData,
+      imageFile: undefined,
+      imagePreviewUrl: undefined
+    }
+    const payload = new FormData()
+    payload.append("courseData", JSON.stringify(payloadData))
+    if (courseData.imageFile) {
+      payload.append("image", courseData.imageFile)
+    }
 
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000))
@@ -320,32 +404,126 @@ export default function CreateCoursePage() {
     }))
   }
 
-  const handleAddLesson = () => {
-      if (newLesson.title && newLesson.date && newLesson.time) {
-          setLessons([...lessons, { ...newLesson, id: Math.random().toString() }])
-          setNewLesson({ title: "", date: "", time: "" })
-          toast.success("تم إضافة الدرس للجدول")
-      } else {
-          toast.error("يرجى تعبئة جميع حقول الدرس")
-      }
+  const formatFileSize = (bytes: number) => {
+    if (!Number.isFinite(bytes)) return ""
+    if (bytes < 1024) return `${bytes} بايت`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} ك.ب`
+    return `${(bytes / 1024 / 1024).toFixed(2)} م.ب`
   }
 
-  const handleFileUpload = () => {
-      // Mock upload
-      setFiles([...files, `Course_Material_${files.length + 1}.pdf`])
-      toast.success("تم رفع الملف بنجاح")
+  const loadImageElement = (file: File) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const url = URL.createObjectURL(file)
+      const image = new window.Image()
+      image.onload = () => {
+        URL.revokeObjectURL(url)
+        resolve(image)
+      }
+      image.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error("image-load-failed"))
+      }
+      image.src = url
+    })
+
+  const compressCourseImage = async (file: File, image: HTMLImageElement) => {
+    const canvas = document.createElement("canvas")
+    canvas.width = COURSE_CARD_IMAGE_WIDTH
+    canvas.height = COURSE_CARD_IMAGE_HEIGHT
+    const context = canvas.getContext("2d")
+    if (!context) throw new Error("canvas-unavailable")
+
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = "high"
+    context.drawImage(image, 0, 0, COURSE_CARD_IMAGE_WIDTH, COURSE_CARD_IMAGE_HEIGHT)
+
+    const baseName = file.name.replace(/\.[^/.]+$/, "")
+    const makeBlob = (type: string, quality: number) =>
+      new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality))
+
+    let blob = await makeBlob("image/webp", 0.92)
+    let extension = "webp"
+    if (!blob) {
+      blob = await makeBlob("image/jpeg", 0.92)
+      extension = "jpg"
+    }
+    if (!blob) {
+      throw new Error("compression-failed")
+    }
+
+    return new File([blob], `${baseName}.${extension}`, { type: blob.type })
   }
+
+  const handleCourseImageFile = async (file?: File | null) => {
+    if (!file) return
+    setCourseImageError("")
+
+    if (!file.type.startsWith("image/")) {
+      setCourseImageError("الملف المحدد ليس صورة. يرجى اختيار صورة بصيغة JPG أو PNG أو WEBP.")
+      return
+    }
+
+    try {
+      const image = await loadImageElement(file)
+      const width = image.naturalWidth || image.width
+      const height = image.naturalHeight || image.height
+
+      if (width !== COURSE_CARD_IMAGE_WIDTH || height !== COURSE_CARD_IMAGE_HEIGHT) {
+        setCourseImageError(
+          `المقاس غير مطابق. المطلوب ${COURSE_CARD_IMAGE_WIDTH}×${COURSE_CARD_IMAGE_HEIGHT} بكسل. المقاس الحالي ${width}×${height} بكسل.`
+        )
+        return
+      }
+
+      const compressedFile = await compressCourseImage(file, image)
+      const previewUrl = URL.createObjectURL(compressedFile)
+
+      setCourseData(prev => ({
+        ...prev,
+        imageFile: compressedFile,
+        imagePreviewUrl: previewUrl
+      }))
+    } catch (error) {
+      setCourseImageError("تعذر معالجة الصورة. يرجى اختيار صورة أخرى.")
+    }
+  }
+
+  const clearCourseImage = () => {
+    setCourseData(prev => ({
+      ...prev,
+      imageFile: null,
+      imagePreviewUrl: ""
+    }))
+    setCourseImageError("")
+  }
+
+  const priceValue = Number(courseData.price || 0)
+  const minCapacityValue = Number(courseData.minStudents || 0)
+  const maxCapacityValue = Number(courseData.maxStudents || 0)
+
+  const isPriceValid = courseData.isFree || priceValue > 0
+  const isCapacityValid =
+    minCapacityValue >= 1 &&
+    maxCapacityValue >= 1 &&
+    minCapacityValue <= maxCapacityValue
+  const isModeSelected = courseData.deliveryType === "online" || courseData.deliveryType === "in_person"
+  const isInPersonValid = courseData.deliveryType === "in_person" && !!courseData.hallId && selectedSessions.length > 0
+  const isOnlineValid = courseData.deliveryType === "online" && !!onlineSchedule.startDate && !!onlineSchedule.startTime && !!onlineSchedule.duration
+  const isStep2Valid = isPriceValid && isCapacityValid && isModeSelected && (courseData.deliveryType === "in_person" ? isInPersonValid : isOnlineValid)
 
   const isInfoValid = () => {
-      return courseData.title && courseData.category && courseData.shortDescription && courseData.description
+      return (
+        courseData.title &&
+        courseData.category &&
+        courseData.shortDescription &&
+        courseData.description &&
+        courseData.imageFile &&
+        !courseImageError
+      )
   }
 
   const isPricingValid = () => {
-      return courseData.price
-  }
-
-  const isCurriculumValid = () => {
-      return true
+      return isStep2Valid
   }
 
   const isLocationValid = () => {
@@ -354,10 +532,19 @@ export default function CreateCoursePage() {
       return true
   }
 
+  const handleStep2Next = () => {
+      if (!isStep2Valid) return
+      setActiveTab("location")
+  }
+
   const selectedHall = mockHalls.find(h => h.id === courseData.hallId)
+  const selectedHallName = selectedHall?.name ?? courseData.hallName
+  const totalSelectedHours = selectedSessions.length
+  const totalSelectedDays = new Set(selectedSessions.map((s) => s.date)).size
+  const totalSelectedPrice = selectedHall ? totalSelectedHours * selectedHall.hourlyRate : 0
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
+    <div className="max-w-5xl mx-auto pb-12" dir="rtl">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
@@ -379,24 +566,24 @@ export default function CreateCoursePage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
         {/* Step Indicator (Tabs List) */}
         <div className="w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100 sticky top-0 z-10">
-            <TabsList className="grid w-full grid-cols-4 h-12 bg-gray-50/50">
+            <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-50/50">
                 <TabsTrigger value="info" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2">
                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">1</div>
                     بيانات الدورة
                 </TabsTrigger>
-                <TabsTrigger value="pricing" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2" disabled={!isInfoValid()}>
+                <TabsTrigger value="pricing" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2">
                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">2</div>
-                    التسعير والمواعيد
-                </TabsTrigger>
-                <TabsTrigger value="curriculum" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2" disabled={!isInfoValid() || !isPricingValid()}>
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">3</div>
-                    المنهج والمرفقات
-                </TabsTrigger>
-                <TabsTrigger value="location" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2" disabled={!isInfoValid() || !isPricingValid() || !isCurriculumValid()}>
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">4</div>
-                    المكان والنشر
+                    الحجز والمواعيد
                 </TabsTrigger>
             </TabsList>
+            <div className="mt-3 h-1 w-full rounded-full bg-gray-100">
+                <div
+                    className="h-1 rounded-full bg-blue-600 transition-all duration-300"
+                    style={{
+                        width: activeTab === "info" ? "50%" : "100%"
+                    }}
+                />
+            </div>
         </div>
 
         {/* Tab 1: Course Info */}
@@ -409,60 +596,250 @@ export default function CreateCoursePage() {
                         <CardTitle>المعلومات الأساسية</CardTitle>
                         <CardDescription>تفاصيل الدورة والعنوان</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                        <Label htmlFor="title">عنوان الدورة *</Label>
-                        <Input
-                            id="title"
-                            placeholder="مثال: تعلم React من الصفر"
-                            value={courseData.title}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
-                        />
-                        </div>
+                    <CardContent>
+                        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
+                            <div className="space-y-3">
+                                <Label htmlFor="courseImage">صورة الدورة *</Label>
+                                <div
+                                    className={`relative h-[260px] w-[260px] max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition-shadow ${
+                                        isImageDragging ? "ring-2 ring-blue-500 ring-offset-2" : ""
+                                    }`}
+                                    onDragOver={(event) => {
+                                        event.preventDefault()
+                                        setIsImageDragging(true)
+                                    }}
+                                    onDragLeave={() => setIsImageDragging(false)}
+                                    onDrop={(event) => {
+                                        event.preventDefault()
+                                        setIsImageDragging(false)
+                                        handleCourseImageFile(event.dataTransfer.files?.[0])
+                                    }}
+                                >
+                                    <input
+                                        ref={courseImageInputRef}
+                                        id="courseImage"
+                                        type="file"
+                                        accept="image/*"
+                                        className="sr-only"
+                                        onChange={(event) => {
+                                            handleCourseImageFile(event.target.files?.[0])
+                                            event.currentTarget.value = ""
+                                        }}
+                                    />
 
-                        <div className="space-y-2">
-                        <Label htmlFor="category">الفئة *</Label>
-                        <Select value={courseData.category} onValueChange={(value) => setCourseData(prev => ({ ...prev, category: value }))}>
-                            <SelectTrigger>
-                            <SelectValue placeholder="اختر فئة الدورة" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {categories.map(category => (
-                                <SelectItem key={category} value={category}>
-                                {category}
-                                </SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        </div>
+                                    {courseData.imagePreviewUrl ? (
+                                        <>
+                                            <Image
+                                                src={courseData.imagePreviewUrl}
+                                                alt={courseData.title || "صورة الدورة"}
+                                                fill
+                                                sizes="260px"
+                                                className="object-cover"
+                                                unoptimized
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                                            <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    className="h-8 bg-white/95 hover:bg-white"
+                                                    onClick={() => courseImageInputRef.current?.click()}
+                                                >
+                                                    تغيير
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-8 bg-white/95 text-slate-700 hover:bg-white"
+                                                    onClick={clearCourseImage}
+                                                >
+                                                    حذف
+                                                </Button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
+                                            <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] text-slate-600">
+                                                {COURSE_CARD_IMAGE_WIDTH}×{COURSE_CARD_IMAGE_HEIGHT} • 1:1
+                                            </span>
+                                            <p className="text-sm font-semibold text-slate-700">
+                                                اسحب الصورة هنا أو اختر من الجهاز
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="bg-white/90"
+                                                onClick={() => courseImageInputRef.current?.click()}
+                                            >
+                                                اختيار من الجهاز
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
 
-                        <div className="space-y-2">
-                        <Label htmlFor="shortDescription">وصف الترويجي (قصير) *</Label>
-                        <Textarea
-                            id="shortDescription"
-                            placeholder="وصف يظهر في بطاقة الدورة..."
-                            value={courseData.shortDescription}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, shortDescription: e.target.value }))}
-                            rows={2}
-                        />
-                        </div>
-                        
-                        <div className="space-y-2">
-                        <Label htmlFor="description">الوصف التفصيلي *</Label>
-                        <Textarea
-                            id="description"
-                            placeholder="ماذا سيتعلم الطالب؟ المتطلبات..."
-                            value={courseData.description}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
-                            rows={4}
-                        />
+                                {courseData.imageFile && !courseImageError && (
+                                    <div className="text-xs text-emerald-600">
+                                        تم ضغط الصورة تلقائيًا بجودة عالية
+                                        {courseData.imageFile.size ? ` (${formatFileSize(courseData.imageFile.size)})` : ""}
+                                    </div>
+                                )}
+
+                                {courseImageError && (
+                                    <p className="text-xs text-red-500">{courseImageError}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                <Label htmlFor="title">عنوان الدورة *</Label>
+                                <Input
+                                    id="title"
+                                    placeholder="مثال: تعلم React من الصفر"
+                                    value={courseData.title}
+                                    onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
+                                />
+                                </div>
+
+                                <div className="space-y-2">
+                                <Label htmlFor="category">الفئة *</Label>
+                                <Select value={courseData.category} onValueChange={(value) => setCourseData(prev => ({ ...prev, category: value }))}>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="اختر فئة الدورة" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                    {categories.map(category => (
+                                        <SelectItem key={category} value={category}>
+                                        {category}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                <Label htmlFor="shortDescription">وصف الترويجي (قصير) *</Label>
+                                <Textarea
+                                    id="shortDescription"
+                                    placeholder="وصف يظهر في بطاقة الدورة..."
+                                    value={courseData.shortDescription}
+                                    onChange={(e) => setCourseData(prev => ({ ...prev, shortDescription: e.target.value }))}
+                                    rows={2}
+                                />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                <Label htmlFor="description">الوصف التفصيلي *</Label>
+                                <Textarea
+                                    id="description"
+                                    placeholder="ماذا سيتعلم الطالب؟ المتطلبات..."
+                                    value={courseData.description}
+                                    onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
+                                    rows={4}
+                                />
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
 
+                {/* 2. التسعير */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-start justify-between text-right">
+                            <CardDescription className="text-right">حدد الحد الأدنى والأقصى للمقاعد.</CardDescription>
+                            <div className="flex items-center gap-2">
+                                <Banknote className="h-5 w-5 text-blue-600" />
+                                <CardTitle>العدد والتسعير</CardTitle>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="minCapacity">الحد الأدنى للمقاعد *</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="minCapacity"
+                                        type="number"
+                                        dir="rtl"
+                                        value={courseData.minStudents}
+                                        onChange={(e) => setCourseData(prev => ({ ...prev, minStudents: e.target.value }))}
+                                        className="h-11 pl-16 [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
+                                        مقعد
+                                    </span>
+                                </div>
+                                <p className="min-h-[16px] text-xs text-red-500">
+                                    {!isCapacityValid ? "يرجى إدخال حد أدنى صحيح." : ""}
+                                </p>
+                            </div>
 
+                            <div className="space-y-2">
+                                <Label htmlFor="capacity">الحد الأقصى للمقاعد *</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="capacity"
+                                        type="number"
+                                        dir="rtl"
+                                        value={courseData.maxStudents}
+                                        onChange={(e) => setCourseData(prev => ({ ...prev, maxStudents: e.target.value }))}
+                                        className="h-11 pl-16 [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
+                                        مقعد
+                                    </span>
+                                </div>
+                                <p className="min-h-[16px] text-xs text-red-500">
+                                    {!isCapacityValid ? "يرجى إدخال حد أقصى صحيح." : ""}
+                                </p>
+                            </div>
 
-                {/* 3. Media & Attributes (MOVED DOWN) */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                                        <input
+                                            id="isFree"
+                                            type="checkbox"
+                                            checked={courseData.isFree}
+                                            onChange={(e) =>
+                                                setCourseData(prev => ({
+                                                    ...prev,
+                                                    isFree: e.target.checked,
+                                                    price: e.target.checked ? "0" : prev.price
+                                                }))
+                                            }
+                                        />
+                                        <label htmlFor="isFree">مجانية</label>
+                                    </div>
+                                    <Label htmlFor="price">سعر الدورة *</Label>
+                                </div>
+                                <div className="relative">
+                                    <Input
+                                        id="price"
+                                        type="number"
+                                        dir="rtl"
+                                        value={courseData.price}
+                                        onChange={(e) => setCourseData(prev => ({ ...prev, price: e.target.value }))}
+                                        disabled={courseData.isFree}
+                                        className="h-11 pl-16 [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
+                                        ر.ي
+                                    </span>
+                                </div>
+                                <p className="min-h-[16px] text-xs text-red-500">
+                                    {!isPriceValid ? "يرجى إدخال سعر صحيح." : ""}
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 3. Media & Attributes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Objectives */}
                     <Card>
@@ -512,315 +889,383 @@ export default function CreateCoursePage() {
 
             </div>
 
-            <div className="flex justify-end pt-6">
-                <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid()}>
-                    التالي: التسعير والمواعيد
-                </Button>
+            <div className="flex justify-end gap-3 pt-6">
+                <Button variant="outline" onClick={() => handleSubmit('draft')}>حفظ كمسودة</Button>
+                <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid()}>التالي: التسعير والمواعيد</Button>
             </div>
         </TabsContent>
 
-        {/* Tab 2: Pricing & Schedule (NEW STEP) */}
+                {/* Tab 2: Pricing & Schedule */}
         <TabsContent value="pricing" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2">
-             <Card>
-                <CardHeader><CardTitle>التسعير والتواريخ</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="price">السعر (ريال يمني) *</Label>
-                            <Input id="price" type="number" value={courseData.price} onChange={(e) => setCourseData(prev => ({ ...prev, price: e.target.value }))} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="maxStudents">المقاعد (اختياري)</Label>
-                            <Input id="maxStudents" type="number" value={courseData.maxStudents} onChange={(e) => setCourseData(prev => ({ ...prev, maxStudents: e.target.value }))} />
-                        </div>
-                    </div>
-                    
-                    {/* Session Scheduler Section */}
-                    <div className="border-t pt-6 mt-4">
-                        <Label className="text-base font-semibold block mb-4">جدول المواعيد والجلسات</Label>
-                        
-                        {/* Toggle Type */}
-                        <div className="bg-gray-100/50 p-1 rounded-lg flex mb-6 w-fit">
-                            <button 
-                                type="button"
-                                onClick={() => setScheduleType('unified')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${scheduleType === 'unified' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
-                            >
-                                وقت موحد (تكرار)
-                            </button>
-                            <button 
-                                type="button"
-                                onClick={() => setScheduleType('custom')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${scheduleType === 'custom' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
-                            >
-                                وقت مخصص
-                            </button>
-                        </div>
-
-                        {/* Scheduler Inputs */}
-                        <div className="bg-blue-50/30 border border-blue-100 rounded-xl p-5 mb-6">
-                            {scheduleType === 'unified' ? (
-                                <div className="space-y-6">
-                                    {/* Date Range - RTL: Start Right, End Left */}
-                                    <div className="flex gap-4">
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700">من تاريخ (Start Date)</Label>
-                                            <Input type="date" value={unifiedSettings.startDate} onChange={e => setUnifiedSettings({...unifiedSettings, startDate: e.target.value})} className="bg-white" />
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700">إلى تاريخ (End Date)</Label>
-                                            <Input type="date" value={unifiedSettings.endDate} onChange={e => setUnifiedSettings({...unifiedSettings, endDate: e.target.value})} className="bg-white" />
-                                        </div>
+            <div className="space-y-6">
+                {/* Course Mode Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Users className="h-5 w-5 text-blue-600" />
+                            نوع الدورة
+                        </CardTitle>
+                        <CardDescription>اختر طريقة تقديم الدورة.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <RadioGroup
+                            value={courseData.deliveryType}
+                            onValueChange={(value) => setCourseData(prev => ({ ...prev, deliveryType: value }))}
+                            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                        >
+                            <label className={`relative flex items-center justify-between gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all ${courseData.deliveryType === 'online' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200'}`}>
+                                <RadioGroupItem value="online" className="sr-only" />
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-full bg-blue-100 text-blue-600">
+                                        <Globe className="h-5 w-5" />
                                     </div>
-
-                                    {/* Days Selector */}
-                                    <div className="space-y-3">
-                                        <Label className="text-sm font-medium text-gray-700">الأيام (Days)</Label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {weekDays.map(day => (
-                                                <button
-                                                    key={day.id}
-                                                    type="button"
-                                                    onClick={() => toggleDay(day.id)}
-                                                    className={`
-                                                        px-4 py-2 rounded-lg text-sm font-medium transition-all border
-                                                        ${unifiedSettings.selectedDays.includes(day.id) 
-                                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' 
-                                                            : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-gray-50'}
-                                                    `}
-                                                >
-                                                    {day.label}
-                                                </button>
-                                            ))}
-                                        </div>
+                                    <div>
+                                        <p className="font-semibold">أونلاين</p>
+                                        <p className="text-xs text-gray-500">عبر الإنترنت بالكامل</p>
                                     </div>
-
-                                    {/* Time Range - RTL: Start Right, End Left */}
-                                    <div className="flex gap-4">
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700">من الساعة (Start Time)</Label>
-                                            <Input type="time" value={unifiedSettings.startTime} onChange={e => setUnifiedSettings({...unifiedSettings, startTime: e.target.value})} className="bg-white" />
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700">إلى الساعة (End Time)</Label>
-                                            <Input type="time" value={unifiedSettings.endTime} onChange={e => setUnifiedSettings({...unifiedSettings, endTime: e.target.value})} className="bg-white" />
-                                        </div>
-                                    </div>
-
-                                    <Button type="button" onClick={generateUnifiedSessions} className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm h-11 text-base">
-                                        <Plus className="w-5 h-5 mr-2" />
-                                        إضافة الجلسات للجدول
-                                    </Button>
                                 </div>
-                            ) : (
-                                <div className="space-y-6 animate-in fade-in">
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-medium text-gray-700">التاريخ</Label>
-                                        <Input type="date" value={customSession.date} onChange={e => setCustomSession({...customSession, date: e.target.value})} className="bg-white" />
+                                {courseData.deliveryType === 'online' && (
+                                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                                )}
+                            </label>
+                            <label className={`relative flex items-center justify-between gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all ${courseData.deliveryType === 'in_person' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200'}`}>
+                                <RadioGroupItem value="in_person" className="sr-only" />
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-full bg-purple-100 text-purple-600">
+                                        <Building className="h-5 w-5" />
                                     </div>
-                                    
-                                    {/* Time Range - RTL: Start Right, End Left */}
-                                    <div className="flex gap-4">
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700">وقت البدء (Start)</Label>
-                                            <Input type="time" value={customSession.startTime} onChange={e => setCustomSession({...customSession, startTime: e.target.value})} className="bg-white" />
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700">وقت النهاية (End)</Label>
-                                            <Input type="time" value={customSession.endTime} onChange={e => setCustomSession({...customSession, endTime: e.target.value})} className="bg-white" />
-                                        </div>
+                                    <div>
+                                        <p className="font-semibold">حضوري</p>
+                                        <p className="text-xs text-gray-500">داخل القاعة التدريبية</p>
                                     </div>
-                                    
-                                    <Button type="button" onClick={addCustomSession} className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm h-11 text-base">
-                                        <Plus className="w-5 h-5 mr-2" />
-                                        إضافة جلسة
-                                    </Button>
                                 </div>
-                            )}
-                        </div>
+                                {courseData.deliveryType === 'in_person' && (
+                                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                                )}
+                            </label>
+                        </RadioGroup>
+                        {!isModeSelected && (
+                            <p className="text-xs text-red-500">يرجى اختيار نوع الدورة.</p>
+                        )}
+                    </CardContent>
+                </Card>
 
-                        {/* Sessions List */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between text-sm text-gray-500 px-1 border-b pb-2">
-                                <span className="font-semibold text-gray-700">الجلسات المجدولة ({sessions.length})</span>
-                                <span className="bg-gray-100 px-2 py-1 rounded text-xs">المدة الإجمالية: {totalHours.toFixed(1)} ساعة</span>
-                            </div>
-                            
-                            {sessions.length > 0 ? (
-                                <div className="border rounded-xl divide-y bg-white max-h-[400px] overflow-y-auto shadow-sm">
-                                    {sessions.map((session, idx) => (
-                                        <div key={session.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors bg-white group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold border border-blue-100">
-                                                    {idx + 1}
+                {/* In-person flow */}
+                {courseData.deliveryType === "in_person" && (
+                    <>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>اختيار القاعة</CardTitle>
+                                <CardDescription>حدد القاعة المناسبة للدورة.</CardDescription>
+                            </CardHeader>
+                        <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>القاعة *</Label>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full justify-between"
+                                        onClick={handleOpenHallPicker}
+                                    >
+                                        <span>{selectedHallName || "اختر القاعة"}</span>
+                                        <MapPin className="h-4 w-4 text-gray-400" />
+                                    </Button>
+                                    {!courseData.hallId && (
+                                        <p className="text-xs text-red-500">يرجى اختيار القاعة.</p>
+                                    )}
+                                </div>
+                                {selectedHall && (
+                                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                                        <div className="flex flex-col gap-4 sm:flex-row-reverse sm:items-start sm:gap-2">
+                                            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-100">
+                                                <Image
+                                                    src={selectedHall.image}
+                                                    alt={selectedHall.name}
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0 flex-1 space-y-2 text-right" dir="rtl">
+                                                <div className="flex items-center gap-2 justify-end flex-row-reverse">
+                                                    <h4 className="text-base font-semibold text-slate-900">{selectedHall.name}</h4>
+                                                    <Badge variant="secondary">{selectedHall.type}</Badge>
                                                 </div>
-                                                <div>
-                                                    <div className="font-bold text-gray-900 mb-1 flex items-center gap-2">
-                                                            {new Date(session.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
-                                                    </div>
-                                                    <div className="text-xs text-gray-500 flex items-center gap-2 bg-gray-50 px-2 py-1 rounded w-fit">
-                                                        <Clock className="w-3 h-3" />
-                                                        <span dir="ltr">{session.startTime} - {session.endTime}</span>
-                                                    </div>
+                                                <p className="text-sm text-slate-600">{selectedHall.description}</p>
+                                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                                    <a
+                                                        className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 hover:text-blue-700"
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedHall.location)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <MapPin className="h-3.5 w-3.5" />
+                                                        {selectedHall.location}
+                                                    </a>
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
+                                                        <Users className="h-3.5 w-3.5" />
+                                                        السعة: {selectedHall.capacity} شخص
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm font-semibold text-blue-700">
+                                                    {selectedHall.hourlyRate} ر.ي / ساعة
                                                 </div>
                                             </div>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-9 w-9 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" 
-                                                onClick={() => removeSession(session.id)}
-                                                title="حذف الجلسة"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </Button>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                                    <div className="bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <Calendar className="w-6 h-6 text-gray-400" />
                                     </div>
-                                    <h3 className="text-sm font-medium text-gray-900">لا توجد جلسات مضافة</h3>
-                                    <p className="text-xs text-gray-500 mt-1">ابدأ بإضافة مواعيد الدورة باستخدام النموذج أعلاه</p>
+                                )}
+                        </CardContent>
+                    </Card>
+
+                        {courseData.hallId && (
+                            <Card>
+                                <CardHeader>
+                                <CardTitle className="flex items-center gap-2 justify-end text-right w-full">
+                                    <Calendar className="h-5 w-5 text-blue-600" />
+                                    اختيار المواعيد
+                                </CardTitle>
+                                <CardDescription className="text-right">اختر الأيام والأوقات المتاحة لهذه القاعة.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_1.1fr]">
+            <div className="order-2 rounded-2xl border border-slate-100 p-4 lg:order-2">
+                <div className="flex items-center justify-between flex-row-reverse">
+                    <p className="text-sm font-semibold text-slate-700">{monthLabel}</p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            onClick={() => setCalendarOffset((prev) => Math.max(0, prev - 1))}
+                            disabled={calendarOffset === 0}
+                        >
+                            الشهر السابق
+                        </button>
+                        <button
+                            type="button"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            onClick={() => setCalendarOffset((prev) => Math.min(maxMonthsAhead, prev + 1))}
+                            disabled={calendarOffset === maxMonthsAhead}
+                        >
+                            الشهر التالي
+                        </button>
+                    </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs text-slate-500">
+                    {weekDaysShort.map((day) => (
+                        <div key={day}>{day}</div>
+                    ))}
+                </div>
+
+                <div className="mt-3 grid grid-cols-7 gap-2">
+                    {calendarDays.map((cell, index) => {
+                        if (!cell) return <div key={`empty-${index}`} />
+                        const meta = getDayMeta(cell.day, cell.dateKey, cell.isPast)
+                        const isSelected = selectedDate === cell.dateKey
+                        const isToday = formatDateKey(new Date()) === cell.dateKey
+                        const hasSelection = selectedSessions.some((s) => s.date === cell.dateKey)
+                        return (
+                            <button
+                                key={cell.dateKey}
+                                type="button"
+                                title={!meta.isSelectable ? meta.reason : ""}
+                                disabled={!meta.isSelectable}
+                                onClick={() => handleSelectDay(cell.dateKey, meta.isSelectable, meta.reason)}
+                                className={`h-9 rounded-lg text-sm transition ${
+                                    isSelected
+                                        ? "bg-blue-600 text-white shadow-sm"
+                                        : !meta.isSelectable
+                                            ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                                            : hasSelection
+                                                ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                                : "bg-white text-slate-700 hover:bg-blue-50 border border-slate-200"
+                                }`}
+                            >
+                                <span className={`${isToday && !isSelected ? "rounded-full border border-blue-300 px-2 py-0.5" : ""}`}>
+                                    {cell.day}
+                                </span>
+                            </button>
+                        )
+                    })}
+                </div>
+
+                {unavailableMessage && (
+                    <p className="mt-2 text-xs text-red-500 text-right">{unavailableMessage}</p>
+                )}
+            </div>
+
+            <div className="order-1 rounded-2xl border border-slate-100 p-4 lg:order-1">
+                <h4 className="text-sm font-semibold text-slate-700 text-right">الأوقات المتاحة</h4>
+                {!hasAvailability && (
+                    <p className="mt-3 text-sm text-slate-500 text-right">لا توجد مواعيد متاحة لهذه القاعة في هذا الشهر.</p>
+                )}
+                {selectedDate ? (
+                    <>
+                        <p className="mt-3 text-sm text-slate-500 text-right">اليوم المحدد: {formatDateLabel(selectedDate)}</p>
+                        {slotsForSelectedDate.length === 0 ? (
+                            <div className="mt-4 text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-4 text-right">
+                                لا توجد أوقات متاحة في هذا اليوم
+                            </div>
+                        ) : (
+                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                {timeSlots.map((slot) => {
+                                    const isBooked = bookedSlotsForSelectedDate.includes(slot)
+                                    const isAvailable = slotsForSelectedDate.includes(slot)
+                                    if (!isAvailable && !isBooked) return null
+                                    const selected = selectedSessionsForDay.some((s) => s.slot === slot)
+                                    return (
+                                        <button
+                                            key={slot}
+                                            type="button"
+                                            disabled={!isAvailable}
+                                            onClick={() => isAvailable && toggleSessionSlot(selectedDate, slot)}
+                                            className={`rounded-lg border px-3 py-2 text-sm transition ${
+                                                selected
+                                                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                                                    : !isAvailable
+                                                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                                                        : "border-blue-200 text-blue-700 hover:bg-blue-50"
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-center gap-1">
+                                                {!isAvailable && <Lock className="h-3 w-3" />}
+                                                <span>{slot}</span>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <p className="mt-3 text-sm text-slate-500 text-right">اختر يوماً من التقويم لعرض الأوقات.</p>
+                )}
+
+                {selectedSessions.length === 0 && (
+                    <p className="mt-3 text-xs text-red-500 text-right">يرجى اختيار جلسة واحدة على الأقل</p>
+                )}
+
+                {selectedSessions.length > 0 && (
+                    <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-right">
+                        <p className="font-semibold text-slate-800">تم اختيار {selectedSessions.length} جلسات</p>
+                        <ul className="mt-2 space-y-1 text-slate-600">
+                            {sortedSessions.map((session) => (
+                                <li key={`${session.date}-${session.slot}`}>{formatDateLabel(session.date)} • {session.slot}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {selectedSessions.length > 0 && (
+                    <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3 text-sm text-right">
+                        <p className="font-semibold text-slate-800">الإجمالي</p>
+                        <p className="mt-2 text-slate-600">
+                            عدد الأيام: {totalSelectedDays} | عدد الساعات: {totalSelectedHours} | المبلغ: {totalSelectedPrice} ر.ي
+                        </p>
+                    </div>
+                )}
+
+            </div>
+        </div>
+    
+</CardContent>
+                            </Card>
+                        )}
+                    </>
+                )}
+
+                {/* Online flow */}
+                {courseData.deliveryType === "online" && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>مواعيد الدورة (أونلاين)</CardTitle>
+                            <CardDescription>حدد تاريخ ووقت الجلسة الأولى.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label>تاريخ البداية *</Label>
+                                    <Input
+                                        type="date"
+                                        value={onlineSchedule.startDate}
+                                        onChange={(e) => setOnlineSchedule(prev => ({ ...prev, startDate: e.target.value }))}
+                                    />
+                                    {!onlineSchedule.startDate && (
+                                        <p className="text-xs text-red-500">يرجى اختيار تاريخ البداية.</p>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    {/* Read-Only Auto Data (Hidden or Displayed) */}
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t bg-gray-50/50 p-4 rounded-lg mt-4" style={{ display: sessions.length > 0 ? 'grid' : 'none' }}>
-                        <div>
-                            <span className="text-xs text-gray-400 block mb-1">تاريخ البداية (تلقائي)</span>
-                            <div className="font-bold text-sm text-gray-800 bg-white px-3 py-2 rounded border inline-block min-w-[120px]">
-                                {courseData.startDate || "-"}
+                                <div className="space-y-2">
+                                    <Label>وقت البداية *</Label>
+                                    <Input
+                                        type="time"
+                                        value={onlineSchedule.startTime}
+                                        onChange={(e) => setOnlineSchedule(prev => ({ ...prev, startTime: e.target.value }))}
+                                    />
+                                    {!onlineSchedule.startTime && (
+                                        <p className="text-xs text-red-500">يرجى تحديد وقت البداية.</p>
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>مدة الجلسة *</Label>
+                                    <Select value={onlineSchedule.duration} onValueChange={(value) => setOnlineSchedule(prev => ({ ...prev, duration: value }))}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="اختر المدة" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="60">60 دقيقة</SelectItem>
+                                            <SelectItem value="90">90 دقيقة</SelectItem>
+                                            <SelectItem value="120">120 دقيقة</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {!onlineSchedule.duration && (
+                                        <p className="text-xs text-red-500">يرجى اختيار مدة الجلسة.</p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                        <div>
-                            <span className="text-xs text-gray-400 block mb-1">تاريخ النهاية (تلقائي)</span>
-                            <div className="font-bold text-sm text-gray-800 bg-white px-3 py-2 rounded border inline-block min-w-[120px]">
-                                {courseData.endDate || "-"}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>المنصة (اختياري)</Label>
+                                    <Select value={onlineSchedule.platform} onValueChange={(value) => setOnlineSchedule(prev => ({ ...prev, platform: value }))}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="اختر المنصة" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {platforms.map(platform => (
+                                                <SelectItem key={platform.value} value={platform.value}>
+                                                    {platform.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>رابط الاجتماع (اختياري)</Label>
+                                    <Input
+                                        type="text"
+                                        value={onlineSchedule.meetingLink}
+                                        onChange={(e) => setOnlineSchedule(prev => ({ ...prev, meetingLink: e.target.value }))}
+                                        placeholder="https://"
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
             <div className="flex justify-between pt-6">
                 <Button variant="outline" onClick={() => setActiveTab("info")}>السابق</Button>
-                <Button onClick={() => setActiveTab("curriculum")} disabled={!isInfoValid() || !isPricingValid()}>
-                    التالي: المنهج والمرفقات
+                <Button
+                    onClick={() => handleSubmit('submit')}
+                    disabled={
+                        isSubmitting ||
+                        (courseData.deliveryType === "in_person" && selectedSessions.length === 0) ||
+                        (courseData.deliveryType === "online" && !isOnlineValid)
+                    }
+                >
+                    {isSubmitting ? 'جاري الحجز...' : 'حجز'}
                 </Button>
-            </div>
-        </TabsContent>
-
-        {/* Tab 3: Curriculum & Materials */}
-        <TabsContent value="curriculum" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Lesson Scheduler */}
-                <Card className="h-fit">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-blue-600" />
-                            جدولة الدروس
-                        </CardTitle>
-                        <CardDescription>قم بإضافة جدول المحاضرات المتوقع</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-4">
-                            <div className="space-y-2">
-                                <Label>عنوان الدرس</Label>
-                                <Input 
-                                    placeholder="مثال: مقدمة في React" 
-                                    value={newLesson.title}
-                                    onChange={(e) => setNewLesson({...newLesson, title: e.target.value})}
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>التاريخ</Label>
-                                    <Input type="date" value={newLesson.date} onChange={(e) => setNewLesson({...newLesson, date: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>الوقت</Label>
-                                    <Input type="time" value={newLesson.time} onChange={(e) => setNewLesson({...newLesson, time: e.target.value})} />
-                                </div>
-                            </div>
-                            <Button onClick={handleAddLesson} className="w-full" variant="secondary">
-                                <Plus className="w-4 h-4 mr-2" />
-                                إضافة للجدول
-                            </Button>
-                        </div>
-
-                        {/* Lessons List */}
-                        <div className="space-y-2">
-                            <h4 className="font-medium text-sm text-gray-700 mb-2">الدروس المضافة ({lessons.length})</h4>
-                            {lessons.length === 0 && (
-                                <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed rounded-lg">
-                                    لا يوجد دروس مضافة بعد
-                                </div>
-                            )}
-                            {lessons.map((lesson, idx) => (
-                                <div key={lesson.id} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                                            {idx + 1}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-sm">{lesson.title}</p>
-                                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                <span>{lesson.date}</span>
-                                                <span>•</span>
-                                                <span>{lesson.time}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <Button variant="ghost" size="sm" onClick={() => setLessons(lessons.filter(l => l.id !== lesson.id))}>
-                                        <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Course Materials */}
-                <Card className="h-fit">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-orange-600" />
-                            المواد التعليمية (المرفقات)
-                        </CardTitle>
-                        <CardDescription>ارفع ملفات PDF، عروض تقديمية، أو مصادر إضافية</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition cursor-pointer" onClick={handleFileUpload}>
-                            <Upload className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-                            <p className="font-medium text-gray-900">اضغط لرفع الملفات</p>
-                            <p className="text-sm text-gray-500 mt-1">PDF, PPTX, DOCS (Max 10MB)</p>
-                        </div>
-
-                         <div className="space-y-2">
-                            <h4 className="font-medium text-sm text-gray-700 mb-2">الملفات المرفقة ({files.length})</h4>
-                            {files.map((file, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-blue-500" />
-                                        <span className="text-sm truncate max-w-[200px]">{file}</span>
-                                    </div>
-                                    <Button variant="ghost" size="sm" onClick={() => setFiles(files.filter((_, i) => i !== idx))}>
-                                        <X className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-             <div className="flex justify-between pt-6">
-                <Button variant="outline" onClick={() => setActiveTab("pricing")}>السابق</Button>
-                <Button onClick={() => setActiveTab("location")}>التالي: المكان والنشر</Button>
             </div>
         </TabsContent>
 
@@ -907,23 +1352,53 @@ export default function CreateCoursePage() {
                          {courseData.deliveryType === 'in_person' && (
                              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                                 <Label htmlFor="hall" className="mb-2 block">اختيار القاعة *</Label>
-                                <Select value={courseData.hallId} onValueChange={(value) => setCourseData(prev => ({ ...prev, hallId: value }))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="اختر القاعة المناسبة" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {mockHalls.map(hall => (
-                                            <SelectItem key={hall.id} value={hall.id}>
-                                            {hall.name} (السعة: {hall.capacity})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full justify-between"
+                                    onClick={handleOpenHallPicker}
+                                >
+                                    <span>{selectedHallName || "اختر القاعة المناسبة"}</span>
+                                    <MapPin className="h-4 w-4 text-gray-400" />
+                                </Button>
                                 {selectedHall && (
-                                     <div className="bg-gray-50 p-3 rounded-md flex items-center gap-3 text-sm border">
-                                         <MapPin className="h-4 w-4 text-gray-500" />
-                                         <span>{selectedHall.location}</span>
-                                     </div>
+                                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                                        <div className="flex flex-col gap-4 sm:flex-row-reverse sm:items-start sm:gap-2">
+                                            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-100">
+                                                <Image
+                                                    src={selectedHall.image}
+                                                    alt={selectedHall.name}
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0 flex-1 space-y-2 text-right" dir="rtl">
+                                                <div className="flex items-center gap-2 justify-end flex-row-reverse">
+                                                    <h4 className="text-base font-semibold text-slate-900">{selectedHall.name}</h4>
+                                                    <Badge variant="secondary">{selectedHall.type}</Badge>
+                                                </div>
+                                                <p className="text-sm text-slate-600">{selectedHall.description}</p>
+                                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                                    <a
+                                                        className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 hover:text-blue-700"
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedHall.location)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <MapPin className="h-3.5 w-3.5" />
+                                                        {selectedHall.location}
+                                                    </a>
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
+                                                        <Users className="h-3.5 w-3.5" />
+                                                        السعة: {selectedHall.capacity} شخص
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm font-semibold text-blue-700">
+                                                    {selectedHall.hourlyRate} ر.ي / ساعة
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                              </div>
                          )}
@@ -939,7 +1414,7 @@ export default function CreateCoursePage() {
 
             {/* Action Buttons */}
             <div className="flex justify-between items-center pt-6 border-t mt-8">
-                <Button variant="outline" onClick={() => setActiveTab("curriculum")}>السابق</Button>
+                <Button variant="outline" onClick={() => setActiveTab("pricing")}>السابق</Button>
                 
                 <div className="flex gap-3">
                      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -990,3 +1465,25 @@ export default function CreateCoursePage() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

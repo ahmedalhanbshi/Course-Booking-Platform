@@ -3,15 +3,13 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Award, Book, LayoutDashboard, Calendar, BookOpen, Home } from "lucide-react"
+import { Book, BookOpen, Home } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const links = [
   { href: "/student/dashboard", label: "الصفحة الرئيسية", icon: Home },
   { href: "/student/courses", label: "تصفح الدورات", icon: BookOpen },
   { href: "/student/my-courses", label: "دوراتي", icon: Book },
-  { href: "/student/schedule", label: "جدول الدروس", icon: Calendar },
-  { href: "/student/certificates", label: "شهاداتي", icon: Award },
 ]
 
 export function StudentSidebar() {

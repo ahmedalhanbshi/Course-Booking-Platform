@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Eye, Clock, Users, BookOpen, MoreVertical, UserCog, Plus, Edit, Trash2 } from "lucide-react"
+import { Eye, Clock, Users, BookOpen, MoreVertical, UserCog, Plus, Edit, Trash2, Search } from "lucide-react"
 import { Course } from "@/types"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -16,7 +16,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 
 // Mock data
-// Statuses: 'active' (نشط), 'completed' (مكتمل), 'draft' (مسودة)
+// Statuses: 'active' (مستمر), 'completed' (مكتمل), 'draft' (مسودة)
 const mockCourses: any[] = [
   {
     id: "1",
@@ -118,6 +118,16 @@ export default function InstituteCourses() {
   const [trainerFilter, setTrainerFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
 
+  const normalizeText = (value: string) => {
+    if (!value) return value
+    if (!/[ØÙ]/.test(value)) return value
+    try {
+      return decodeURIComponent(escape(value))
+    } catch {
+      return value
+    }
+  }
+
   // State for changing trainer
   const [isChangeTrainerOpen, setIsChangeTrainerOpen] = useState(false)
   const [selectedCourseForTrainerChange, setSelectedCourseForTrainerChange] = useState<any | null>(null)
@@ -128,10 +138,12 @@ export default function InstituteCourses() {
   const [courseToDelete, setCourseToDelete] = useState<any | null>(null)
 
   const filteredCourses = courses.filter(course => {
+    const normalizedTitle = normalizeText(course.title)
+    const normalizedTrainer = normalizeText(course.trainer?.name ?? "")
     const matchesStatus = statusFilter === "all" || course.status === statusFilter
-    const matchesTrainer = trainerFilter === "all" || course.trainer.name.includes(trainerFilter)
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.trainer.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesTrainer = trainerFilter === "all" || normalizedTrainer.includes(trainerFilter)
+    const matchesSearch = normalizedTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      normalizedTrainer.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesStatus && matchesTrainer && matchesSearch
   })
 
@@ -183,7 +195,7 @@ export default function InstituteCourses() {
     }
   }
 
-  const uniqueTrainers = Array.from(new Set(courses.map(course => course.trainer.name)))
+  const uniqueTrainers = Array.from(new Set(courses.map(course => normalizeText(course.trainer?.name ?? ""))))
 
   return (
     <div className="space-y-6">
@@ -200,42 +212,42 @@ export default function InstituteCourses() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="البحث في الدورات..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="الحالة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الحالات</SelectItem>
-                <SelectItem value="active">نشط</SelectItem>
-                <SelectItem value="draft">مسودة</SelectItem>
-                <SelectItem value="completed">مكتمل</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={trainerFilter} onValueChange={setTrainerFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="المدرب" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع المدربين</SelectItem>
-                {uniqueTrainers.map(trainer => (
-                  <SelectItem key={trainer} value={trainer as string}>{trainer as string}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Filters */}
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="البحث في الدورات..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="حالة الدورة" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">جميع الحالات</SelectItem>
+              <SelectItem value="active">مستمر</SelectItem>
+              <SelectItem value="draft">مسودة</SelectItem>
+              <SelectItem value="completed">مكتمل</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={trainerFilter} onValueChange={setTrainerFilter}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="المدرب" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">جميع المدربين</SelectItem>
+              {uniqueTrainers.map(trainer => (
+                <SelectItem key={trainer} value={trainer as string}>{trainer as string}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* Courses Table */}
       <Card>
@@ -259,13 +271,13 @@ export default function InstituteCourses() {
                 <TableRow key={course.id}>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{course.title}</div>
+                      <div className="font-medium">{normalizeText(course.title)}</div>
                       <div className="text-sm text-gray-500">{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</div>
                     </div>
                   </TableCell>
-                  <TableCell>{course.trainer.name}</TableCell>
+                  <TableCell>{normalizeText(course.trainer.name)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{course.category}</Badge>
+                    <Badge variant="outline">{normalizeText(course.category)}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -335,7 +347,7 @@ export default function InstituteCourses() {
             <Label htmlFor="trainer-select" className="mb-2 block">اختر المدرب</Label>
             <Select value={newTrainerId} onValueChange={setNewTrainerId}>
               <SelectTrigger id="trainer-select">
-                <SelectValue placeholder="اختر مدرباً" />
+                <SelectValue placeholder="اختر مدربًا" />
               </SelectTrigger>
               <SelectContent>
                 {availableTrainers.map(trainer => (
@@ -368,3 +380,4 @@ export default function InstituteCourses() {
     </div>
   )
 }
+

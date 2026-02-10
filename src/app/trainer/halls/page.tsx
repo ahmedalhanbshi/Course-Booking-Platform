@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -16,6 +16,7 @@ import { formatDate, formatTime } from "@/lib/utils"
 // Define generic or minimal types to avoid import errors if strictly typed in a separate file I can't check
 import { RoomBooking } from "@/types"
 import { toast } from "sonner"
+import ExploreHallsPage from "@/app/student/explore/halls/page"
 
 // --- Mock Data for Halls ---
 const mockHalls = [
@@ -642,7 +643,6 @@ const BookingActionArea = ({ hall, bookings, onBookStart, onPaymentClick }: {
 
 export default function TrainerHallsPage() {
     const router = useRouter()
-    const [activeTab, setActiveTab] = useState<'guide' | 'requests'>('guide')
     
     // Halls state
     const [searchTerm, setSearchTerm] = useState("")
@@ -802,264 +802,15 @@ export default function TrainerHallsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">إدارة القاعات</h1>
-                    <p className="text-gray-600 mt-2">استعراض دليل القاعات ومتابعة طلبات الحجز</p>
-                </div>
-
-                {/* Segmented Control / Pill Tabs */}
-                <div className="bg-gray-100 p-1 rounded-xl flex items-center w-fit">
-                    <button
-                        onClick={() => setActiveTab('guide')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-                            activeTab === 'guide'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        دليل القاعات
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('requests')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-                            activeTab === 'requests'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        حجوزاتي
-                    </button>
-                </div>
+            <div className="flex items-center justify-between gap-4 w-full">
+                <h1 className="text-3xl font-bold text-slate-900 text-right leading-tight">
+                    دليل القاعات
+                </h1>
             </div>
-
-            {/* Tab 1: Halls Guide */}
-            {activeTab === 'guide' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Filters */}
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="flex flex-col md:flex-row gap-4">
-                                <div className="flex-1 relative">
-                                    <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                                    <Input
-                                        placeholder="ابحث عن قاعة..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pr-10"
-                                    />
-                                </div>
-                                <div className="w-full md:w-48">
-                                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="نوع القاعة" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">الكل</SelectItem>
-                                            <SelectItem value="lecture">قاعة محاضرات</SelectItem>
-                                            <SelectItem value="lab">معمل حاسب</SelectItem>
-                                            <SelectItem value="meeting">قاعة اجتماعات</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Halls Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredHalls.map((hall) => (
-                            <Card key={hall.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                                <div className="aspect-video relative bg-gray-100 group">
-                                    <img 
-                                        src={hall.image} 
-                                        alt={hall.name}
-                                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    <Badge className="absolute top-3 right-3 bg-white/90 text-black hover:bg-white shadow-sm font-medium backdrop-blur-sm">
-                                        {hall.type === 'lecture' ? 'قاعة محاضرات' : hall.type === 'lab' ? 'معمل حاسب' : 'قاعة اجتماعات'}
-                                    </Badge>
-                                </div>
-                                <CardHeader>
-                                    <CardTitle className="flex justify-between items-start">
-                                        <span>{hall.name}</span>
-                                    </CardTitle>
-                                    <CardDescription className="flex items-center gap-1 mt-1">
-                                        <MapPin className="h-3 w-3" />
-                                        {hall.location}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                                        {hall.description}
-                                    </p>
-                                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                                        <div className="flex items-center gap-1">
-                                            <Users className="h-4 w-4" />
-                                            <span>{hall.capacity} شخص</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {hall.features.slice(0, 3).map((feature) => (
-                                            <Badge key={feature} variant="secondary" className="text-xs">
-                                                {featureLabels[feature]}
-                                            </Badge>
-                                        ))}
-                                        {hall.features.length > 3 && (
-                                            <Badge variant="secondary" className="text-xs">
-                                                +{hall.features.length - 3}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </CardContent>
-                                <CardFooter>
-                                    <Dialog>
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline" className="w-full" onClick={() => {
-                                                setSelectedHall(hall)
-                                                setIsBookingMode(false)
-                                            }}>
-                                                عرض التفاصيل
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden gap-0">
-                                            <div className="grid md:grid-cols-5 h-full max-h-[90vh] md:max-h-[600px] overflow-hidden">
-                                                
-                                                {/* Left Column: Image (40%) */}
-                                                <div className="hidden md:block md:col-span-2 relative h-full bg-gray-100">
-                                                    <img 
-                                                        src={hall.image || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=2070&auto=format&fit=crop"}
-                                                        alt={hall.name}
-                                                        className="w-full h-full object-cover md:rounded-r-2xl" 
-                                                    />
-                                                    
-                                                    {/* Gradient Overlay */}
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-50 md:rounded-r-2xl" />
-                                                    
-                                                    {/* Type Badge Overlay */}
-                                                    <div className="absolute top-4 right-4 z-10">
-                                                        <Badge className="bg-white/90 text-black hover:bg-white backdrop-blur-sm shadow-sm">
-                                                            {hall.type === 'lecture' ? 'قاعة محاضرات' : hall.type === 'lab' ? 'معمل حاسب' : 'قاعة اجتماعات'}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-
-                                                {/* Right Column: Details or Booking Wizard (60%) */}
-                                                <div className="md:col-span-3 h-full overflow-hidden relative">
-                                                    
-                                                    {isBookingMode ? (
-                                                        <BookingForm 
-                                                            hall={hall} 
-                                                            onCancel={() => setIsBookingMode(false)}
-                                                            onBook={(data) => {
-                                                                    const bookingsToAdd = data.sessions.map((session: any) => ({
-                                                                        id: Math.random().toString(),
-                                                                        roomId: hall.id,
-                                                                        sessionId: "manual", 
-                                                                        startTime: new Date(session.date + 'T' + session.startTime), 
-                                                                        endTime: new Date(session.date + 'T' + session.endTime), 
-                                                                        status: 'pending' as const,
-                                                                        requestedById: 'current-user', 
-                                                                        createdAt: new Date(),
-                                                                        initialConfirmation: false,
-                                                                        paymentConfirmation: false,
-                                                                        notes: data.reason
-                                                                    }))
-                                                                    setBookings([...bookings, ...bookingsToAdd])
-                                                                    toast.success(`تم إرسال ${bookingsToAdd.length} طلبات حجز بنجاح.`)
-                                                                    setIsBookingMode(false)
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div className="flex flex-col h-full bg-white">
-                                                            {/* Standard Header */}
-                                                            <div className="flex items-start justify-between p-6 pb-2 shrink-0">
-                                                                <div>
-                                                                    <DialogTitle className="text-2xl font-bold text-gray-900">{hall.name}</DialogTitle>
-                                                                    <DialogDescription className="flex items-center gap-1 mt-1 text-gray-500">
-                                                                        <MapPin className="h-3.5 w-3.5" />
-                                                                        {hall.location}
-                                                                    </DialogDescription>
-                                                                </div>
-                                                                <DialogClose asChild>
-                                                                    <Button variant="ghost" className="h-8 w-8 p-0 rounded-full" >
-                                                                        <X className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DialogClose>
-                                                            </div>
-
-                                                            {/* Scrollable Details */}
-                                                            <div className="space-y-6 flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">
-                                                        {/* Description */}
-                                                        <div>
-                                                            <p className="text-sm text-gray-600 leading-relaxed">
-                                                                {hall.description}
-                                                            </p>
-                                                        </div>
-
-                                                        {/* Stats Row - Compact */}
-                                                        <div className="flex flex-wrap gap-4 items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                                            <div className="flex items-center gap-2 text-sm text-gray-700">
-                                                                <Users className="h-4 w-4 text-blue-600" />
-                                                                <span className="font-medium">{hall.capacity}</span> <span className="text-gray-500 text-xs">شخص</span>
-                                                            </div>
-                                                            <div className="w-px h-4 bg-gray-300"></div>
-                                                            <div className="flex items-center gap-2 text-sm text-gray-700">
-                                                                <Building className="h-4 w-4 text-blue-600" />
-                                                                <span className="font-medium">{hall.type === 'lab' ? 'معمل' : 'قاعة'}</span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Equipment - Inline Badges */}
-                                                        <div>
-                                                            <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">التجهيزات المتوفرة</h4>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {hall.features.map((feature) => {
-                                                                    const Icon = featureIcons[feature] || Building
-                                                                    return (
-                                                                        <Badge key={feature} variant="secondary" className="gap-1 font-normal text-xs px-2 py-1 bg-white border border-gray-100 hover:bg-gray-50">
-                                                                            <Icon className="h-3 w-3 text-gray-500" />
-                                                                            {featureLabels[feature]}
-                                                                        </Badge>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        </div>
-
-                                                        <Separator className="my-2" />
-
-                                                        {/* Booking Action Entry Point */}
-                                                        <div className="pt-2">
-                                                            <BookingActionArea 
-                                                                hall={hall} 
-                                                                bookings={bookings} 
-                                                                onBookStart={() => setIsBookingMode(true)}
-                                                                onPaymentClick={(bookingId) => {
-                                                                    const booking = bookings.find(b => b.id === bookingId)
-                                                                    if (booking) {
-                                                                        setSelectedBooking(booking)
-                                                                        setIsPaymentModalOpen(true)
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    </div>
-                                                )}
-                                                </div>
-                                            </div>
-                                        </DialogContent>
-                                    </Dialog>
-                                </CardFooter>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Tab 2: My Requests */}
-            {activeTab === 'requests' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <ExploreHallsPage hideTitle basePath="/trainer/halls" />
+            </div>
+            {false && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1289,7 +1040,7 @@ export default function TrainerHallsPage() {
                     </Card>
                 </div>
             )}
-            
+
             {/* Payment Modal */}
             <PaymentModal 
                 isOpen={isPaymentModalOpen} 
@@ -1300,3 +1051,4 @@ export default function TrainerHallsPage() {
         </div>
     )
 }
+

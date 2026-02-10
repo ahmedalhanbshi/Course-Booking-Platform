@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,7 +47,7 @@ const mockBookings: RoomBooking[] = [
     status: "rejected",
     requestedById: "trainer3",
     approvedById: "admin1",
-    notes: "القاعة محجوزة مسبقاً",
+    notes: "القاعة محجوزة مسبقًا",
     createdAt: new Date()
   }
 ]
@@ -61,7 +61,7 @@ const mockRooms = [
 export default function InstituteRoomBookings() {
   const [bookings, setBookings] = useState<RoomBooking[]>(mockBookings)
   const [selectedBooking, setSelectedBooking] = useState<RoomBooking | null>(null)
-  const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'approve' | 'reject' | null }>({
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; type: "approve" | "reject" | null }>({
     open: false,
     type: null
   })
@@ -70,13 +70,13 @@ export default function InstituteRoomBookings() {
 
   const handleApproveBooking = (booking: RoomBooking) => {
     setSelectedBooking(booking)
-    setActionDialog({ open: true, type: 'approve' })
+    setActionDialog({ open: true, type: "approve" })
     setSelectedRoom(booking.roomId)
   }
 
   const handleRejectBooking = (booking: RoomBooking) => {
     setSelectedBooking(booking)
-    setActionDialog({ open: true, type: 'reject' })
+    setActionDialog({ open: true, type: "reject" })
   }
 
   const executeAction = () => {
@@ -84,29 +84,32 @@ export default function InstituteRoomBookings() {
 
     const updatedBooking: RoomBooking = {
       ...selectedBooking,
-      status: actionDialog.type === 'approve' ? 'approved' : 'rejected',
+      status: actionDialog.type === "approve" ? "approved" : "rejected",
       approvedById: "admin1",
-      notes: actionDialog.type === 'approve' ? `تم تخصيص ${mockRooms.find(r => r.id === selectedRoom)?.name}` : notes
+      notes:
+        actionDialog.type === "approve"
+          ? `تم تخصيص ${mockRooms.find((r) => r.id === selectedRoom)?.name}`
+          : notes
     }
 
-    if (actionDialog.type === 'approve') {
+    if (actionDialog.type === "approve") {
       updatedBooking.roomId = selectedRoom
     }
 
-    setBookings(bookings.map(b => b.id === selectedBooking.id ? updatedBooking : b))
+    setBookings(bookings.map((b) => (b.id === selectedBooking.id ? updatedBooking : b)))
     setActionDialog({ open: false, type: null })
     setSelectedBooking(null)
     setNotes("")
     setSelectedRoom("")
   }
 
-  const getStatusBadge = (status: RoomBooking['status']) => {
+  const getStatusBadge = (status: RoomBooking["status"]) => {
     switch (status) {
-      case 'approved':
+      case "approved":
         return <Badge className="bg-green-100 text-green-800">مقبول</Badge>
-      case 'rejected':
+      case "rejected":
         return <Badge className="bg-red-100 text-red-800">مرفوض</Badge>
-      case 'pending':
+      case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">قيد المراجعة</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
@@ -114,7 +117,7 @@ export default function InstituteRoomBookings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">طلبات حجز القاعات</h1>
         <p className="text-gray-600 mt-2">مراجعة وإدارة طلبات حجز قاعات المعهد</p>
@@ -139,9 +142,7 @@ export default function InstituteRoomBookings() {
             <TableBody>
               {bookings.map((booking) => (
                 <TableRow key={booking.id}>
-                  <TableCell className="font-medium">
-                    دورة البرمجة الأساسية
-                  </TableCell>
+                  <TableCell className="font-medium">دورة البرمجة الأساسية</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
@@ -163,12 +164,12 @@ export default function InstituteRoomBookings() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
-                      {mockRooms.find(r => r.id === booking.roomId)?.name}
+                      {mockRooms.find((r) => r.id === booking.roomId)?.name}
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(booking.status)}</TableCell>
                   <TableCell>
-                    {booking.status === 'pending' && (
+                    {booking.status === "pending" ? (
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -188,10 +189,9 @@ export default function InstituteRoomBookings() {
                           رفض
                         </Button>
                       </div>
-                    )}
-                    {booking.status !== 'pending' && (
+                    ) : (
                       <span className="text-sm text-gray-500">
-                        {booking.status === 'approved' ? 'تم القبول' : 'تم الرفض'}
+                        {booking.status === "approved" ? "تم القبول" : "تم الرفض"}
                       </span>
                     )}
                   </TableCell>
@@ -202,12 +202,11 @@ export default function InstituteRoomBookings() {
         </CardContent>
       </Card>
 
-      {/* Action Dialog */}
       <Dialog open={actionDialog.open} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>
-              {actionDialog.type === 'approve' ? 'قبول طلب الحجز' : 'رفض طلب الحجز'}
+              {actionDialog.type === "approve" ? "قبول طلب الحجز" : "رفض طلب الحجز"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -223,7 +222,7 @@ export default function InstituteRoomBookings() {
               </div>
             )}
 
-            {actionDialog.type === 'approve' && (
+            {actionDialog.type === "approve" && (
               <div>
                 <Label htmlFor="room-select">اختر القاعة</Label>
                 <Select value={selectedRoom} onValueChange={setSelectedRoom}>
@@ -241,7 +240,7 @@ export default function InstituteRoomBookings() {
               </div>
             )}
 
-            {actionDialog.type === 'reject' && (
+            {actionDialog.type === "reject" && (
               <div>
                 <Label htmlFor="notes">سبب الرفض</Label>
                 <Textarea
@@ -256,15 +255,12 @@ export default function InstituteRoomBookings() {
             <div className="flex gap-2">
               <Button
                 onClick={executeAction}
-                className={actionDialog.type === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}
-                disabled={actionDialog.type === 'approve' && !selectedRoom}
+                className={actionDialog.type === "approve" ? "bg-green-600 hover:bg-green-700" : ""}
+                disabled={actionDialog.type === "approve" && !selectedRoom}
               >
-                {actionDialog.type === 'approve' ? 'قبول الطلب' : 'رفض الطلب'}
+                {actionDialog.type === "approve" ? "قبول الطلب" : "رفض الطلب"}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setActionDialog({ open: false, type: null })}
-              >
+              <Button variant="outline" onClick={() => setActionDialog({ open: false, type: null })}>
                 إلغاء
               </Button>
             </div>

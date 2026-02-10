@@ -13,7 +13,7 @@ export default function StudentLayout({
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
     return (
-        <div className="min-h-screen bg-gray-50/50 dark:bg-background flex" dir="rtl">
+        <div className="min-h-screen bg-gray-50/50 dark:bg-background flex gap-4" dir="rtl">
             {/* Fixed Sidebar */}
             <div 
                 className={cn(
@@ -29,7 +29,7 @@ export default function StudentLayout({
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto h-screen flex flex-col min-w-0">
                 <StudentHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
-                <div className="flex-1 container mx-auto p-8 max-w-7xl">
+                <div className="flex-1 w-full max-w-[1200px] mx-auto px-5 py-4">
                     {children}
                 </div>
             </main>

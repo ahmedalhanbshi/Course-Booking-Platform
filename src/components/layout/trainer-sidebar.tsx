@@ -15,6 +15,7 @@ const links = [
   { href: "/trainer/announcements", label: "الإعلانات", icon: Megaphone },
 
   { href: "/trainer/halls", label: "القاعات", icon: Building },
+  { href: "/trainer/room-bookings", label: "حجوزاتي", icon: Calendar },
 ]
 
 export function TrainerSidebar() {
