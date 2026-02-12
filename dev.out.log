@@ -7,89 +7,20 @@
    - Network:       http://192.168.188.1:3000
 
  ✓ Starting...
- ✓ Ready in 3.1s
- ○ Compiling /trainer/courses/create ...
- GET /trainer/courses/create 500 in 9.7s (compile: 9.1s, proxy.ts: 286ms, render: 360ms)
- GET /trainer/courses/create 500 in 303ms (compile: 271ms, proxy.ts: 16ms, render: 16ms)
- GET /trainer/courses 200 in 2.5s (compile: 1565ms, proxy.ts: 8ms, render: 949ms)
- ✓ Compiled in 673ms
- GET /trainer/courses 200 in 243ms (compile: 49ms, proxy.ts: 65ms, render: 129ms)
- GET /auth/login?callbackUrl=%2Ftrainer%2Fcourses%2Fcreate 200 in 2.2s (compile: 1957ms, render: 235ms)
- GET /trainer/courses/create 200 in 343ms (compile: 243ms, proxy.ts: 44ms, render: 56ms)
- ○ Compiling /trainer/halls ...
- GET /trainer/halls 200 in 3.4s (compile: 3.3s, proxy.ts: 6ms, render: 51ms)
- ✓ Compiled in 545ms
- ✓ Compiled in 346ms
- ✓ Compiled in 285ms
- ✓ Compiled in 304ms
- ✓ Compiled in 296ms
- GET /trainer/dashboard 200 in 1403ms (compile: 1330ms, proxy.ts: 9ms, render: 64ms)
- ✓ Compiled in 242ms
- GET / 200 in 800ms (compile: 741ms, render: 59ms)
- ✓ Compiled in 340ms
- ✓ Compiled in 273ms
- ✓ Compiled in 267ms
- GET /auth/login?callbackUrl=%2Ftrainer%2Fcourses%2Fcreate 200 in 127ms (compile: 8ms, render: 118ms)
- GET /auth/login?callbackUrl=%2Ftrainer%2Fhalls 200 in 49ms (compile: 6ms, render: 43ms)
- GET /auth/login 200 in 24ms (compile: 5ms, render: 19ms)
- GET /trainer/dashboard 200 in 65ms (compile: 12ms, proxy.ts: 8ms, render: 45ms)
- GET /trainer/courses 200 in 67ms (compile: 17ms, proxy.ts: 5ms, render: 45ms)
- GET /trainer/courses/create 200 in 388ms (compile: 311ms, proxy.ts: 5ms, render: 73ms)
- GET /trainer/halls?mode=select 200 in 751ms (compile: 206ms, proxy.ts: 13ms, render: 532ms)
- GET /trainer/halls 200 in 60ms (compile: 10ms, proxy.ts: 13ms, render: 37ms)
- GET /trainer/courses 200 in 62ms (compile: 8ms, proxy.ts: 4ms, render: 50ms)
- GET /trainer/courses/create 200 in 55ms (compile: 8ms, proxy.ts: 12ms, render: 36ms)
- GET /trainer/halls?mode=select 200 in 142ms (compile: 4ms, proxy.ts: 7ms, render: 131ms)
- GET /trainer/courses 200 in 43ms (compile: 8ms, proxy.ts: 8ms, render: 26ms)
- GET /trainer/explore 200 in 711ms (compile: 658ms, proxy.ts: 4ms, render: 50ms)
- ✓ Compiled in 260ms
- ✓ Compiled in 220ms
- GET /trainer/courses 200 in 268ms (compile: 219ms, proxy.ts: 7ms, render: 42ms)
- GET /trainer/courses 200 in 479ms (compile: 8ms, proxy.ts: 5ms, render: 466ms)
- ✓ Compiled in 190ms
- ✓ Compiled in 309ms
- ✓ Compiled in 217ms
- GET /trainer/courses 500 in 747ms (compile: 323ms, proxy.ts: 11ms, render: 412ms)
- ✓ Compiled in 245ms
- GET /trainer/courses 200 in 593ms (compile: 173ms, proxy.ts: 9ms, render: 410ms)
- GET /trainer/students 200 in 1264ms (compile: 1209ms, proxy.ts: 16ms, render: 40ms)
- GET /trainer/enrollments 200 in 729ms (compile: 697ms, proxy.ts: 5ms, render: 27ms)
- GET /trainer/students 200 in 53ms (compile: 7ms, proxy.ts: 9ms, render: 37ms)
- ✓ Compiled in 228ms
- GET / 200 in 192ms (compile: 15ms, render: 177ms)
- GET /auth/login 200 in 76ms (compile: 7ms, render: 69ms)
- GET /institute/dashboard 200 in 1277ms (compile: 1229ms, proxy.ts: 7ms, render: 40ms)
- GET /institute/halls 200 in 848ms (compile: 821ms, proxy.ts: 5ms, render: 22ms)
- GET /institute/staff 200 in 1154ms (compile: 900ms, proxy.ts: 187ms, render: 67ms)
- GET /institute/halls 200 in 29ms (compile: 7ms, proxy.ts: 4ms, render: 17ms)
- GET /institute/halls 200 in 62ms (compile: 10ms, proxy.ts: 7ms, render: 44ms)
- ✓ Compiled in 273ms
- GET / 200 in 157ms (compile: 43ms, render: 113ms)
- GET /auth/login 200 in 125ms (compile: 50ms, render: 74ms)
- GET /trainer/dashboard 200 in 88ms (compile: 27ms, proxy.ts: 9ms, render: 53ms)
- GET /trainer/halls 200 in 513ms (compile: 408ms, proxy.ts: 6ms, render: 99ms)
- GET /trainer/halls/hall-1 200 in 2.5s (compile: 2.4s, proxy.ts: 5ms, render: 39ms)
- ✓ Compiled in 334ms
- ✓ Compiled in 328ms
- ✓ Compiled in 223ms
- ✓ Compiled in 265ms
- ✓ Compiled in 279ms
- ✓ Compiled in 352ms
- GET /trainer/halls/hall-1 200 in 731ms (compile: 179ms, proxy.ts: 13ms, render: 539ms)
- ✓ Compiled in 292ms
- GET / 200 in 80ms (compile: 20ms, render: 60ms)
- GET /auth/login 200 in 98ms (compile: 36ms, render: 62ms)
- GET /institute/dashboard 200 in 89ms (compile: 26ms, proxy.ts: 6ms, render: 57ms)
- GET /institute/halls 200 in 344ms (compile: 304ms, proxy.ts: 6ms, render: 34ms)
- ✓ Compiled in 1209ms
- ✓ Compiled in 432ms
- ✓ Compiled in 321ms
- ✓ Compiled in 336ms
- GET /institute/halls 500 in 1328ms (compile: 576ms, proxy.ts: 21ms, render: 731ms)
- ✓ Compiled in 387ms
- GET /institute/halls 200 in 802ms (compile: 311ms, proxy.ts: 6ms, render: 485ms)
- ✓ Compiled in 200ms
- ✓ Compiled in 311ms
- ✓ Compiled in 324ms
- ✓ Compiled in 513ms
- ✓ Compiled in 251ms
+ ✓ Ready in 2s
+ ○ Compiling / ...
+ GET / 200 in 3.8s (compile: 3.5s, render: 328ms)
+ GET / 200 in 25ms (compile: 6ms, render: 18ms)
+ GET /auth/login 200 in 565ms (compile: 530ms, render: 35ms)
+ GET /trainer/dashboard 200 in 557ms (compile: 400ms, proxy.ts: 72ms, render: 86ms)
+ GET /trainer/students 200 in 485ms (compile: 447ms, proxy.ts: 5ms, render: 33ms)
+ GET /trainer/courses/1/students 200 in 1044ms (compile: 994ms, proxy.ts: 4ms, render: 47ms)
+ ✓ Compiled in 216ms
+ ✓ Compiled in 195ms
+ ✓ Compiled in 208ms
+ ✓ Compiled in 212ms
+ ✓ Compiled in 213ms
+ GET /trainer/courses/1/students 200 in 317ms (compile: 226ms, proxy.ts: 7ms, render: 84ms)
+ ✓ Compiled in 182ms
+ ✓ Compiled in 194ms
+ ✓ Compiled in 187ms

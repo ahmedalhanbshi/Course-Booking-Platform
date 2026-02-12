@@ -9,8 +9,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, Building, Eye, EyeOff, MapPin, Globe } from "lucide-react"
+import { User, Mail, Phone, Building, Eye, EyeOff, MapPin, Globe, Plus, Trash2 } from "lucide-react"
 import { UserRole } from "@/types"
+
+type BankAccount = {
+    id: string
+    bankName: string
+    beneficiaryName: string
+    accountNumber: string
+}
 
 // Mock user data for Institute Admin
 const mockUser = {
@@ -32,10 +39,46 @@ export default function InstituteProfilePage() {
     const [isEditing, setIsEditing] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [activeTab, setActiveTab] = useState("personal")
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
+        {
+            id: "institute-bank-1",
+            bankName: "مصرف الراجحي",
+            beneficiaryName: "معهد المستقبل للتقنية",
+            accountNumber: "SA038000012345678900002"
+        }
+    ])
 
     const handleSave = () => {
         // In real app, this would make an API call
         setIsEditing(false)
+    }
+
+    const handleAddBankAccount = () => {
+        setBankAccounts((prev) => [
+            ...prev,
+            {
+                id: `institute-bank-${Date.now()}`,
+                bankName: "",
+                beneficiaryName: user.instituteName,
+                accountNumber: ""
+            }
+        ])
+    }
+
+    const handleUpdateBankAccount = (
+        id: string,
+        field: keyof Omit<BankAccount, "id">,
+        value: string
+    ) => {
+        setBankAccounts((prev) =>
+            prev.map((account) =>
+                account.id === id ? { ...account, [field]: value } : account
+            )
+        )
+    }
+
+    const handleRemoveBankAccount = (id: string) => {
+        setBankAccounts((prev) => prev.filter((account) => account.id !== id))
     }
 
     const renderPersonalInfo = () => (
@@ -115,6 +158,80 @@ export default function InstituteProfilePage() {
                                 مدير معهد
                             </Badge>
                         </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-base font-semibold">الحسابات البنكية</h3>
+                            <p className="text-sm text-gray-500">
+                                يمكنك إضافة أكثر من حساب بنكي للمعهد.
+                            </p>
+                        </div>
+                        {isEditing && (
+                            <Button type="button" variant="outline" size="sm" onClick={handleAddBankAccount}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                إضافة بنك
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="space-y-3">
+                        {bankAccounts.map((account, index) => (
+                            <div key={account.id} className="space-y-3 rounded-md border bg-gray-50 p-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium">الحساب البنكي {index + 1}</p>
+                                    {isEditing && bankAccounts.length > 1 && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            onClick={() => handleRemoveBankAccount(account.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="space-y-2">
+                                        <Label>اسم البنك</Label>
+                                        <Input
+                                            value={account.bankName}
+                                            onChange={(e) =>
+                                                handleUpdateBankAccount(account.id, "bankName", e.target.value)
+                                            }
+                                            placeholder="مثال: مصرف الراجحي"
+                                            disabled={!isEditing}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>اسم المستفيد</Label>
+                                        <Input
+                                            value={account.beneficiaryName}
+                                            onChange={(e) =>
+                                                handleUpdateBankAccount(account.id, "beneficiaryName", e.target.value)
+                                            }
+                                            placeholder="اسم المستفيد الرسمي"
+                                            disabled={!isEditing}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>رقم الحساب / IBAN</Label>
+                                        <Input
+                                            value={account.accountNumber}
+                                            onChange={(e) =>
+                                                handleUpdateBankAccount(account.id, "accountNumber", e.target.value)
+                                            }
+                                            placeholder="SAxxxxxxxxxxxxxxxxxxxx"
+                                            disabled={!isEditing}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 

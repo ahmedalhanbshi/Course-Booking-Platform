@@ -9,7 +9,9 @@ export default function InstituteCourseStudentsPage() {
 
   return (
     <CourseStudentsManager 
-      courseId={courseId} 
+      courseId={courseId}
+      showRegistrationSummary={false}
+      showRegistrationStats={false}
       backLink="/institute/courses"
       backText="العودة للدورات"
     />

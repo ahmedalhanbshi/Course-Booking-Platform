@@ -337,9 +337,6 @@ export default function InstituteExploreCoursesPage() {
                     <Link href="/institute/courses">إدارة الدورة</Link>
                   </Button>
                   <Button asChild variant="outline" className="h-9 rounded-full px-4 text-sm">
-                    <Link href="/institute/staff">عرض المدربين</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="h-9 rounded-full px-4 text-sm">
                     <Link href={`/institute/courses/${course.id}/students`}>عرض الحجوزات</Link>
                   </Button>
                 </div>

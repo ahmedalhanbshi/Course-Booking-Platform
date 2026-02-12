@@ -67,7 +67,6 @@ const instituteAdminMenuItems = [
   { href: "/institute/dashboard", label: "الصفحة الرئيسية", icon: Home },
   { href: "/institute/courses", label: "إدارة الدورات", icon: BookOpen },
   { href: "/institute/students", label: "إدارة الطلاب", icon: Users },
-  { href: "/institute/staff", label: "إدارة المدربين", icon: Users },
   { href: "/institute/halls", label: "إدارة القاعات", icon: Building2 },
   { href: "/institute/announcements", label: "الإعلانات", icon: Megaphone },
 ]

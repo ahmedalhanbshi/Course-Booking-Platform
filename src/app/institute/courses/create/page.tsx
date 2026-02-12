@@ -20,10 +20,10 @@ import ExploreHallsPage from "@/app/student/explore/halls/page"
 
 // Mock user data
 const mockUser = {
-  id: "2",
-  name: "فاطمة علي",
-  email: "fatima@example.com",
-  role: 'trainer' as const,
+  id: "institute-1",
+  name: "معهد المستقبل للتقنية",
+  email: "saeed@institute.com",
+  role: "institute_admin" as const,
 }
 
 const categories = [
@@ -77,46 +77,67 @@ const hallAvailability: Record<string, number[]> = {
 const weekDaysShort = ["أحد", "اثن", "ثلا", "أرب", "خم", "جم", "سبت"]
 
 // Mock data for halls (Shared with Halls Page)
-const mockHalls = [
+type InstituteHall = {
+  id: string
+  instituteId: string
+  name: string
+  capacity: number
+  location: string
+  type: string
+  hourlyRate: number
+  description: string
+  image: string
+  features: Array<"wifi" | "projector" | "screen" | "computers">
+}
+
+const mockHalls: InstituteHall[] = [
   {
     id: "hall-1",
+    instituteId: "institute-1",
     name: "القاعة الرئيسية",
     capacity: 80,
     location: "الدور الأرضي • الجناح الشرقي",
     type: "قاعة محاضرات",
     hourlyRate: 18000,
     description: "قاعة واسعة للمحاضرات والفعاليات الكبرى مع تجهيزات عرض متكاملة.",
-    image: "https://images.unsplash.com/photo-1760121788536-9797394e210e?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
+    image: "https://images.unsplash.com/photo-1760121788536-9797394e210e?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600",
+    features: ["wifi", "projector", "screen"]
   },
   {
     id: "hall-2",
+    instituteId: "institute-1",
     name: "قاعة الاجتماعات الذكية",
     capacity: 18,
     location: "الدور الأول • الجناح الغربي",
     type: "قاعة اجتماعات",
     hourlyRate: 12000,
     description: "مساحة مريحة لاجتماعات الفرق مع شاشة تفاعلية وإضاءة هادئة.",
-    image: "https://images.unsplash.com/photo-1766802981801-4b4a9a1d8f1c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
+    image: "https://images.unsplash.com/photo-1766802981801-4b4a9a1d8f1c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600",
+    features: ["wifi", "screen"]
   },
   {
     id: "hall-3",
+    instituteId: "institute-1",
     name: "معمل الحاسب المتقدم",
     capacity: 30,
     location: "الدور الثاني • الجناح الشرقي",
     type: "معمل",
     hourlyRate: 15000,
     description: "معمل مجهز لأعمال التدريب العملي مع أجهزة حديثة وشبكة قوية.",
-    image: "https://images.unsplash.com/photo-1725274032244-9a8f0fa1e9a7?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
+    image: "https://images.unsplash.com/photo-1725274032244-9a8f0fa1e9a7?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600",
+    features: ["wifi", "projector", "computers"]
   },
   {
     id: "hall-4",
+    instituteId: "institute-1",
     name: "قاعة التدريب (ج)",
     capacity: 40,
     location: "الدور الأول • الجناح الشرقي",
     type: "قاعة محاضرات",
     hourlyRate: 14000,
     description: "قاعة متوسطة مناسبة للدورات وورش العمل القصيرة.",
-    image: "https://images.unsplash.com/photo-1670348060135-d4c6662b4138?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
+    image: "https://images.unsplash.com/photo-1670348060135-d4c6662b4138?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600",
+    features: ["wifi", "projector"]
   }
 ]
 
@@ -267,7 +288,7 @@ export default function CreateCoursePage() {
 
   const handleSelectDay = (dateKey: string, isAvailable: boolean, reason: string) => {
     if (!isAvailable) {
-      setUnavailableMessage(`لا يمكن الحجز في هذا اليوم لأن: ${reason}`)
+      setUnavailableMessage(`لا يمكن اختيار هذا اليوم لأن: ${reason}`)
       setSelectedDate(null)
       return
     }
@@ -296,7 +317,7 @@ export default function CreateCoursePage() {
     if (action === 'submit') {
       // Logic: If physical hall selected, status = 'pending_approval'
       if (courseData.deliveryType === 'in_person' || courseData.deliveryType === 'hybrid') {
-          toast.success("تم إرسال الدورة وطلب حجز القاعة للمراجعة المبدئية")
+          toast.success("تم نشر الدورة وربطها بالقاعة المختارة بنجاح")
       } else if (courseData.deliveryType === 'capacity_based') {
           toast.success("تم نشر الدورة بنظام الحجز المبكر (تحديد القاعة لاحقاً)")
       } else {
@@ -385,7 +406,8 @@ export default function CreateCoursePage() {
       setActiveTab("location")
   }
 
-  const selectedHall = mockHalls.find(h => h.id === courseData.hallId)
+  const instituteHalls = mockHalls.filter((hall) => hall.instituteId === mockUser.id)
+  const selectedHall = instituteHalls.find((hall) => hall.id === courseData.hallId)
   const totalSelectedHours = selectedSessions.length
   const totalSelectedDays = new Set(selectedSessions.map((s) => s.date)).size
   const totalSelectedPrice = selectedHall ? totalSelectedHours * selectedHall.hourlyRate : 0
@@ -420,7 +442,7 @@ export default function CreateCoursePage() {
                 </TabsTrigger>
                 <TabsTrigger value="pricing" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2">
                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">2</div>
-                    الحجز والمواعيد
+                    القاعة والمواعيد
                 </TabsTrigger>
             </TabsList>
             <div className="mt-3 h-1 w-full rounded-full bg-gray-100">
@@ -627,7 +649,7 @@ export default function CreateCoursePage() {
 
             <div className="flex justify-end gap-3 pt-6">
                 <Button variant="outline" onClick={() => handleSubmit('draft')}>حفظ كمسودة</Button>
-                <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid()}>التالي: التسعير والمواعيد</Button>
+                <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid()}>التالي: القاعة والمواعيد</Button>
             </div>
         </TabsContent>
 
@@ -711,20 +733,28 @@ export default function CreateCoursePage() {
                                     )}
                                 </div>
                                 <Dialog open={isHallDialogOpen} onOpenChange={setIsHallDialogOpen}>
-                                    <DialogContent dir="rtl" className="max-w-6xl">
-                                        <DialogHeader>
-                                            <DialogTitle>دليل القاعات</DialogTitle>
-                                            <DialogDescription>اختر القاعة المناسبة للدورة.</DialogDescription>
+                                    <DialogContent
+                                        dir="rtl"
+                                        className="w-[95vw] max-w-[1280px] max-h-[90vh] overflow-hidden [&>button[data-dialog-close='default']]:left-4 [&>button[data-dialog-close='default']]:right-auto"
+                                    >
+                                        <DialogHeader className="text-right sm:text-right">
+                                            <DialogTitle>قاعات المعهد</DialogTitle>
+                                            <DialogDescription>
+                                                اختر القاعة المناسبة من قاعات المعهد المتاحة ({instituteHalls.length} قاعات).
+                                            </DialogDescription>
                                         </DialogHeader>
-                                        <ExploreHallsPage
-                                            hideTitle
-                                            basePath="/institute/halls"
-                                            actionLabel="اختيار"
-                                            onSelectHall={(hallId) => {
-                                                setCourseData(prev => ({ ...prev, hallId }))
-                                                setIsHallDialogOpen(false)
-                                            }}
-                                        />
+                                        <div className="overflow-y-auto pr-1 max-h-[76vh]">
+                                            <ExploreHallsPage
+                                                hideTitle
+                                                basePath="/institute/halls"
+                                                actionLabel="اختيار القاعة"
+                                                hallsData={instituteHalls}
+                                                onSelectHall={(hallId) => {
+                                                    setCourseData((prev) => ({ ...prev, hallId }))
+                                                    setIsHallDialogOpen(false)
+                                                }}
+                                            />
+                                        </div>
                                     </DialogContent>
                                 </Dialog>
                                 {selectedHall && (
@@ -1017,7 +1047,7 @@ export default function CreateCoursePage() {
                         (courseData.deliveryType === "online" && !isOnlineValid)
                     }
                 >
-                    {isSubmitting ? 'جاري الحجز...' : 'حجز'}
+                    {isSubmitting ? 'جاري النشر...' : 'نشر الدورة'}
                 </Button>
             </div>
         </TabsContent>

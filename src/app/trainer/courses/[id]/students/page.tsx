@@ -8,10 +8,13 @@ export default function TrainerCourseStudentsPage() {
   const courseId = params.id as string
 
   return (
-    <CourseStudentsManager 
-      courseId={courseId} 
+    <CourseStudentsManager
+      courseId={courseId}
       backLink={`/trainer/courses/${courseId}`}
       backText="العودة للدورة"
+      hiddenStudentIds={["7"]}
+      showRegistrationSummary={false}
+      showRegistrationStats={false}
     />
   )
 }

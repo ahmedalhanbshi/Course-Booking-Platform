@@ -3,14 +3,13 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, Mail, MessageSquare, Eye, CheckCircle, XCircle, Clock, ArrowLeft, Send, UserCheck, Phone, Calendar, BookOpen, Award, Trash2 } from "lucide-react"
+import { Users, Mail, MessageSquare, Eye, ArrowLeft, Send, UserCheck, Phone, Calendar, Trash2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { Enrollment, User, Course } from "@/types"
 import { useState } from "react"
@@ -21,6 +20,9 @@ interface CourseStudentsManagerProps {
   courseId: string
   backLink: string
   backText: string
+  hiddenStudentIds?: string[]
+  showRegistrationSummary?: boolean
+  showRegistrationStats?: boolean
 }
 
 // Mock user data
@@ -122,23 +124,22 @@ const mockEnrollments: (Enrollment & { student: { id: string; name: string; emai
       phone: "+966502468135",
     }
   },
-  {
-    id: "5",
-    studentId: "7",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-14"),
-    status: 'cancelled',
-    progress: 20,
-    student: {
-      id: "7",
-      name: "خالد عمر",
-      email: "khaled.omar@example.com",
-      phone: "+966508642975",
-    }
-  },
 ]
-export default function CourseStudentsManager({ courseId, backLink, backText }: CourseStudentsManagerProps) {
-  const [enrollments] = useState(mockEnrollments.filter(e => e.status !== 'completed'))
+export default function CourseStudentsManager({
+  courseId,
+  backLink,
+  backText,
+  hiddenStudentIds = [],
+  showRegistrationSummary = true,
+  showRegistrationStats = true
+}: CourseStudentsManagerProps) {
+  const [enrollments] = useState(
+    mockEnrollments.filter(
+      (enrollment) =>
+        enrollment.status !== 'completed' &&
+        !hiddenStudentIds.includes(enrollment.studentId)
+    )
+  )
   const [showNotificationDialog, setShowNotificationDialog] = useState(false)
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [notificationData, setNotificationData] = useState({
@@ -157,24 +158,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
   const activeEnrollments = enrollments.filter(e => e.status === 'active')
-  const completedEnrollments = enrollments.filter(e => e.status === 'completed')
-
-  const getStatusLabel = (status: Enrollment['status']) => {
-    switch (status) {
-      case 'active': return 'مستمر'
-      case 'cancelled': return 'ملغى'
-      default: return status
-    }
-  }
-
-  const getStatusColor = (status: Enrollment['status']) => {
-    switch (status) {
-      case 'active': return 'text-green-600'
-      case 'completed': return 'text-blue-600'
-      case 'cancelled': return 'text-red-600'
-      default: return 'text-gray-600'
-    }
-  }
   
   const handleDeleteClick = (enrollment: typeof mockEnrollments[0]) => {
     setStudentToDelete(enrollment)
@@ -404,7 +387,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
           </DialogHeader>
           {viewStudent && (
             <div className="space-y-6">
-              <div className="flex items-start justify-between border-b pb-4">
+              <div className="flex items-start border-b pb-4">
                 <div className="flex items-center gap-4">
                   <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
                     <Users className="h-8 w-8 text-gray-500" />
@@ -423,12 +406,9 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                     )}
                   </div>
                 </div>
-                <Badge className={getStatusColor(viewStudent.status)}>
-                  {getStatusLabel(viewStudent.status)}
-                </Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-gray-600 mb-1">
                     <Calendar className="h-4 w-4" />
@@ -436,37 +416,18 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                   </div>
                   <p className="text-gray-900">{formatDate(viewStudent.enrolledAt)}</p>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <BookOpen className="h-4 w-4" />
-                    <span className="text-sm font-medium">التقدم في الدورة</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-600 rounded-full"
-                        style={{ width: `${viewStudent.progress}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-bold">{viewStudent.progress}%</span>
-                  </div>
-                </div>
               </div>
 
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-3">ملاحظات وإجراءات سريعة</h4>
-                <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => {
+                <div className="flex">
+                  <Button variant="outline" className="w-full" onClick={() => {
                     setShowDetailsDialog(false)
                     setSelectedStudents([viewStudent.studentId])
                     setShowNotificationDialog(true)
                   }}>
                     <MessageSquare className="mr-2 h-4 w-4" />
                     إرسال رسالة
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    <UserCheck className="mr-2 h-4 w-4" />
-                    تحديث الحالة
                   </Button>
                 </div>
               </div>
@@ -576,48 +537,53 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
       </Card>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">ملخص التسجيل</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+      {(showRegistrationSummary || showRegistrationStats) && (
+        <div className={`grid grid-cols-1 ${showRegistrationSummary && showRegistrationStats ? "md:grid-cols-2" : ""} gap-6 mt-8`}>
+          {showRegistrationSummary && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">ملخص التسجيل</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">نشطين:</span>
+                    <span className="font-medium text-green-600">
+                      {activeEnrollments.length}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-              <div className="flex justify-between">
-                <span className="text-gray-600">نشطين:</span>
-                <span className="font-medium text-green-600">
-                  {activeEnrollments.length}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">إحصائيات التسجيل</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">إجمالي التسجيلات:</span>
-                <span className="font-medium">{enrollments.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">معدل التسجيل الأسبوعي:</span>
-                <span className="font-medium">3.2</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">أعلى تقدم:</span>
-                <span className="font-medium">
-                  {Math.max(...enrollments.map(e => e.progress))}%
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {showRegistrationStats && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">إحصائيات التسجيل</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">إجمالي التسجيلات:</span>
+                    <span className="font-medium">{enrollments.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">معدل التسجيل الأسبوعي:</span>
+                    <span className="font-medium">3.2</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">أعلى تقدم:</span>
+                    <span className="font-medium">
+                      {Math.max(...enrollments.map(e => e.progress))}%
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -121,6 +121,34 @@ export default function TrainerSchedulePage() {
 
     const sortedDates = Object.keys(sessionsByDate).sort()
 
+    const sessionOrderById = mockSessions
+        .slice()
+        .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+        .reduce((acc, session, index) => {
+            acc[session.id] = index + 1
+            return acc
+        }, {} as Record<string, number>)
+
+    const getLessonLabel = (sessionId: string) => {
+        const lessonNumber = sessionOrderById[sessionId]
+        const ordinalLabels: Record<number, string> = {
+            1: "الأول",
+            2: "الثاني",
+            3: "الثالث",
+            4: "الرابع",
+            5: "الخامس",
+            6: "السادس",
+            7: "السابع",
+            8: "الثامن",
+            9: "التاسع",
+            10: "العاشر",
+        }
+
+        if (!lessonNumber) return "درس"
+        const ordinal = ordinalLabels[lessonNumber]
+        return ordinal ? `الدرس ${ordinal}` : `الدرس ${lessonNumber}`
+    }
+
     const getStatusConfig = (status: string) => {
         switch (status) {
             case 'upcoming':
@@ -163,7 +191,7 @@ export default function TrainerSchedulePage() {
 
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="text-lg font-bold text-gray-900">{session.title}</h4>
+                                                        <h4 className="text-lg font-bold text-gray-900">{getLessonLabel(session.id)}</h4>
                                                         <Badge variant="secondary" className={getStatusConfig(session.status).className}>
                                                             {getStatusConfig(session.status).label}
                                                         </Badge>
@@ -239,7 +267,7 @@ export default function TrainerSchedulePage() {
                     <DialogHeader>
                         <DialogTitle>تعديل موعد الجلسة</DialogTitle>
                         <DialogDescription>
-                            {selectedSession?.title} - {selectedSession?.courseTitle}
+                            {selectedSession ? `${getLessonLabel(selectedSession.id)} - ${selectedSession.courseTitle}` : ""}
                         </DialogDescription>
                     </DialogHeader>
                     
