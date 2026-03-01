@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Hammam/Desktop/gitHub/Course-Booking-Platform/src/app/trainer/halls/page.tsx"],"sourcesContent":["\"use client\"\r\n\r\nimport ExploreHallsPage from \"@/app/student/explore/halls/page\"\r\n\r\nexport default function TrainerHallsPage() {\r\n    return (\r\n        <div className=\"space-y-6\">\r\n            <div className=\"flex items-center justify-between gap-4 w-full\">\r\n                <h1 className=\"text-3xl font-bold text-slate-900 text-right leading-tight\">\r\n                    دليل القاعات\r\n                </h1>\r\n            </div>\r\n            <div className=\"animate-in fade-in slide-in-from-bottom-4 duration-500\">\r\n                <ExploreHallsPage hideTitle basePath=\"/trainer/halls\" />\r\n            </div>\r\n        </div>\r\n    )\r\n}\r\n"],"names":[],"mappings":";;;;;;;;;;AAAA;;;AAIe,SAAS;IACpB,qBACI,6LAAC;QAAI,WAAU;;0BACX,6LAAC;gBAAI,WAAU;0BACX,cAAA,6LAAC;oBAAG,WAAU;8BAA6D;;;;;;;;;;;0BAI/E,6LAAC;gBAAI,WAAU;0BACX,cAAA,6LAAC;oBAAiB,SAAS;oBAAC,UAAS;;;;;;;;;;;;;;;;;AAIrD;KAbwB"}}]
-}

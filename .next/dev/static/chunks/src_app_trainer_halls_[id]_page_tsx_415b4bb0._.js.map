@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Hammam/Desktop/gitHub/Course-Booking-Platform/src/app/trainer/halls/%5Bid%5D/page.tsx"],"sourcesContent":["\"use client\"\r\n\r\nimport HallDetailsPage from \"@/app/student/explore/halls/[id]/page\"\r\n\r\nexport default function TrainerHallDetailsPage() {\r\n  return <HallDetailsPage />\r\n}\r\n"],"names":[],"mappings":";;;;;;;;;;AAAA;;;AAIe,SAAS;IACtB,qBAAO,6LAAC;;;;;AACV;KAFwB"}}]
-}
