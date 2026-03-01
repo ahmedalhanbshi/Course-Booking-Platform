@@ -109,7 +109,7 @@ export default function StudentCourseDashboard() {
   // In a real application, you would check the user's enrollment status from the backend/context.
   const isEnrolled = true // Set to false to test redirect
   const searchParams = useSearchParams()
- 
+
   // Check if "completed" is passed in query, OR use a mock toggle if needed. 
   // For now, let's default to FALSE unless ?status=completed is present.
   const isCompleted = searchParams.get('status') === 'completed'
@@ -341,6 +341,7 @@ export default function StudentCourseDashboard() {
                 fill
                 className="object-cover"
                 sizes="240px"
+                unoptimized={true}
               />
             </div>
           </div>
@@ -351,82 +352,82 @@ export default function StudentCourseDashboard() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Right Column (Main) */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Next Session Alert */}
             {/* Next Session Alert OR Completion/Cancellation Banner */}
             {isCompleted ? (
-                // Completion Banner
-                <Card className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-                    <CardContent className="p-8 flex items-center justify-between gap-6">
-                         <div className="flex items-center gap-6">
-                            <div className="p-4 bg-white rounded-full shadow-sm text-amber-500 border border-amber-100">
-                                <Award className="w-10 h-10" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-xl text-amber-900 mb-2">مبروك! لقد أتممت الدورة بنجاح</h3>
-                                <p className="text-amber-700">تم الانتهاء من الدورة بنجاح. نتمنى لك التوفيق في رحلتك التعليمية القادمة.</p>
-                            </div>
-                         </div>
-                    </CardContent>
-                </Card>
-            ) : isCancelled ? (
-                // Cancelled Banner
-                <Card className="rounded-2xl border border-red-100 bg-red-50 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-                    <CardContent className="p-8 flex items-center justify-between gap-6">
-                         <div className="flex items-center gap-6">
-                            <div className="p-4 bg-white rounded-full shadow-sm text-red-500 border border-red-100">
-                                <Ban className="w-10 h-10" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-xl text-red-900 mb-2">عذراً، تم إلغاء اشتراكك في هذه الدورة</h3>
-                                <p className="text-red-700">لم يعد بإمكانك الوصول لمحتوى الدورة. يرجى تجديد الاشتراك للمتابعة.</p>
-                            </div>
-                         </div>
-                    </CardContent>
-                </Card>
-            ) : (
-                // Upcoming Session Banner
-                <Card className="rounded-2xl border border-blue-100 bg-blue-50 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-                <CardContent className="p-6 flex items-center justify-between gap-4">
-                    <div className="flex flex-col gap-2 text-right">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        {nextLessonTitle}
-                      </h3>
-                      <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-                        <span dir="ltr">{nextSessionDate}</span>
-                        <span dir="ltr">{nextSessionTime}</span>
-                        {nextLessonDuration && <span>{nextLessonDuration}</span>}
-                      </div>
+              // Completion Banner
+              <Card className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+                <CardContent className="p-8 flex items-center justify-between gap-6">
+                  <div className="flex items-center gap-6">
+                    <div className="p-4 bg-white rounded-full shadow-sm text-amber-500 border border-amber-100">
+                      <Award className="w-10 h-10" />
                     </div>
-                    
-                    {nextJoinLink && (
-                      <Button
-                        className="h-9 rounded-full bg-white text-blue-600 hover:bg-blue-50 font-semibold gap-2 px-5 shadow-sm text-sm border-2 border-transparent hover:border-blue-100 transition-all"
-                        asChild
-                      >
-                        <a href={nextJoinLink} target="_blank" rel="noopener noreferrer">
-                          <Play className="w-4 h-4 fill-current" />
-                          انضمام للدرس
-                        </a>
-                      </Button>
-                    )}
+                    <div>
+                      <h3 className="font-bold text-xl text-amber-900 mb-2">مبروك! لقد أتممت الدورة بنجاح</h3>
+                      <p className="text-amber-700">تم الانتهاء من الدورة بنجاح. نتمنى لك التوفيق في رحلتك التعليمية القادمة.</p>
+                    </div>
+                  </div>
                 </CardContent>
-                </Card>
+              </Card>
+            ) : isCancelled ? (
+              // Cancelled Banner
+              <Card className="rounded-2xl border border-red-100 bg-red-50 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+                <CardContent className="p-8 flex items-center justify-between gap-6">
+                  <div className="flex items-center gap-6">
+                    <div className="p-4 bg-white rounded-full shadow-sm text-red-500 border border-red-100">
+                      <Ban className="w-10 h-10" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-xl text-red-900 mb-2">عذراً، تم إلغاء اشتراكك في هذه الدورة</h3>
+                      <p className="text-red-700">لم يعد بإمكانك الوصول لمحتوى الدورة. يرجى تجديد الاشتراك للمتابعة.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              // Upcoming Session Banner
+              <Card className="rounded-2xl border border-blue-100 bg-blue-50 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+                <CardContent className="p-6 flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-2 text-right">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      {nextLessonTitle}
+                    </h3>
+                    <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                      <span dir="ltr">{nextSessionDate}</span>
+                      <span dir="ltr">{nextSessionTime}</span>
+                      {nextLessonDuration && <span>{nextLessonDuration}</span>}
+                    </div>
+                  </div>
+
+                  {nextJoinLink && (
+                    <Button
+                      className="h-9 rounded-full bg-white text-blue-600 hover:bg-blue-50 font-semibold gap-2 px-5 shadow-sm text-sm border-2 border-transparent hover:border-blue-100 transition-all"
+                      asChild
+                    >
+                      <a href={nextJoinLink} target="_blank" rel="noopener noreferrer">
+                        <Play className="w-4 h-4 fill-current" />
+                        انضمام للدرس
+                      </a>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             <Tabs defaultValue="schedule" className="w-full">
               <TabsList className="w-full grid grid-cols-2 h-auto p-1 bg-slate-100/80 rounded-full gap-1">
-                <TabsTrigger 
-                  value="schedule" 
+                <TabsTrigger
+                  value="schedule"
                   className="rounded-full py-2.5 text-sm font-medium text-slate-500 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
                 >
                   الجدول الدراسي
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="announcements" 
+                <TabsTrigger
+                  value="announcements"
                   className="rounded-full py-2.5 text-sm font-medium text-slate-500 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
                 >
                   الإعلانات
@@ -434,17 +435,17 @@ export default function StudentCourseDashboard() {
               </TabsList>
 
 
-             <TabsContent value="schedule" className="mt-6 relative" id="schedule">
-                  {isCancelled && (
-                    <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
-                            <Lock className="w-8 h-8" />
-                        </div>
-                        <h3 className="font-bold text-lg text-slate-900">الجدول مقفل</h3>
-                        <p className="text-slate-500 text-sm">يجب إعادة الاشتراك</p>
+              <TabsContent value="schedule" className="mt-6 relative" id="schedule">
+                {isCancelled && (
+                  <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                      <Lock className="w-8 h-8" />
                     </div>
-                 )}
-                 <div className={isCancelled ? "opacity-40 pointer-events-none select-none filter blur-sm transition-all" : ""}>
+                    <h3 className="font-bold text-lg text-slate-900">الجدول مقفل</h3>
+                    <p className="text-slate-500 text-sm">يجب إعادة الاشتراك</p>
+                  </div>
+                )}
+                <div className={isCancelled ? "opacity-40 pointer-events-none select-none filter blur-sm transition-all" : ""}>
                   <Card className="rounded-2xl border border-slate-100 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
                     <CardHeader>
                       <CardTitle className="text-slate-900">جدول الدروس</CardTitle>
@@ -483,28 +484,25 @@ export default function StudentCourseDashboard() {
                         return (
                           <div
                             key={session.id}
-                            className={`flex items-center justify-between gap-4 rounded-lg border p-4 text-sm ${
-                              isSessionCompleted
+                            className={`flex items-center justify-between gap-4 rounded-lg border p-4 text-sm ${isSessionCompleted
                                 ? "border-slate-200 bg-slate-50 text-slate-400"
                                 : "border-slate-200 bg-white text-slate-700"
-                            }`}
+                              }`}
                             dir="rtl"
                           >
                             <div className="flex-1 space-y-2 text-right">
                               <div className="flex items-center justify-between gap-3">
                                 <h4
-                                  className={`text-sm font-semibold ${
-                                    isSessionCompleted ? "text-slate-500" : "text-slate-900"
-                                  }`}
+                                  className={`text-sm font-semibold ${isSessionCompleted ? "text-slate-500" : "text-slate-900"
+                                    }`}
                                 >
                                   {lessonLabel}
                                 </h4>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Calendar
-                                  className={`h-4 w-4 ${
-                                    isSessionCompleted ? "text-slate-400" : "text-blue-600"
-                                  }`}
+                                  className={`h-4 w-4 ${isSessionCompleted ? "text-slate-400" : "text-blue-600"
+                                    }`}
                                 />
                                 <span>{sessionDate}</span>
                               </div>
@@ -520,11 +518,10 @@ export default function StudentCourseDashboard() {
                             <Button
                               size="sm"
                               disabled={!canJoin}
-                              className={`h-8 w-[110px] shrink-0 rounded-full px-4 text-xs font-semibold gap-2 ${
-                                canJoin
+                              className={`h-8 w-[110px] shrink-0 rounded-full px-4 text-xs font-semibold gap-2 ${canJoin
                                   ? "bg-blue-600 text-white hover:bg-blue-700"
                                   : "bg-slate-200 text-slate-500 hover:bg-slate-200"
-                              }`}
+                                }`}
                               asChild={canJoin}
                             >
                               {canJoin ? (
@@ -545,34 +542,34 @@ export default function StudentCourseDashboard() {
               </TabsContent>
 
               <TabsContent value="announcements" className="mt-6 space-y-4 relative">
-                 {isCancelled && (
-                    <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
-                            <Lock className="w-8 h-8" />
-                        </div>
-                        <h3 className="font-bold text-lg text-slate-900">الإعلانات مقفلة</h3>
-                        <p className="text-slate-500 text-sm">يجب إعادة الاشتراك</p>
+                {isCancelled && (
+                  <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                      <Lock className="w-8 h-8" />
                     </div>
-                 )}
+                    <h3 className="font-bold text-lg text-slate-900">الإعلانات مقفلة</h3>
+                    <p className="text-slate-500 text-sm">يجب إعادة الاشتراك</p>
+                  </div>
+                )}
                 <div className={isCancelled ? "opacity-40 pointer-events-none select-none filter blur-sm transition-all text-right" : "text-right"}>
-                {mockCourseData.announcements.map((announcement) => {
-                  const announcementTitle = safeText(announcement.title, "إشعار")
-                  const announcementContent = safeText(announcement.content, "لا توجد تفاصيل إضافية.")
-                  const announcementDate = safeText(announcement.date, "—")
-                  const announcementTime = extractTimeLabel(
-                    announcement.publishedAt ?? announcement.createdAt
-                  )
-                  const announcementDateTime = announcementTime
-                    ? `${announcementDate} • ${announcementTime}`
-                    : announcementDate
+                  {mockCourseData.announcements.map((announcement) => {
+                    const announcementTitle = safeText(announcement.title, "إشعار")
+                    const announcementContent = safeText(announcement.content, "لا توجد تفاصيل إضافية.")
+                    const announcementDate = safeText(announcement.date, "—")
+                    const announcementTime = extractTimeLabel(
+                      announcement.publishedAt ?? announcement.createdAt
+                    )
+                    const announcementDateTime = announcementTime
+                      ? `${announcementDate} • ${announcementTime}`
+                      : announcementDate
 
-                  return (
-                    <div 
-                      key={announcement.id}
-                      className="rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)] hover:shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-all mb-4"
-                      dir="rtl"
-                    >
-                      <div className="flex items-center justify-between mb-4">
+                    return (
+                      <div
+                        key={announcement.id}
+                        className="rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)] hover:shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-all mb-4"
+                        dir="rtl"
+                      >
+                        <div className="flex items-center justify-between mb-4">
                           <h3 className="font-bold flex items-center gap-2 text-slate-900">
                             <AlertCircle className="w-5 h-5 text-primary" />
                             {announcementTitle}
@@ -582,12 +579,12 @@ export default function StudentCourseDashboard() {
                           </span>
                         </div>
 
-                      <p className="text-slate-600 leading-relaxed text-right">
-                        {announcementContent}
-                      </p>
-                    </div>
-                  )
-                })}
+                        <p className="text-slate-600 leading-relaxed text-right">
+                          {announcementContent}
+                        </p>
+                      </div>
+                    )
+                  })}
                 </div>
               </TabsContent>
             </Tabs>
@@ -606,11 +603,12 @@ export default function StudentCourseDashboard() {
               <CardContent>
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 relative rounded-full overflow-hidden border">
-                    <Image 
-                      src={instructorAvatar} 
+                    <Image
+                      src={instructorAvatar}
                       alt={instructorName}
                       fill
                       className="object-cover"
+                      unoptimized={true}
                     />
                   </div>
                   <div>
@@ -620,24 +618,24 @@ export default function StudentCourseDashboard() {
                     )}
                   </div>
                 </div>
-                
+
                 <Separator className="my-3" />
-                
+
                 {/* Replaced Message Button with Contact Info */}
                 <div className="space-y-3 text-sm">
-                   <div className="flex items-center gap-3 text-slate-600">
-                     <div className="p-1.5 bg-slate-100 rounded-md">
-                        {/* Using MessageSquare icon as a general contact icon or similar */}
-                        <MessageSquare className="w-4 h-4" />
-                     </div>
-                     <span className="font-medium" dir="ltr">+966 50 123 4567</span>
-                   </div>
-                   <div className="flex items-center gap-3 text-slate-600">
-                     <div className="p-1.5 bg-slate-100 rounded-md">
-                        <FileText className="w-4 h-4" /> {/* Fallback icon, usually Mail but using standard Lucide imports */}
-                     </div>
-                     <span className="font-medium">instructor@example.com</span>
-                   </div>
+                  <div className="flex items-center gap-3 text-slate-600">
+                    <div className="p-1.5 bg-slate-100 rounded-md">
+                      {/* Using MessageSquare icon as a general contact icon or similar */}
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <span className="font-medium" dir="ltr">+966 50 123 4567</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-slate-600">
+                    <div className="p-1.5 bg-slate-100 rounded-md">
+                      <FileText className="w-4 h-4" /> {/* Fallback icon, usually Mail but using standard Lucide imports */}
+                    </div>
+                    <span className="font-medium">instructor@example.com</span>
+                  </div>
                 </div>
 
               </CardContent>

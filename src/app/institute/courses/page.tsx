@@ -1,122 +1,70 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Eye, Clock, Users, BookOpen, MoreVertical, UserCog, Plus, Edit, Trash2, Search } from "lucide-react"
-import { Course } from "@/types"
+import { Eye, Users, MoreVertical, UserCog, Plus, Edit, Trash2, Search, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import Link from "next/link"
-
-// Mock data
-// Statuses: 'active' (مستمر), 'completed' (مكتمل), 'draft' (مسودة)
-const mockCourses: any[] = [
-  {
-    id: "1",
-    title: "دورة البرمجة الأساسية",
-    description: "تعلم أساسيات البرمجة من الصفر",
-    shortDescription: "دورة شاملة للمبتدئين",
-    trainerId: "trainer1",
-    trainer: {
-      id: "trainer1",
-      name: "فاطمة علي",
-      email: "fatima@example.com",
-      role: "trainer",
-      status: "active",
-      avatar: "/avatars/fatima.jpg",
-      createdAt: new Date()
-    },
-    category: "برمجة",
-    price: 50000,
-    duration: 40,
-    startDate: new Date("2024-02-01"),
-    endDate: new Date("2024-03-01"),
-    maxStudents: 30,
-    enrolledStudents: 25,
-    rating: 4.5,
-    reviewCount: 12,
-    status: "active",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  {
-    id: "2",
-    title: "دورة تطوير التطبيقات",
-    description: "بناء تطبيقات الويب الحديثة",
-    shortDescription: "React و Node.js",
-    trainerId: "trainer2",
-    trainer: {
-      id: "trainer2",
-      name: "محمد أحمد",
-      email: "mohamed@example.com",
-      role: "trainer",
-      status: "active",
-      avatar: "/avatars/mohamed.jpg",
-      createdAt: new Date()
-    },
-    category: "تطوير الويب",
-    price: 80000,
-    duration: 60,
-    startDate: new Date("2024-02-15"),
-    endDate: new Date("2024-04-15"),
-    maxStudents: 25,
-    enrolledStudents: 20,
-    rating: 4.8,
-    reviewCount: 8,
-    status: "draft",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  {
-    id: "3",
-    title: "دورة إدارة المشاريع",
-    description: "مهارات إدارة المشاريع الرقمية",
-    shortDescription: "Agile و Scrum",
-    trainerId: "trainer3",
-    trainer: {
-      id: "trainer3",
-      name: "سارة خالد",
-      email: "sara@example.com",
-      role: "trainer",
-      status: "active",
-      avatar: "/avatars/sara.jpg",
-      createdAt: new Date()
-    },
-    category: "إدارة",
-    price: 60000,
-    duration: 30,
-    startDate: new Date("2024-01-01"),
-    endDate: new Date("2024-01-30"),
-    maxStudents: 20,
-    enrolledStudents: 20,
-    rating: 4.2,
-    reviewCount: 6,
-    status: "completed",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  }
-]
-
-// Mock trainers list for selection
-const availableTrainers = [
-  { id: "trainer1", name: "فاطمة علي" },
-  { id: "trainer2", name: "محمد أحمد" },
-  { id: "trainer3", name: "سارة خالد" },
-  { id: "trainer4", name: "ياسر عمر" },
-]
+import Image from "next/image"
+import { getFileUrl } from "@/lib/utils"
+import { instituteService } from "@/lib/institute-service"
 
 export default function InstituteCourses() {
-  const [courses, setCourses] = useState<any[]>(mockCourses)
+  const [courses, setCourses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [trainerFilter, setTrainerFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
+
+  // Available trainers from DB
+  const [availableTrainers, setAvailableTrainers] = useState<{ id: string; name: string; email: string }[]>([])
+
+  // State for changing trainer
+  const [isChangeTrainerOpen, setIsChangeTrainerOpen] = useState(false)
+  const [selectedCourseForTrainerChange, setSelectedCourseForTrainerChange] = useState<any | null>(null)
+  const [newTrainerId, setNewTrainerId] = useState("")
+
+  // State for delete confirmation
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [courseToDelete, setCourseToDelete] = useState<any | null>(null)
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const data = await instituteService.getCourses()
+      setCourses(data)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل في جلب الدورات")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchTrainers = async () => {
+    try {
+      const data = await instituteService.getTrainers()
+      setAvailableTrainers(data)
+    } catch {
+      // Silently fail for trainers list
+    }
+  }
+
+  useEffect(() => {
+    fetchCourses()
+    fetchTrainers()
+  }, [])
 
   const normalizeText = (value: string) => {
     if (!value) return value
@@ -128,15 +76,6 @@ export default function InstituteCourses() {
     }
   }
 
-  // State for changing trainer
-  const [isChangeTrainerOpen, setIsChangeTrainerOpen] = useState(false)
-  const [selectedCourseForTrainerChange, setSelectedCourseForTrainerChange] = useState<any | null>(null)
-  const [newTrainerId, setNewTrainerId] = useState("")
-
-  // State for delete confirmation
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [courseToDelete, setCourseToDelete] = useState<any | null>(null)
-
   const filteredCourses = courses.filter(course => {
     const normalizedTitle = normalizeText(course.title)
     const normalizedTrainer = normalizeText(course.trainer?.name ?? "")
@@ -147,12 +86,17 @@ export default function InstituteCourses() {
     return matchesStatus && matchesTrainer && matchesSearch
   })
 
-  const handleDeleteCourse = () => {
+  const handleDeleteCourse = async () => {
     if (courseToDelete) {
-      setCourses(courses.filter(c => c.id !== courseToDelete.id))
+      try {
+        await instituteService.deleteCourse(courseToDelete.id)
+        setCourses(courses.filter(c => c.id !== courseToDelete.id))
+        toast.success("تم حذف الدورة بنجاح")
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || "فشل في حذف الدورة")
+      }
       setIsDeleteDialogOpen(false)
       setCourseToDelete(null)
-      toast.success("تم حذف الدورة بنجاح")
     }
   }
 
@@ -162,20 +106,25 @@ export default function InstituteCourses() {
     setIsChangeTrainerOpen(true)
   }
 
-  const handleChangeTrainer = () => {
+  const handleChangeTrainer = async () => {
     if (selectedCourseForTrainerChange && newTrainerId) {
-      const selectedTrainer = availableTrainers.find(t => t.id === newTrainerId)
-      if (selectedTrainer) {
-        setCourses(courses.map(course =>
-          course.id === selectedCourseForTrainerChange.id
-            ? {
-              ...course,
-              trainerId: newTrainerId,
-              trainer: { ...course.trainer, id: newTrainerId, name: selectedTrainer.name, status: 'active' }
-            }
-            : course
-        ))
+      try {
+        await instituteService.changeTrainer(selectedCourseForTrainerChange.id, newTrainerId)
+        const selectedTrainer = availableTrainers.find(t => t.id === newTrainerId)
+        if (selectedTrainer) {
+          setCourses(courses.map(course =>
+            course.id === selectedCourseForTrainerChange.id
+              ? {
+                ...course,
+                trainerId: newTrainerId,
+                trainer: { ...course.trainer, id: newTrainerId, name: selectedTrainer.name }
+              }
+              : course
+          ))
+        }
         toast.success("تم تغيير المدرب بنجاح")
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || "فشل في تغيير المدرب")
       }
       setIsChangeTrainerOpen(false)
       setSelectedCourseForTrainerChange(null)
@@ -187,15 +136,39 @@ export default function InstituteCourses() {
       case 'active':
         return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">مستمر</Badge>
       case 'completed':
-        return <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">مكتمل</Badge> // Gray/Blue as requested
+        return <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">مكتمل</Badge>
       case 'draft':
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">مسودة</Badge>
+      case 'cancelled':
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">ملغي</Badge>
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">مرفوض</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
   }
 
   const uniqueTrainers = Array.from(new Set(courses.map(course => normalizeText(course.trainer?.name ?? ""))))
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-2">جاري تحميل الدورات...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+        <Button onClick={fetchCourses}>إعادة المحاولة</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -212,7 +185,7 @@ export default function InstituteCourses() {
         </Button>
       </div>
 
-            {/* Filters */}
+      {/* Filters */}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
@@ -249,98 +222,123 @@ export default function InstituteCourses() {
         </div>
       </div>
 
-      {/* Courses Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>قائمة الدورات</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>الدورة</TableHead>
-                <TableHead>المدرب</TableHead>
-                <TableHead>الفئة</TableHead>
-                <TableHead>الطلاب</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCourses.map((course) => (
-                <TableRow key={course.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{normalizeText(course.title)}</div>
-                      <div className="text-sm text-gray-500">{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{normalizeText(course.trainer.name)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{normalizeText(course.category)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      {course.enrolledStudents}/{course.maxStudents}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(course.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                       {/* Simplified Actions for Institute Admin */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                             <Link href={`/institute/courses/${course.id}/students`} className="flex items-center cursor-pointer w-full">
-                               <Users className="mr-2 h-4 w-4" />
-                               إدارة الطلاب
-                             </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
+      {/* Courses Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {filteredCourses.length === 0 ? (
+          <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
+            لا توجد دورات مطابقة لخيارات البحث الحالية.
+          </div>
+        ) : (
+          filteredCourses.map((course) => (
+            <div
+              key={course.id}
+              dir="rtl"
+              className="w-full h-auto sm:h-[220px] rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)] text-right flex flex-col sm:flex-row items-start gap-5 transition-all hover:shadow-[0_8px_30px_rgba(15,23,42,0.12)]"
+            >
+              <div className="relative h-[160px] sm:h-[185px] w-full sm:w-[185px] shrink-0 overflow-hidden rounded-2xl bg-slate-100 flex items-center justify-center">
+                {course.image && !imageErrors[course.id] ? (
+                  <Image
+                    src={getFileUrl(course.image)}
+                    alt={course.title}
+                    fill
+                    sizes="185px"
+                    className="h-full w-full object-cover"
+                    unoptimized={true}
+                    onError={() => setImageErrors(prev => ({ ...prev, [course.id]: true }))}
+                  />
+                ) : (
+                  <span className="text-slate-400 font-bold text-2xl text-center px-2">{normalizeText(course.title).charAt(0)}</span>
+                )}
+              </div>
+
+              <div className="flex h-full w-full flex-1 flex-col text-right">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1 min-w-0 pl-2">
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 mb-2">
+                      {normalizeText(course.category)}
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-900 line-clamp-2">
+                      {normalizeText(course.title)}
+                    </h3>
+                  </div>
+
+                  {/* Dropdown Menu actions */}
+                  <div className="flex items-center shrink-0">
+                    <DropdownMenu dir="rtl">
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/institute/courses/${course.id}/students`} className="flex items-center cursor-pointer w-full">
+                            <Users className="ml-2 h-4 w-4" />
+                            إدارة الطلاب
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/institute/courses/${course.id}`} className="flex items-center cursor-pointer w-full">
+                            <Eye className="ml-2 h-4 w-4" />
                             عرض التفاصيل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/institute/courses/${course.id}/edit`} className="flex items-center cursor-pointer w-full">
+                            <Edit className="ml-2 h-4 w-4" />
                             تعديل الدورة
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openChangeTrainerDialog(course)}>
-                            <UserCog className="mr-2 h-4 w-4" />
-                            تغيير المدرب
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                            onClick={() => {
-                              setCourseToDelete(course)
-                              setIsDeleteDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            حذف الدورة
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openChangeTrainerDialog(course)}>
+                          <UserCog className="ml-2 h-4 w-4" />
+                          تغيير المدرب
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                          onClick={() => {
+                            setCourseToDelete(course)
+                            setIsDeleteDialogOpen(true)
+                          }}
+                        >
+                          <Trash2 className="ml-2 h-4 w-4" />
+                          حذف الدورة
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="mt-1 text-sm text-slate-500 line-clamp-1">
+                  المدرب: <span className="font-medium text-slate-700">{normalizeText(course.trainer?.name ?? "-")}</span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-start gap-2 text-sm text-slate-600">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs">
+                    <Users className="h-3.5 w-3.5" />
+                    السعة: <span className="font-medium text-slate-900">{course.enrolledStudents}/{course.maxStudents}</span>
+                  </span>
+                </div>
+
+                <div className="mt-auto flex w-full items-center justify-between pt-4">
+                  <span className="inline-flex h-9 items-center rounded-full bg-blue-50 px-3.5 text-sm font-bold text-blue-700">
+                    {new Intl.NumberFormat('en-US').format(course.price)} ر.ي
+                  </span>
+                  <div>
+                    {getStatusBadge(course.status)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
       <Dialog open={isChangeTrainerOpen} onOpenChange={setIsChangeTrainerOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>تغيير مدرب الدورة</DialogTitle>
             <DialogDescription>
-              اختر المدرب الجديد للدورة "{selectedCourseForTrainerChange?.title}"
+              اختر المدرب الجديد للدورة &quot;{selectedCourseForTrainerChange?.title}&quot;
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -368,7 +366,7 @@ export default function InstituteCourses() {
           <DialogHeader>
             <DialogTitle>تأكيد الحذف</DialogTitle>
             <DialogDescription>
-              هل أنت متأكد من رغبتك في حذف الدورة "{courseToDelete?.title}"؟ لا يمكن التراجع عن هذا الإجراء.
+              هل أنت متأكد من رغبتك في حذف الدورة &quot;{courseToDelete?.title}&quot;؟ لا يمكن التراجع عن هذا الإجراء.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -380,4 +378,3 @@ export default function InstituteCourses() {
     </div>
   )
 }
-

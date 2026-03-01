@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'trainer' | 'institute_admin' | 'platform_admin';
+export type UserRole = 'STUDENT' | 'TRAINER' | 'INSTITUTE_ADMIN' | 'PLATFORM_ADMIN';
 export type UserStatus = 'pending' | 'active' | 'approved' | 'rejected' | 'suspended';
 export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 export type InstituteStatus = VerificationStatus;
@@ -135,7 +135,6 @@ export interface Enrollment {
   courseId: string;
   enrolledAt: Date;
   status: EnrollmentStatus;
-  progress: number; // percentage
   cancellationReason?: string;
   deletedAt?: Date;
 }

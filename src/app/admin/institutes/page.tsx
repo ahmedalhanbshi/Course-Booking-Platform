@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,56 +12,25 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, CheckCircle, XCircle, Building, Clock, Trash2, Edit } from "lucide-react"
 import { Institute } from "@/types"
-import { formatDate } from "@/lib/utils"
-import { AdminPageHeader } from "@/components/admin/page-header"
+import { formatDate, getFileUrl } from "@/lib/utils"
 
-// Mock data
-const mockInstitutes: Institute[] = [
-  {
-    id: "inst1",
-    name: "معهد الرياض للتدريب",
-    description: "معهد متخصص في التدريب المهني والتقني",
-    email: "info@riyadh-institute.com",
-    phone: "+966501234567",
-    address: "الرياض، المملكة العربية السعودية",
-    logo: "/logos/inst1.jpg",
-    website: "https://riyadh-institute.com",
-    status: "approved",
-    createdAt: new Date("2023-01-15"),
-    updatedAt: new Date("2023-01-15")
-  },
-  {
-    id: "inst2",
-    name: "أكاديمية جدة التقنية",
-    description: "أكاديمية متخصصة في البرمجة والتطوير",
-    email: "contact@jeddah-tech.com",
-    phone: "+966507654321",
-    address: "جدة، المملكة العربية السعودية",
-    logo: "/logos/inst2.jpg",
-    website: "https://jeddah-tech.com",
-    status: "pending",
-    createdAt: new Date("2024-01-10"),
-    updatedAt: new Date("2024-01-10")
-  },
-  {
-    id: "inst3",
-    name: "مركز الدمام التعليمي",
-    description: "مركز تعليمي شامل للدورات التدريبية",
-    email: "info@dammam-center.com",
-    phone: "+966509876543",
-    address: "الدمام، المملكة العربية السعودية",
-    logo: "/logos/inst3.jpg",
-    website: "https://dammam-center.com",
-    status: "suspended",
-    createdAt: new Date("2023-06-20"),
-    updatedAt: new Date("2023-06-20")
-  }
-]
+// ... (in component)
+
+
+import { AdminPageHeader } from "@/components/admin/page-header"
+import { adminService } from "@/lib/admin-service"
+
+import { useSearchParams } from "next/navigation"
 
 export default function AdminInstitutes() {
-  const [institutes, setInstitutes] = useState<Institute[]>(mockInstitutes)
+  const searchParams = useSearchParams()
+  const viewId = searchParams.get('view')
+
+  const [institutes, setInstitutes] = useState<Institute[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [selectedInstitute, setSelectedInstitute] = useState<Institute | null>(null)
-  const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'approve' | 'suspend' | 'reactivate' | 'delete' | 'edit' | null }>({
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'view' | 'approve' | 'suspend' | 'reactivate' | 'delete' | 'edit' | null }>({
     open: false,
     type: null
   })
@@ -76,6 +45,38 @@ export default function AdminInstitutes() {
     status: "pending",
     password: ""
   })
+  const [suspendReason, setSuspendReason] = useState("")
+
+  useEffect(() => {
+    loadInstitutes()
+  }, [])
+
+  useEffect(() => {
+    if (!loading && viewId && institutes.length > 0) {
+      const institute = institutes.find(i => i.id === viewId)
+      if (institute) {
+        handleViewInstitute(institute)
+      }
+    }
+  }, [loading, institutes, viewId])
+
+  const loadInstitutes = async () => {
+    try {
+      setLoading(true)
+      const data = await adminService.getAllInstitutes()
+      setInstitutes(data)
+    } catch (err: any) {
+      console.error(err)
+      setError("فشل تحميل قائمة المعاهد")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleViewInstitute = (institute: Institute) => {
+    setSelectedInstitute(institute)
+    setActionDialog({ open: true, type: 'view' })
+  }
 
   const handleApproveInstitute = (institute: Institute) => {
     setSelectedInstitute(institute)
@@ -100,62 +101,42 @@ export default function AdminInstitutes() {
   const handleEditInstitute = (institute: Institute) => {
     setSelectedInstitute(institute)
     setEditForm({
-      name: institute.name,
-      email: institute.email,
+      name: institute.name || "",
+      email: institute.email || "",
       phone: institute.phone || "",
       description: institute.description || "",
       address: institute.address || "",
       website: institute.website || "",
       logo: institute.logo || "",
-      status: institute.status,
+      status: institute.status || "pending",
       password: ""
     })
     setActionDialog({ open: true, type: 'edit' })
   }
 
-  const executeAction = () => {
+  const executeAction = async () => {
     if (!selectedInstitute) return
 
-    if (actionDialog.type === 'delete') {
-      setInstitutes(institutes.filter(inst => inst.id !== selectedInstitute.id))
-    } else if (actionDialog.type === 'edit') {
-      setInstitutes(institutes.map(inst =>
-        inst.id === selectedInstitute.id ? {
-          ...inst,
-          name: editForm.name,
-          email: editForm.email,
-          phone: editForm.phone,
-          description: editForm.description,
-          address: editForm.address,
-          website: editForm.website,
-          logo: editForm.logo,
-          status: editForm.status as any
-          // Password handled by API
-        } : inst
-      ))
-    } else {
-      let newStatus: Institute['status']
-      switch (actionDialog.type) {
-        case 'approve':
-          newStatus = 'approved'
-          break
-        case 'suspend':
-          newStatus = 'suspended'
-          break
-        case 'reactivate':
-          newStatus = 'approved'
-          break
-        default:
-          return
+    try {
+      if (actionDialog.type === 'approve') {
+        await adminService.approveInstitute(selectedInstitute.id)
+      } else if (actionDialog.type === 'suspend') {
+        await adminService.suspendInstitute(selectedInstitute.id, suspendReason)
+      } else if (actionDialog.type === 'reactivate') {
+        await adminService.reactivateInstitute(selectedInstitute.id)
+      } else if (actionDialog.type === 'delete') {
+        await adminService.deleteInstitute(selectedInstitute.id)
+      } else if (actionDialog.type === 'edit') {
+        await adminService.updateInstitute(selectedInstitute.id, editForm)
       }
 
-      setInstitutes(institutes.map(inst =>
-        inst.id === selectedInstitute.id ? { ...inst, status: newStatus } : inst
-      ))
+      await loadInstitutes()
+      setActionDialog({ open: false, type: null })
+      setSelectedInstitute(null)
+      setSuspendReason("")
+    } catch (err) {
+      console.error(err)
     }
-
-    setActionDialog({ open: false, type: null })
-    setSelectedInstitute(null)
   }
 
   const getStatusBadge = (status: Institute['status']) => {
@@ -170,6 +151,9 @@ export default function AdminInstitutes() {
         return <Badge variant="secondary">{status}</Badge>
     }
   }
+
+  if (loading) return <div className="p-8 text-center">جاري تحميل المعاهد...</div>
+  if (error) return <div className="p-8 text-center text-red-500">{error}</div>
 
   return (
     <div className="space-y-6">
@@ -198,7 +182,7 @@ export default function AdminInstitutes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {institutes.filter(inst => inst.status === 'approved').length}
+              {institutes.filter(inst => inst.status === 'approved' || inst.verificationStatus === 'approved').length}
             </div>
             <p className="text-xs text-muted-foreground">معاهد نشطة</p>
           </CardContent>
@@ -211,7 +195,7 @@ export default function AdminInstitutes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {institutes.filter(inst => inst.status === 'pending').length}
+              {institutes.filter(inst => inst.status === 'pending' || inst.verificationStatus === 'pending').length}
             </div>
             <p className="text-xs text-muted-foreground">طلبات جديدة</p>
           </CardContent>
@@ -224,102 +208,111 @@ export default function AdminInstitutes() {
           <CardTitle>قائمة المعاهد</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>المعاهد</TableHead>
-                <TableHead>الموقع</TableHead>
-                <TableHead>تاريخ التسجيل</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {institutes.map((institute) => (
-                <TableRow key={institute.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {institute.logo && (
-                        <img
-                          src={institute.logo}
-                          alt={institute.name}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      )}
-                      <div>
-                        <div className="font-medium">{institute.name}</div>
-                        <div className="text-sm text-gray-500">{institute.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{institute.address}</div>
-                  </TableCell>
-                  <TableCell>
-                    {formatDate(institute.createdAt)}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(institute.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleEditInstitute(institute)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {institute.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApproveInstitute(institute)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          اعتماد
-                        </Button>
-                      )}
-                      {institute.status === 'approved' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSuspendInstitute(institute)}
-                          className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          تعليق
-                        </Button>
-                      )}
-                      {institute.status === 'suspended' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleReactivateInstitute(institute)}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          إعادة تفعيل
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteInstitute(institute)}
-                        className="border-red-300 text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {institutes.length === 0 ? (
+            <div className="text-center p-8 text-gray-500">لا توجد معاهد مسجلة</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>المعاهد</TableHead>
+                  <TableHead>الموقع</TableHead>
+                  <TableHead>تاريخ التسجيل</TableHead>
+                  <TableHead>الحالة</TableHead>
+                  <TableHead>الإجراءات</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {institutes.map((institute) => (
+                  <TableRow key={institute.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {institute.logo ? (
+                          <img
+                            src={institute.logo}
+                            alt={institute.name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                            <Building className="h-4 w-4 text-gray-500" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium">{institute.name}</div>
+                          <div className="text-sm text-gray-500">{institute.email}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{institute.address || '-'}</div>
+                    </TableCell>
+                    <TableCell>
+                      {formatDate(institute.createdAt)}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(institute.verificationStatus || institute.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleViewInstitute(institute)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleEditInstitute(institute)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {(institute.status === 'pending' || institute.verificationStatus === 'pending') && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveInstitute(institute)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            اعتماد
+                          </Button>
+                        )}
+                        {(institute.status === 'approved' || institute.verificationStatus === 'approved') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSuspendInstitute(institute)}
+                            className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            تعليق
+                          </Button>
+                        )}
+                        {institute.status === 'suspended' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleReactivateInstitute(institute)}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            إعادة تفعيل
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteInstitute(institute)}
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       {/* Action Dialog */}
       <Dialog open={actionDialog.open} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
+              {actionDialog.type === 'view' && 'تفاصيل المعهد'}
               {actionDialog.type === 'approve' && 'اعتماد المعهد'}
               {actionDialog.type === 'suspend' && 'تعليق المعهد'}
               {actionDialog.type === 'reactivate' && 'إعادة تفعيل المعهد'}
@@ -328,7 +321,79 @@ export default function AdminInstitutes() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {selectedInstitute && actionDialog.type !== 'edit' && (
+            {selectedInstitute && actionDialog.type === 'view' && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  {selectedInstitute.logo ? (
+                    <img
+                      src={getFileUrl(selectedInstitute.logo)}
+                      alt={selectedInstitute.name}
+                      className="w-20 h-20 rounded-full object-cover border"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center border">
+                      <Building className="h-10 w-10 text-gray-500" />
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-xl font-bold">{selectedInstitute.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      {getStatusBadge(selectedInstitute.verificationStatus || selectedInstitute.status)}
+                      <span className="text-sm text-gray-500">منذ {formatDate(selectedInstitute.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                  <div>
+                    <h4 className="font-semibold text-sm text-gray-500 mb-1">البريد الإلكتروني</h4>
+                    <p>{selectedInstitute.email}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm text-gray-500 mb-1">رقم الهاتف</h4>
+                    <p dir="ltr" className="text-right">{selectedInstitute.phone || 'غير متوفر'}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm text-gray-500 mb-1">الموقع الإلكتروني</h4>
+                    {selectedInstitute.website ? (
+                      <a href={selectedInstitute.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate block">
+                        {selectedInstitute.website}
+                      </a>
+                    ) : (
+                      <p>غير متوفر</p>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm text-gray-500 mb-1">العنوان</h4>
+                    <p>{selectedInstitute.address || 'غير متوفر'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">نبذة عن المعهد</h4>
+                  <p className="text-gray-700 bg-gray-50 p-4 rounded-lg min-h-[80px]">
+                    {selectedInstitute.description || 'لا يوجد وصف للمعهد.'}
+                  </p>
+                </div>
+
+                {selectedInstitute.licenseDocumentUrl && (
+                  <div>
+                    <h4 className="font-semibold mb-2">وثائق الترخيص</h4>
+                    <a
+                      href={getFileUrl(selectedInstitute.licenseDocumentUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-3 border rounded-lg hover:bg-gray-50 transition-colors text-primary"
+                    >
+                      <img src="/icons/file.svg" alt="file" className="w-5 h-5" />
+                      <span>عرض وثيقة الترخيص</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedInstitute && actionDialog.type !== 'edit' && actionDialog.type !== 'view' && (
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-medium mb-2">تفاصيل المعهد:</h4>
                 <div className="space-y-1 text-sm">
@@ -345,6 +410,8 @@ export default function AdminInstitutes() {
                 <Textarea
                   id="suspend-reason"
                   placeholder="اكتب سبب تعليق المعهد..."
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
                 />
               </div>
             )}
@@ -448,18 +515,20 @@ export default function AdminInstitutes() {
                 variant="outline"
                 onClick={() => setActionDialog({ open: false, type: null })}
               >
-                إلغاء
+                {actionDialog.type === 'view' ? 'إغلاق' : 'إلغاء'}
               </Button>
-              <Button
-                onClick={executeAction}
-                variant={actionDialog.type === 'delete' ? "destructive" : "default"}
-              >
-                {actionDialog.type === 'approve' && 'اعتماد المعهد'}
-                {actionDialog.type === 'suspend' && 'تعليق المعهد'}
-                {actionDialog.type === 'reactivate' && 'إعادة التفعيل'}
-                {actionDialog.type === 'delete' && 'حذف'}
-                {actionDialog.type === 'edit' && 'حفظ التغييرات'}
-              </Button>
+              {actionDialog.type !== 'view' && (
+                <Button
+                  onClick={executeAction}
+                  variant={actionDialog.type === 'delete' ? "destructive" : "default"}
+                >
+                  {actionDialog.type === 'approve' && 'اعتماد المعهد'}
+                  {actionDialog.type === 'suspend' && 'تعليق المعهد'}
+                  {actionDialog.type === 'reactivate' && 'إعادة التفعيل'}
+                  {actionDialog.type === 'delete' && 'حذف'}
+                  {actionDialog.type === 'edit' && 'حفظ التغييرات'}
+                </Button>
+              )}
             </DialogFooter>
           </div>
         </DialogContent>

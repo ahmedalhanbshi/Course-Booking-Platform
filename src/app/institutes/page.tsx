@@ -71,14 +71,7 @@ export default function InstitutesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50" dir="rtl">
-            <Navbar
-                user={{
-                    name: "أحمد محمد",
-                    email: "ahmed@example.com",
-                    role: "student",
-                    avatar: "/avatars/student.jpg"
-                }}
-            />
+            <Navbar />
 
             <main className="container mx-auto max-w-7xl px-4 py-8">
                 {/* Header Section */}

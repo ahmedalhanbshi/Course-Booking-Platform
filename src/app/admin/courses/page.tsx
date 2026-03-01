@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,156 +10,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Eye, XCircle, BookOpen, Users, Trash2, Edit } from "lucide-react"
+import { Eye, XCircle, BookOpen, Users, Trash2, Edit, Loader2, Calendar, DollarSign } from "lucide-react"
 import { Course } from "@/types"
 import { AdminPageHeader } from "@/components/admin/page-header"
+import { adminService } from "@/lib/admin-service"
 import { format } from "date-fns"
 
-// Mock data
-const mockCourses: Course[] = [
-  {
-    id: "course1",
-    title: "دورة البرمجة الأساسية",
-    description: "تعلم أساسيات البرمجة من الصفر",
-    shortDescription: "دورة شاملة للمبتدئين",
-    trainerId: "trainer1",
-    trainer: {
-      id: "trainer1",
-      name: "فاطمة علي",
-      email: "fatima@example.com",
-      role: "trainer",
-      status: "active",
-      avatar: "/avatars/fatima.jpg",
-      createdAt: new Date()
-    },
-    institute: {
-      id: "inst1",
-      name: "معهد الرياض للتدريب",
-      description: "",
-      email: "",
-      phone: "",
-      address: "",
-      status: "approved",
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    category: "برمجة",
-    price: 50000,
-    duration: 40,
-    startDate: new Date("2024-02-01"),
-    endDate: new Date("2024-03-01"),
-    maxStudents: 30,
-    enrolledStudents: 25,
-    rating: 4.5,
-    reviewCount: 12,
-    status: "approved",
-    deliveryType: "in_person",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  {
-    id: "course2",
-    title: "دورة تطوير التطبيقات",
-    description: "بناء تطبيقات الويب الحديثة",
-    shortDescription: "React و Node.js",
-    trainerId: "trainer2",
-    trainer: {
-      id: "trainer2",
-      name: "محمد أحمد",
-      email: "mohamed@example.com",
-      role: "trainer",
-      status: "active",
-      avatar: "/avatars/mohamed.jpg",
-      createdAt: new Date()
-    },
-    institute: {
-      id: "inst1",
-      name: "معهد الرياض للتدريب",
-      description: "",
-      email: "",
-      phone: "",
-      address: "",
-      status: "approved",
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    category: "تطوير الويب",
-    price: 80000,
-    duration: 60,
-    startDate: new Date("2024-02-15"),
-    endDate: new Date("2024-04-15"),
-    maxStudents: 25,
-    enrolledStudents: 20,
-    rating: 4.8,
-    reviewCount: 8,
-    status: "approved",
-    deliveryType: "online",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  {
-    id: "course3",
-    title: "دورة إدارة المشاريع",
-    description: "مهارات إدارة المشاريع الرقمية",
-    shortDescription: "Agile و Scrum",
-    trainerId: "trainer3",
-    trainer: {
-      id: "trainer3",
-      name: "سارة خالد",
-      email: "sara@example.com",
-      role: "trainer",
-      status: "active",
-      avatar: "/avatars/sara.jpg",
-      createdAt: new Date()
-    },
-    institute: {
-      id: "inst2",
-      name: "أكاديمية جدة التقنية",
-      description: "",
-      email: "",
-      phone: "",
-      address: "",
-      status: "approved",
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    category: "إدارة",
-    price: 60000,
-    duration: 30,
-    startDate: new Date("2024-03-01"),
-    endDate: new Date("2024-03-30"),
-    maxStudents: 20,
-    enrolledStudents: 15,
-    rating: 4.2,
-    reviewCount: 6,
-    status: "cancelled",
-    deliveryType: "hybrid",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  }
-]
-
-const mockTrainersList = [
-  { id: "trainer1", name: "فاطمة علي" },
-  { id: "trainer2", name: "محمد أحمد" },
-  { id: "trainer3", name: "سارة خالد" },
-]
-
-const mockInstitutesList = [
-  { id: "inst1", name: "معهد الرياض للتدريب" },
-  { id: "inst2", name: "أكاديمية جدة التقنية" },
-]
-
 export default function AdminCourses() {
-  const [courses, setCourses] = useState<Course[]>(mockCourses)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+  const [viewDialog, setViewDialog] = useState(false)
   const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'delete' | 'edit' | null }>({
     open: false,
     type: null
   })
+  const [actionLoading, setActionLoading] = useState(false)
   const [editForm, setEditForm] = useState({
     title: "",
     price: 0,
@@ -169,23 +39,42 @@ export default function AdminCourses() {
     startDate: "",
     endDate: "",
     maxStudents: 0,
-    status: "approved",
-    trainerId: "",
-    instituteId: ""
+    status: "active",
+    trainerId: ""
   })
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const data = await adminService.getAllCourses()
+      setCourses(data as Course[])
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل في جلب الدورات")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCourses()
+  }, [])
 
   const filteredCourses = courses.filter(course => {
     const matchesStatus = statusFilter === "all" || course.status === statusFilter
     const matchesCategory = categoryFilter === "all" || course.category === categoryFilter
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.trainer.name.toLowerCase().includes(searchQuery.toLowerCase())
+      (course.trainer?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
     return matchesStatus && matchesCategory && matchesSearch
   })
 
-  const handleSuspendCourse = (courseId: string) => {
-    setCourses(courses.map(course =>
-      course.id === courseId ? { ...course, status: 'cancelled' as const } : course
-    ))
+  const handleSuspendCourse = async (courseId: string) => {
+    try {
+      await adminService.suspendCourse(courseId)
+      await fetchCourses()
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل في تعليق الدورة")
+    }
   }
 
   const handleDeleteCourse = (course: Course) => {
@@ -201,75 +90,65 @@ export default function AdminCourses() {
       description: course.description,
       shortDescription: course.shortDescription || "",
       category: course.category,
-      startDate: format(course.startDate, "yyyy-MM-dd"),
-      endDate: format(course.endDate, "yyyy-MM-dd"),
+      startDate: format(new Date(course.startDate), "yyyy-MM-dd"),
+      endDate: format(new Date(course.endDate), "yyyy-MM-dd"),
       maxStudents: course.maxStudents,
       status: course.status,
-      trainerId: course.trainerId,
-      instituteId: course.instituteId || ""
+      trainerId: course.trainerId
     })
     setActionDialog({ open: true, type: 'edit' })
   }
 
-  const executeAction = () => {
+  const executeAction = async () => {
     if (!selectedCourse) return
 
-    if (actionDialog.type === 'delete') {
-      setCourses(courses.filter(c => c.id !== selectedCourse.id))
-    } else if (actionDialog.type === 'edit') {
-      setCourses(courses.map(c =>
-        c.id === selectedCourse.id ? {
-          ...c,
-          title: editForm.title,
-          price: editForm.price,
-          description: editForm.description,
-          shortDescription: editForm.shortDescription,
-          category: editForm.category,
-          startDate: new Date(editForm.startDate),
-          endDate: new Date(editForm.endDate),
-          maxStudents: editForm.maxStudents,
-          status: editForm.status as any,
-          trainerId: editForm.trainerId,
-          instituteId: editForm.instituteId || undefined,
-          trainer: mockTrainersList.find(t => t.id === editForm.trainerId) ? {
-            ...c.trainer,
-            name: mockTrainersList.find(t => t.id === editForm.trainerId)?.name || c.trainer.name,
-            id: editForm.trainerId
-          } : c.trainer,
-          institute: mockInstitutesList.find(i => i.id === editForm.instituteId) ? {
-            ...c.institute!,
-            name: mockInstitutesList.find(i => i.id === editForm.instituteId)?.name || c.institute!.name,
-            id: editForm.instituteId
-          } : c.institute
-        } : c
-      ))
+    setActionLoading(true)
+    try {
+      if (actionDialog.type === 'delete') {
+        await adminService.deleteCourse(selectedCourse.id)
+      } else if (actionDialog.type === 'edit') {
+        await adminService.updateCourse(selectedCourse.id, editForm)
+      }
+      await fetchCourses()
+      setActionDialog({ open: false, type: null })
+      setSelectedCourse(null)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل في تنفيذ العملية")
+    } finally {
+      setActionLoading(false)
     }
-
-    setActionDialog({ open: false, type: null })
-    setSelectedCourse(null)
   }
 
-  const getStatusBadge = (status: Course['status']) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved':
-        return <Badge className="bg-green-100 text-green-800">معتمد</Badge>
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800">قيد المراجعة</Badge>
       case 'active':
-        return <Badge className="bg-blue-100 text-blue-800">نشط</Badge>
+        return <Badge className="bg-green-100 text-green-800">نشط</Badge>
+      case 'draft':
+        return <Badge className="bg-yellow-100 text-yellow-800">مسودة</Badge>
       case 'completed':
         return <Badge className="bg-purple-100 text-purple-800">مكتمل</Badge>
       case 'cancelled':
         return <Badge className="bg-red-100 text-red-800">ملغي</Badge>
+      case 'rejected':
+        return <Badge className="bg-orange-100 text-orange-800">مرفوض</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
   }
 
-  const uniqueCategories = Array.from(new Set(courses.map(course => course.category)))
+  const uniqueCategories = Array.from(new Set(courses.map(course => course.category).filter(Boolean)))
 
   const totalCourses = courses.length
-  const approvedCourses = courses.filter(c => c.status === 'approved' || c.status === 'active').length
+  const activeCourses = courses.filter(c => c.status === 'active').length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-2">جاري تحميل الدورات...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -277,6 +156,12 @@ export default function AdminCourses() {
         title="إدارة الدورات"
         description="مراجعة وإدارة جميع الدورات في المنصة"
       />
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -297,7 +182,7 @@ export default function AdminCourses() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{approvedCourses}</div>
+            <div className="text-2xl font-bold">{activeCourses}</div>
             <p className="text-xs text-muted-foreground">دورة متاحة للتسجيل</p>
           </CardContent>
         </Card>
@@ -320,10 +205,11 @@ export default function AdminCourses() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">جميع الحالات</SelectItem>
-                <SelectItem value="approved">معتمد</SelectItem>
                 <SelectItem value="active">نشط</SelectItem>
+                <SelectItem value="draft">مسودة</SelectItem>
                 <SelectItem value="cancelled">ملغي</SelectItem>
                 <SelectItem value="completed">مكتمل</SelectItem>
+                <SelectItem value="rejected">مرفوض</SelectItem>
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -349,74 +235,160 @@ export default function AdminCourses() {
           <CardTitle>قائمة الدورات</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>الدورة</TableHead>
-                <TableHead>المدرب</TableHead>
-                <TableHead>المعهد</TableHead>
-                <TableHead>الفئة</TableHead>
-                <TableHead>الطلاب</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCourses.map((course) => (
-                <TableRow key={course.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{course.title}</div>
-                      <div className="text-sm text-gray-500">{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{course.trainer.name}</TableCell>
-                  <TableCell>{course.institute?.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{course.category}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      {course.enrolledStudents}/{course.maxStudents}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(course.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleEditCourse(course)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {(course.status === 'approved' || course.status === 'active') && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSuspendCourse(course.id)}
-                          className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          تعليق
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteCourse(course)}
-                        className="border-red-300 text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {filteredCourses.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              لا توجد دورات مطابقة
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>الدورة</TableHead>
+                  <TableHead>المدرب</TableHead>
+                  <TableHead>المعهد</TableHead>
+                  <TableHead>الفئة</TableHead>
+                  <TableHead>الطلاب</TableHead>
+                  <TableHead>الحالة</TableHead>
+                  <TableHead>الإجراءات</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredCourses.map((course) => (
+                  <TableRow key={course.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{course.title}</div>
+                        <div className="text-sm text-gray-500">{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{course.trainer?.name || '-'}</TableCell>
+                    <TableCell>{course.institute?.name || '-'}</TableCell>
+                    <TableCell>
+                      {course.category ? (
+                        <Badge variant="outline">{course.category}</Badge>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        {course.enrolledStudents || 0}/{course.maxStudents}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(course.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setSelectedCourse(course); setViewDialog(true) }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleEditCourse(course)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {(course.status === 'active' || course.status === 'draft') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSuspendCourse(course.id)}
+                            className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            تعليق
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteCourse(course)}
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      {/* View Dialog */}
+      <Dialog open={viewDialog} onOpenChange={(open) => { if (!open) { setViewDialog(false); setSelectedCourse(null) } }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>تفاصيل الدورة</DialogTitle>
+          </DialogHeader>
+          {selectedCourse && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">{selectedCourse.title}</h3>
+                {getStatusBadge(selectedCourse.status)}
+              </div>
+
+              {selectedCourse.shortDescription && (
+                <p className="text-sm text-muted-foreground">{selectedCourse.shortDescription}</p>
+              )}
+
+              {selectedCourse.description && (
+                <div>
+                  <Label className="text-sm font-medium">الوصف</Label>
+                  <p className="text-sm mt-1 bg-gray-50 p-3 rounded-lg">{selectedCourse.description}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">السعر</p>
+                    <p className="font-medium">{new Intl.NumberFormat('en-US').format(selectedCourse.price)} ريال يمني</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">الطلاب</p>
+                    <p className="font-medium">{selectedCourse.enrolledStudents || 0} / {selectedCourse.maxStudents}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">تاريخ البدء</p>
+                    <p className="font-medium">{format(new Date(selectedCourse.startDate), 'yyyy-MM-dd')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">تاريخ الانتهاء</p>
+                    <p className="font-medium">{format(new Date(selectedCourse.endDate), 'yyyy-MM-dd')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">المدرب</p>
+                  <p className="font-medium">{selectedCourse.trainer?.name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">المعهد</p>
+                  <p className="font-medium">{selectedCourse.institute?.name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">الفئة</p>
+                  <p className="font-medium">{selectedCourse.category || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">المدة</p>
+                  <p className="font-medium">{selectedCourse.duration} ساعة</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={actionDialog.open && actionDialog.type === 'delete'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
@@ -438,7 +410,8 @@ export default function AdminCourses() {
               >
                 إلغاء
               </Button>
-              <Button onClick={executeAction} variant="destructive">
+              <Button onClick={executeAction} variant="destructive" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : null}
                 حذف
               </Button>
             </DialogFooter>
@@ -532,28 +505,10 @@ export default function AdminCourses() {
                     <SelectValue placeholder="اختر الحالة" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="approved">معتمد</SelectItem>
+                    <SelectItem value="draft">مسودة</SelectItem>
                     <SelectItem value="active">نشط</SelectItem>
                     <SelectItem value="cancelled">ملغي</SelectItem>
                     <SelectItem value="completed">مكتمل</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-trainer">المدرب</Label>
-                <Select
-                  value={editForm.trainerId}
-                  onValueChange={(value) => setEditForm({ ...editForm, trainerId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المدرب" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockTrainersList.map((trainer) => (
-                      <SelectItem key={trainer.id} value={trainer.id}>
-                        {trainer.name}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -565,7 +520,8 @@ export default function AdminCourses() {
               >
                 إلغاء
               </Button>
-              <Button onClick={executeAction}>
+              <Button onClick={executeAction} disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : null}
                 حفظ التغييرات
               </Button>
             </DialogFooter>

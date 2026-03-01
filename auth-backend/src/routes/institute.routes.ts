@@ -1,0 +1,62 @@
+import { Router } from 'express';
+import { authenticate } from '../middleware/authenticate';
+import { upload } from '../middleware/upload';
+import instituteController from '../controllers/institute.controller';
+
+const router = Router();
+
+// All institute routes require authentication
+router.use(authenticate);
+
+// Dashboard
+router.get('/dashboard', instituteController.getDashboard);
+
+// Profile
+router.get('/profile', instituteController.getProfile);
+router.put('/profile', upload.single('avatar'), instituteController.updateProfile);
+
+// Course management
+router.get('/courses', instituteController.getCourses);
+router.post('/courses', upload.single('image'), instituteController.createCourse);
+router.delete('/courses/:id', instituteController.deleteCourse);
+router.put('/courses/:id/trainer', instituteController.changeTrainer);
+
+// Halls
+router.get('/halls', instituteController.getHalls);
+router.get('/halls/:hallId/availability', instituteController.getHallAvailability);
+router.post('/halls', upload.single('image'), instituteController.addHall);
+router.patch('/halls/:hallId', upload.single('image'), instituteController.updateHall);
+router.delete('/halls/:hallId', instituteController.removeHall);
+
+// Room Bookings
+router.get('/halls/bookings', instituteController.getRoomBookings);
+router.patch('/halls/bookings/:bookingId/status', instituteController.updateRoomBookingStatus);
+
+
+// Trainers
+router.get('/trainers', instituteController.getTrainers);
+
+// Course students
+// Course Students
+router.get('/courses/:id/students', instituteController.getCourseStudents);
+router.put('/courses/:id/students/:enrollmentId/unenroll', instituteController.unenrollStudent);
+
+// Course Details & Edit
+router.get('/courses/:id', instituteController.getCourseById);
+router.put('/courses/:id', upload.single('image'), instituteController.updateCourse);
+
+// Metadata
+router.get('/categories', instituteController.getCategories);
+router.post('/categories', instituteController.createCategory);
+
+// Students
+router.get('/students', instituteController.getStudents);
+
+// Staff (institute-scoped, uses InstituteStaff model)
+router.get('/staff', instituteController.getStaff);
+router.post('/staff', instituteController.addStaff);
+router.patch('/staff/:staffId', instituteController.updateStaff);
+router.delete('/staff/:staffId', instituteController.removeStaff);
+router.patch('/staff/:staffId/status', instituteController.updateStaffStatus);
+
+export default router;

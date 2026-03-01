@@ -1,14 +1,27 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, UserRole } from '@/types'
+import { User } from '@/types'
+import { authService } from '@/lib/auth-service'
+import { clearAccessToken } from '@/lib/api-client'
+
+interface RegisterData {
+    name: string
+    email: string
+    password: string
+    phone?: string
+    role?: string
+}
 
 type AuthContextType = {
     user: User | null
     login: (email: string, password: string) => Promise<boolean>
+    register: (data: RegisterData | FormData) => Promise<boolean>
     logout: () => void
+    updateUser: (data: Partial<User>) => void
     isLoading: boolean
+    isAuthenticated: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -18,91 +31,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true)
     const router = useRouter()
 
-    useEffect(() => {
-        // Check for stored user on mount
-        const storedUser = localStorage.getItem('course_platform_user')
-        if (storedUser) {
-            setUser(JSON.parse(storedUser))
+    /**
+     * Initialize auth state on app startup
+     * Calls /auth/me to restore session from HTTP-only cookie
+     */
+    const initializeAuth = useCallback(async () => {
+        try {
+            setIsLoading(true)
+
+            // Call /auth/me to get current user
+            // If access token expired, interceptor will auto-refresh
+            const userData = await authService.getCurrentUser()
+
+            setUser(userData)
+        } catch (error) {
+            // Failed to get user (not authenticated or refresh failed)
+            setUser(null)
+            clearAccessToken()
+        } finally {
+            setIsLoading(false)
         }
-        setIsLoading(false)
     }, [])
 
-    const login = async (email: string, password: string) => {
-        // Mock authentication logic
-        if (password !== '123456') return false
+    useEffect(() => {
+        initializeAuth()
+    }, [initializeAuth])
 
-        let userData: User | null = null
+    /**
+     * Login with email and password
+     */
+    const login = async (email: string, password: string): Promise<boolean> => {
+        try {
+            setIsLoading(true)
 
-        switch (email) {
-            case 'student@demo.com':
-                userData = {
-                    id: '1',
-                    name: 'أحمد الطالب',
-                    email: 'student@demo.com',
-                    role: 'student',
-                    status: 'active',
-                    avatar: '/images/avatar-1.png',
-                    createdAt: new Date()
-                }
-                break
-            case 'trainer@demo.com':
-                userData = {
-                    id: '2',
-                    name: 'فاطمة المدربة',
-                    email: 'trainer@demo.com',
-                    role: 'trainer',
-                    status: 'active',
-                    avatar: '/images/avatar-2.png',
-                    createdAt: new Date()
-                }
-                break
-            case 'institute@demo.com':
-                userData = {
-                    id: '3',
-                    name: 'معهد المستقبل',
-                    email: 'institute@demo.com',
-                    role: 'institute_admin',
-                    status: 'active',
-                    avatar: '/images/avatar-3.png',
-                    createdAt: new Date()
-                }
-                break
-            case 'admin@demo.com':
-                userData = {
-                    id: '4',
-                    name: 'مدير النظام',
-                    email: 'admin@demo.com',
-                    role: 'platform_admin',
-                    status: 'active',
-                    avatar: '/images/avatar-4.png',
-                    createdAt: new Date()
-                }
-                break
-            default:
-                return false
-        }
+            const response = await authService.login(email, password)
 
-        if (userData) {
-            setUser(userData)
-            localStorage.setItem('course_platform_user', JSON.stringify(userData))
-            // Set cookie for middleware
-            document.cookie = `course_platform_user=${JSON.stringify(userData)}; path=/; max-age=86400; SameSite=Lax`
+            setUser(response.user)
             return true
+        } catch (error: any) {
+            console.error('Login error:', error)
+            setUser(null)
+
+            // Re-throw error with proper message for UI display
+            const errorMessage = error?.response?.data?.message || error?.message || 'Login failed'
+            throw new Error(errorMessage)
+        } finally {
+            setIsLoading(false)
         }
-
-        return false
     }
 
-    const logout = () => {
-        setUser(null)
-        localStorage.removeItem('course_platform_user')
-        // Remove cookie
-        document.cookie = 'course_platform_user=; path=/; max-age=0'
-        router.push('/')
+    /**
+     * Register new user
+     */
+    const register = async (data: RegisterData | FormData): Promise<boolean> => {
+        try {
+            setIsLoading(true)
+
+            await authService.register(data)
+
+            // Don't auto-login - redirect to login page instead
+            return true
+        } catch (error) {
+            console.error('Register error:', error)
+            return false
+        } finally {
+            setIsLoading(false)
+        }
     }
+
+    /**
+     * Logout user
+     * Clears tokens and redirects to home
+     */
+    const logout = useCallback(async () => {
+        try {
+            await authService.logout()
+        } catch (error) {
+            console.error('Logout error:', error)
+        } finally {
+            // Always clear state
+            setUser(null)
+            clearAccessToken()
+            router.push('/')
+        }
+    }, [router])
+
+    const updateUser = useCallback((data: Partial<User>) => {
+        setUser(prev => prev ? { ...prev, ...data } as User : null)
+    }, [])
+
+    const isAuthenticated = !!user
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+        <AuthContext.Provider value={{ user, login, register, logout, updateUser, isLoading, isAuthenticated }}>
             {children}
         </AuthContext.Provider>
     )

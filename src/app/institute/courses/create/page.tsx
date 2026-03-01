@@ -1,9 +1,10 @@
 ﻿"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
+import { instituteService } from "@/lib/institute-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,1230 +14,760 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, Banknote, Lock } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, Banknote, Lock, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import ExploreHallsPage from "@/app/student/explore/halls/page"
 
-// Mock user data
-const mockUser = {
-  id: "2",
-  name: "فاطمة علي",
-  email: "fatima@example.com",
-  role: 'trainer' as const,
-}
-
-const categories = [
-  "تطوير الويب",
-  "التصميم",
-  "إدارة الأعمال",
-  "تطوير البرمجيات",
-  "التسويق",
-  "قواعد البيانات",
-  "الذكاء الاصطناعي",
-  "الأمن السيبراني"
-]
 
 const platforms = [
-  { value: "zoom", label: "Zoom" },
-  { value: "teams", label: "Microsoft Teams" },
-  { value: "meet", label: "Google Meet" },
-  { value: "webex", label: "Webex" },
-  { value: "other", label: "أخرى" }
-]
-
-const pricingHalls = [
-  { id: "hall-1", name: "القاعة الرئيسية", capacity: 80 },
-  { id: "hall-2", name: "قاعة الاجتماعات الذكية", capacity: 18 },
-  { id: "hall-3", name: "معمل الحاسب المتقدم", capacity: 30 },
-  { id: "hall-4", name: "قاعة التدريب (ج)", capacity: 40 }
+    { value: "zoom", label: "Zoom" },
+    { value: "teams", label: "Microsoft Teams" },
+    { value: "meet", label: "Google Meet" },
+    { value: "webex", label: "Webex" },
+    { value: "other", label: "أخرى" }
 ]
 
 const timeSlots = [
-  "08:00 - 09:00",
-  "09:00 - 10:00",
-  "10:00 - 11:00",
-  "11:00 - 12:00",
-  "12:00 - 13:00",
-  "13:00 - 14:00",
-  "14:00 - 15:00",
-  "15:00 - 16:00",
-  "16:00 - 17:00",
-  "17:00 - 18:00",
-  "18:00 - 19:00",
-  "19:00 - 20:00"
+    "08:00 - 09:00",
+    "09:00 - 10:00",
+    "10:00 - 11:00",
+    "11:00 - 12:00",
+    "12:00 - 13:00",
+    "13:00 - 14:00",
+    "14:00 - 15:00",
+    "15:00 - 16:00",
+    "16:00 - 17:00",
+    "17:00 - 18:00",
+    "18:00 - 19:00",
+    "19:00 - 20:00"
 ]
-
-const hallAvailability: Record<string, number[]> = {
-  "hall-1": [2, 5, 7, 10, 12, 15, 18, 22, 25, 28],
-  "hall-2": [1, 3, 6, 9, 13, 16, 20, 23, 27],
-  "hall-3": [4, 8, 11, 14, 17, 19, 24, 26, 29],
-  "hall-4": [2, 6, 9, 12, 15, 18, 21, 24, 27]
-}
 
 const weekDaysShort = ["أحد", "اثن", "ثلا", "أرب", "خم", "جم", "سبت"]
 
-// Mock data for halls (Shared with Halls Page)
-const mockHalls = [
-  {
-    id: "hall-1",
-    name: "القاعة الرئيسية",
-    capacity: 80,
-    location: "الدور الأرضي • الجناح الشرقي",
-    type: "قاعة محاضرات",
-    hourlyRate: 18000,
-    description: "قاعة واسعة للمحاضرات والفعاليات الكبرى مع تجهيزات عرض متكاملة.",
-    image: "https://images.unsplash.com/photo-1760121788536-9797394e210e?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
-  },
-  {
-    id: "hall-2",
-    name: "قاعة الاجتماعات الذكية",
-    capacity: 18,
-    location: "الدور الأول • الجناح الغربي",
-    type: "قاعة اجتماعات",
-    hourlyRate: 12000,
-    description: "مساحة مريحة لاجتماعات الفرق مع شاشة تفاعلية وإضاءة هادئة.",
-    image: "https://images.unsplash.com/photo-1766802981801-4b4a9a1d8f1c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
-  },
-  {
-    id: "hall-3",
-    name: "معمل الحاسب المتقدم",
-    capacity: 30,
-    location: "الدور الثاني • الجناح الشرقي",
-    type: "معمل",
-    hourlyRate: 15000,
-    description: "معمل مجهز لأعمال التدريب العملي مع أجهزة حديثة وشبكة قوية.",
-    image: "https://images.unsplash.com/photo-1725274032244-9a8f0fa1e9a7?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
-  },
-  {
-    id: "hall-4",
-    name: "قاعة التدريب (ج)",
-    capacity: 40,
-    location: "الدور الأول • الجناح الشرقي",
-    type: "قاعة محاضرات",
-    hourlyRate: 14000,
-    description: "قاعة متوسطة مناسبة للدورات وورش العمل القصيرة.",
-    image: "https://images.unsplash.com/photo-1670348060135-d4c6662b4138?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=1600"
-  }
-]
-
 export default function CreateCoursePage() {
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState("pricing")
-  
-  const [courseData, setCourseData] = useState({
-    title: "",
-    category: "",
-    shortDescription: "",
-    description: "",
-    deliveryType: "", // in_person, online, hybrid, capacity_based (risk-free)
-    price: "",
-    minStudents: "",
-    maxStudents: "",
-    isFree: false,
-    startDate: "",
-    endDate: "",
-    instituteId: "",
-    prerequisites: "",
-    objectives: [] as string[],
-    tags: [] as string[],
-    hallId: "", 
-    onlinePlatform: "",
-    meetingLink: "",
-    startTime: "",
-    endTime: ""
-  })
+    const router = useRouter()
+    const [loading, setLoading] = useState(true)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+    const [activeTab, setActiveTab] = useState("info")
 
-  const [selectedSessions, setSelectedSessions] = useState<{ date: string, slot: string }[]>([])
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [calendarOffset, setCalendarOffset] = useState(0)
-  const [unavailableMessage, setUnavailableMessage] = useState("")
-  const [isHallDialogOpen, setIsHallDialogOpen] = useState(false)
-  const [onlineSchedule, setOnlineSchedule] = useState({
-    startDate: "",
-    startTime: "",
-    duration: "",
-    platform: "",
-    meetingLink: ""
-  })
+    // Reference Data State
+    const [categories, setCategories] = useState<{ id: string, name: string }[]>([])
+    const [trainers, setTrainers] = useState<{ id: string, name: string }[]>([])
+    const [halls, setHalls] = useState<any[]>([])
+    const [newCategoryInput, setNewCategoryInput] = useState("")
+    const [isAddingCategory, setIsAddingCategory] = useState(false)
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false)
 
-  const [currentObjective, setCurrentObjective] = useState("")
-  const [currentTag, setCurrentTag] = useState("")
+    const [courseData, setCourseData] = useState({
+        title: "",
+        categoryId: "",
+        trainerId: "",
+        shortDescription: "",
+        description: "",
+        deliveryType: "", // in_person, online, hybrid, capacity_based (risk-free)
+        price: "",
+        minStudents: "",
+        maxStudents: "",
+        isFree: false,
+        hallId: "",
+        objectives: [] as string[],
+        prerequisites: [] as string[],
+        tags: [] as string[]
+    })
 
-  useEffect(() => {
-    setSelectedDate(null)
-    setSelectedSessions([])
-    setUnavailableMessage("")
-    setCalendarOffset(0)
-  }, [courseData.hallId])
+    // Schedule State
+    const [selectedSessions, setSelectedSessions] = useState<{ date: string, slot: string }[]>([])
+    const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [calendarOffset, setCalendarOffset] = useState(0)
+    const [unavailableMessage, setUnavailableMessage] = useState("")
+    const [availableSlots, setAvailableSlots] = useState<string[]>([])
+    const [isSlotsLoading, setIsSlotsLoading] = useState(false)
+    const [isHallDialogOpen, setIsHallDialogOpen] = useState(false)
+    const [onlineSchedule, setOnlineSchedule] = useState({
+        startDate: "",
+        startTime: "",
+        duration: "",
+        platform: "",
+        meetingLink: ""
+    })
 
-  useEffect(() => {
-    setSelectedDate(null)
-    setUnavailableMessage("")
-  }, [calendarOffset])
+    const [currentObjective, setCurrentObjective] = useState("")
+    const [currentPrerequisite, setCurrentPrerequisite] = useState("")
+    const [currentTag, setCurrentTag] = useState("")
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const maxMonthsAhead = 5
+    const [imageFile, setImageFile] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string>("")
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const formatDateLabel = (dateKey: string) => {
-    const [year, month, day] = dateKey.split("-")
-    return `${day}-${month}-${year}`
-  }
-  const formatDateKey = (date: Date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, "0")
-    const day = String(date.getDate()).padStart(2, "0")
-    return `${year}-${month}-${day}`
-  }
-
-  const monthDate = new Date(todayStart.getFullYear(), todayStart.getMonth() + calendarOffset, 1)
-  const year = monthDate.getFullYear()
-  const month = monthDate.getMonth()
-  const monthLabel = monthDate.toLocaleDateString("ar-SA", { month: "long", year: "numeric" })
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const firstDay = new Date(year, month, 1).getDay()
-  const base = hallAvailability[courseData.hallId] ?? []
-  const availableDaysSet = new Set(
-    base.map((day) => ((day + calendarOffset * 2 - 1) % daysInMonth) + 1)
-  )
-
-  const calendarDays: Array<{ day: number; dateKey: string; isPast: boolean } | null> = []
-  for (let i = 0; i < firstDay; i += 1) {
-    calendarDays.push(null)
-  }
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-    const dateValue = new Date(year, month, day)
-    const isPast = dateValue < todayStart
-    calendarDays.push({ day, dateKey, isPast })
-  }
-  while (calendarDays.length % 7 !== 0) {
-    calendarDays.push(null)
-  }
-
-  const isPastDate = (dateKey: string) => {
-    const [year, month, day] = dateKey.split("-")
-    return new Date(Number(year), Number(month) - 1, Number(day)) < todayStart
-  }
-
-  const getDayMeta = (day: number, dateKey: string, isPast: boolean) => {
-    if (isPast) {
-      return { isSelectable: false, reason: "اليوم في الماضي", availableSlots: [] as string[], bookedSlots: [] as string[] }
+    const handleAddCategory = async () => {
+        if (!newCategoryInput.trim()) return
+        try {
+            setIsCreatingCategory(true)
+            const newCat = await instituteService.createCategory(newCategoryInput.trim())
+            setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat].sort((a, b) => a.name.localeCompare(b.name)))
+            setCourseData(prev => ({ ...prev, categoryId: newCat.id }))
+            setNewCategoryInput("")
+            setIsAddingCategory(false)
+            toast.success(`تم إضافة التصنيف "${newCat.name}" بنجاح`)
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "فشل في إضافة التصنيف")
+        } finally {
+            setIsCreatingCategory(false)
+        }
     }
 
-    const isBaseAvailable = availableDaysSet.has(day)
-    if (day % 5 === 0) {
-      return { isSelectable: false, reason: "القاعة مغلقة", availableSlots: [], bookedSlots: [] }
-    }
-    if (day % 7 === 0) {
-      return { isSelectable: false, reason: "خارج ساعات العمل", availableSlots: [], bookedSlots: [] }
-    }
-    if (day % 6 === 0) {
-      return { isSelectable: false, reason: "لا يوجد وقت كافٍ لمدة الجلسة", availableSlots: [], bookedSlots: [] }
-    }
-    if (!isBaseAvailable || day % 4 === 0) {
-      return { isSelectable: false, reason: "محجوز بالكامل", availableSlots: [], bookedSlots: [...timeSlots] }
-    }
-    if (day % 3 === 0) {
-      const bookedSlots = [timeSlots[0]]
-      const availableSlots = timeSlots.filter((slot) => !bookedSlots.includes(slot))
-      return { isSelectable: true, reason: "", availableSlots, bookedSlots }
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]
+            setImageFile(file)
+            setImagePreview(URL.createObjectURL(file))
+        }
     }
 
-    return { isSelectable: true, reason: "", availableSlots: [...timeSlots], bookedSlots: [] }
-  }
+    // Fetch Data
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true)
+                const [cats, trns, hls] = await Promise.all([
+                    instituteService.getCategories(),
+                    instituteService.getTrainers(),
+                    instituteService.getHalls()
+                ])
+                setCategories(cats)
+                setTrainers(trns)
+                setHalls(hls)
+            } catch (err) {
+                toast.error("فشل في تحميل البيانات الأساسية")
+                console.error(err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchData()
+    }, [])
 
-  const hasAvailability = calendarDays.some((cell) => {
-    if (!cell) return false
-    const meta = getDayMeta(cell.day, cell.dateKey, cell.isPast)
-    return meta.isSelectable
-  })
-
-  const selectedSessionsForDay = selectedDate ? selectedSessions.filter((s) => s.date === selectedDate) : []
-  const selectedDay = selectedDate ? Number(selectedDate.split("-")[2]) : null
-  const selectedMeta = selectedDate && selectedDay ? getDayMeta(selectedDay, selectedDate, isPastDate(selectedDate)) : null
-  const slotsForSelectedDate = selectedMeta?.availableSlots ?? []
-  const bookedSlotsForSelectedDate = selectedMeta?.bookedSlots ?? []
-  const sortedSessions = [...selectedSessions].sort((a, b) => {
-    if (a.date === b.date) return a.slot.localeCompare(b.slot)
-    return a.date.localeCompare(b.date)
-  })
-
-  const handleSelectDay = (dateKey: string, isAvailable: boolean, reason: string) => {
-    if (!isAvailable) {
-      setUnavailableMessage(`لا يمكن الحجز في هذا اليوم لأن: ${reason}`)
-      setSelectedDate(null)
-      return
-    }
-    setUnavailableMessage("")
-    setSelectedDate(dateKey)
-  }
-
-  const toggleSessionSlot = (date: string, slot: string) => {
-    const exists = selectedSessions.some((s) => s.date === date && s.slot === slot)
-    if (exists) {
-      setSelectedSessions((prev) => prev.filter((s) => !(s.date === date && s.slot === slot)))
-      return
-    }
-    setSelectedSessions((prev) => [...prev, { date, slot }])
-  }
-  
-
-  const handleSubmit = async (action: 'draft' | 'submit') => {
-    setIsSubmitting(true)
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    setIsSubmitting(false)
-
-    if (action === 'submit') {
-      // Logic: If physical hall selected, status = 'pending_approval'
-      if (courseData.deliveryType === 'in_person' || courseData.deliveryType === 'hybrid') {
-          toast.success("تم إرسال الدورة وطلب حجز القاعة للمراجعة المبدئية")
-      } else if (courseData.deliveryType === 'capacity_based') {
-          toast.success("تم نشر الدورة بنظام الحجز المبكر (تحديد القاعة لاحقاً)")
-      } else {
-          toast.success("تم إنشاء الدورة بنجاح")
-      }
-      
-      // Redirect to courses list
-      router.push('/institute/courses')
-    } else {
-      // Show success message and stay on page
-      toast.success('تم حفظ الدورة كمسودة')
-    }
-  }
-
-  const handleDelete = () => {
-    // In real app, this would delete the course
-    console.log('Deleting course...')
-    setShowDeleteDialog(false)
-    router.push('/institute/courses')
-  }
-
-  const addObjective = () => {
-    if (currentObjective.trim()) {
-      setCourseData(prev => ({
-        ...prev,
-        objectives: [...prev.objectives, currentObjective.trim()]
-      }))
-      setCurrentObjective("")
-    }
-  }
-
-  const removeObjective = (index: number) => {
-    setCourseData(prev => ({
-      ...prev,
-      objectives: prev.objectives.filter((_, i) => i !== index)
+    // Derived Halls for UI
+    const mappedHalls = halls.map(h => ({
+        id: h.id,
+        name: h.name,
+        type: "قاعة تدريب", // Default since backend doesn't store type explicitly yet or assumes 'Room'
+        location: "مقر المعهد", // Placeholder
+        capacity: h.capacity,
+        hourlyRate: Number(h.pricePerHour),
+        image: h.image || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000",
+        features: ["wifi", "projector", "screen"], // Placeholder
+        description: `${h.facilities.join(' • ')}`
     }))
-  }
 
-  const addTag = () => {
-    if (currentTag.trim() && !courseData.tags.includes(currentTag.trim())) {
-      setCourseData(prev => ({
-        ...prev,
-        tags: [...prev.tags, currentTag.trim()]
-      }))
-      setCurrentTag("")
+    const selectedHall = mappedHalls.find(h => h.id === courseData.hallId)
+
+    // Calendar Logic (Simplified Mock)
+    useEffect(() => {
+        setSelectedDate(null)
+        setSelectedSessions([])
+        setUnavailableMessage("")
+        setAvailableSlots([])
+        setCalendarOffset(0)
+    }, [courseData.hallId])
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const maxMonthsAhead = 5
+
+    const formatDateLabel = (dateKey: string) => {
+        const [year, month, day] = dateKey.split("-")
+        return `${day}-${month}-${year}`
     }
-  }
+    const formatDateKey = (date: Date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, "0")
+        const day = String(date.getDate()).padStart(2, "0")
+        return `${year}-${month}-${day}`
+    }
 
-  const removeTag = (tagToRemove: string) => {
-    setCourseData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
+    const monthDate = new Date(todayStart.getFullYear(), todayStart.getMonth() + calendarOffset, 1)
+    const year = monthDate.getFullYear()
+    const month = monthDate.getMonth()
+    const monthLabel = monthDate.toLocaleDateString("ar-SA", { month: "long", year: "numeric" })
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const firstDay = new Date(year, month, 1).getDay()
 
-  const priceValue = Number(courseData.price || 0)
-  const minCapacityValue = Number(courseData.minStudents || 0)
-  const maxCapacityValue = Number(courseData.maxStudents || 0)
+    const calendarDays: Array<{ day: number; dateKey: string; isPast: boolean } | null> = []
+    for (let i = 0; i < firstDay; i += 1) calendarDays.push(null)
+    for (let day = 1; day <= daysInMonth; day += 1) {
+        const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+        const dateValue = new Date(year, month, day)
+        const isPast = dateValue < todayStart
+        calendarDays.push({ day, dateKey, isPast })
+    }
+    while (calendarDays.length % 7 !== 0) calendarDays.push(null)
 
-  const isPriceValid = courseData.isFree || priceValue > 0
-  const isCapacityValid =
-    minCapacityValue >= 1 &&
-    maxCapacityValue >= 1 &&
-    minCapacityValue <= maxCapacityValue
-  const isModeSelected = courseData.deliveryType === "online" || courseData.deliveryType === "in_person"
-  const isInPersonValid = courseData.deliveryType === "in_person" && !!courseData.hallId && selectedSessions.length > 0
-  const isOnlineValid = courseData.deliveryType === "online" && !!onlineSchedule.startDate && !!onlineSchedule.startTime && !!onlineSchedule.duration
-  const isStep2Valid = isPriceValid && isCapacityValid && isModeSelected && (courseData.deliveryType === "in_person" ? isInPersonValid : isOnlineValid)
+    const handleSelectDay = async (dateKey: string) => {
+        setSelectedDate(dateKey)
+        setUnavailableMessage("")
+        setAvailableSlots([])
 
-  const isInfoValid = () => {
-      return courseData.title && courseData.category && courseData.shortDescription && courseData.description
-  }
+        if (!courseData.hallId) return
 
-  const isPricingValid = () => {
-      return isStep2Valid
-  }
+        setIsSlotsLoading(true)
+        try {
+            const data = await instituteService.getHallAvailability(courseData.hallId, dateKey)
 
-  const isLocationValid = () => {
-      if (!courseData.deliveryType) return false
-      if (courseData.deliveryType === 'in_person' && !courseData.hallId) return false
-      return true
-  }
+            const [yearStr, monthStr, dayStr] = dateKey.split("-")
+            const dateObj = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr))
+            const dayOfWeekMap = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+            const dayName = dayOfWeekMap[dateObj.getDay()]
 
-  const handleStep2Next = () => {
-      if (!isStep2Valid) return
-      setActiveTab("location")
-  }
+            const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
+            const hasAvailabilityDefined = data.availability && data.availability.length > 0
 
-  const selectedHall = mockHalls.find(h => h.id === courseData.hallId)
-  const totalSelectedHours = selectedSessions.length
-  const totalSelectedDays = new Set(selectedSessions.map((s) => s.date)).size
-  const totalSelectedPrice = selectedHall ? totalSelectedHours * selectedHall.hourlyRate : 0
+            const booked = data.bookedSessions || []
 
-  return (
-    <div className="max-w-5xl mx-auto pb-12" dir="rtl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/institute/courses">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              العودة للدورات
-            </Link>
-          </Button>
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          إنشاء دورة تدريبية جديدة
-        </h1>
-        <p className="text-gray-600">
-          اتبع الخطوات التالية لإنشاء ونشر دورتك التدريبية
-        </p>
-      </div>
+            const openSlots = timeSlots.filter(slot => {
+                const [startHourStr, endHourStr] = slot.split(" - ")
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
-        {/* Step Indicator (Tabs List) */}
-        <div className="w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100 sticky top-0 z-10">
-            <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-50/50">
-                <TabsTrigger value="info" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">1</div>
-                    بيانات الدورة
-                </TabsTrigger>
-                <TabsTrigger value="pricing" className="data-[state=active]:bg-white data-[state=active]:shadow-sm h-10 gap-2">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">2</div>
-                    الحجز والمواعيد
-                </TabsTrigger>
-            </TabsList>
-            <div className="mt-3 h-1 w-full rounded-full bg-gray-100">
-                <div
-                    className="h-1 rounded-full bg-blue-600 transition-all duration-300"
-                    style={{
-                        width: activeTab === "info" ? "50%" : "100%"
-                    }}
-                />
+                // 1. Check against base availability (working hours)
+                if (hasAvailabilityDefined) {
+                    const isWithinWorkingHours = allowedPeriods.some((period: any) => {
+                        const pStart = period.startTime.substring(0, 5)
+                        const pEnd = period.endTime.substring(0, 5)
+                        return startHourStr >= pStart && endHourStr <= pEnd
+                    })
+                    if (!isWithinWorkingHours) return false
+                }
+
+                // 2. Check against booked sessions
+                const slotStart = new Date(`${dateKey}T${startHourStr}:00`)
+                const slotEnd = new Date(`${dateKey}T${endHourStr}:00`)
+
+                const isOverlap = booked.some((b: any) => {
+                    const bStart = new Date(b.startTime)
+                    const bEnd = new Date(b.endTime)
+                    return slotStart < bEnd && slotEnd > bStart
+                })
+
+                return !isOverlap
+            })
+
+            setAvailableSlots(openSlots)
+            if (openSlots.length === 0) setUnavailableMessage("لا يوجد أوقات متاحة في هذا اليوم أوالقاعة مغلقة")
+        } catch (e: any) {
+            toast.error("فشل جلب أوقات القاعة المتاحة")
+        } finally {
+            setIsSlotsLoading(false)
+        }
+    }
+
+    const toggleSessionSlot = (date: string, slot: string) => {
+        const exists = selectedSessions.some((s) => s.date === date && s.slot === slot)
+        if (exists) {
+            setSelectedSessions(prev => prev.filter(s => !(s.date === date && s.slot === slot)))
+        } else {
+            setSelectedSessions(prev => [...prev, { date, slot }])
+        }
+    }
+
+    // --- Submission Logic ---
+    const handleSubmit = async (status: 'DRAFT' | 'ACTIVE') => {
+        try {
+            setIsSubmitting(true)
+
+            // Calculate Dates
+            let startDate: string, endDate: string;
+            let sessionsPayload: any[] = [];
+
+            if (courseData.deliveryType === 'in_person') {
+                if (selectedSessions.length === 0) throw new Error("يجب اختيار جلسة واحدة على الأقل");
+                const sortedSessions = [...selectedSessions].sort((a, b) => a.date.localeCompare(b.date));
+                startDate = sortedSessions[0].date;
+                endDate = sortedSessions[sortedSessions.length - 1].date;
+
+                sessionsPayload = selectedSessions.map(s => ({
+                    date: s.date,
+                    startTime: s.slot.split(" - ")[0],
+                    endTime: s.slot.split(" - ")[1],
+                    location: selectedHall?.name || "القاعة المختارة",
+                    topic: "عنوان الجلسة"
+                }));
+
+            } else if (courseData.deliveryType === 'online') {
+                if (!onlineSchedule.startDate) throw new Error("يجب تحديد تاريخ البدء");
+                startDate = onlineSchedule.startDate;
+                // Assume single session or Calculate end date based on logic/duration
+                // For simplicity, end date = start date (single session course)
+                endDate = onlineSchedule.startDate;
+
+                // Calculate end time
+                const start = new Date(`${onlineSchedule.startDate}T${onlineSchedule.startTime}`);
+                const end = new Date(start.getTime() + Number(onlineSchedule.duration) * 60000);
+                const endTime = end.toTimeString().substring(0, 5);
+
+                sessionsPayload = [{
+                    date: onlineSchedule.startDate,
+                    startTime: onlineSchedule.startTime,
+                    endTime: endTime,
+                    location: 'Online',
+                    topic: 'جلسة أونلاين'
+                }];
+            } else {
+                // Capacity based or other
+                startDate = new Date().toISOString().split('T')[0]; // Placeholder
+                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // +30 days
+            }
+
+            const formData = new FormData()
+            formData.append('title', courseData.title)
+            formData.append('categoryId', courseData.categoryId)
+            formData.append('trainerId', courseData.trainerId)
+            formData.append('shortDescription', courseData.shortDescription)
+            formData.append('description', courseData.description)
+            formData.append('deliveryType', courseData.deliveryType)
+            formData.append('price', courseData.price.toString())
+            formData.append('minStudents', courseData.minStudents.toString())
+            formData.append('maxStudents', courseData.maxStudents.toString())
+            formData.append('isFree', courseData.isFree.toString())
+            formData.append('hallId', courseData.hallId)
+            formData.append('objectives', JSON.stringify(courseData.objectives))
+            formData.append('prerequisites', JSON.stringify(courseData.prerequisites))
+            formData.append('tags', JSON.stringify(courseData.tags))
+
+            formData.append('status', status === 'ACTIVE' ? 'DRAFT' : 'DRAFT')
+            formData.append('startDate', startDate)
+            formData.append('endDate', endDate)
+            formData.append('duration', (courseData.deliveryType === 'in_person' ? selectedSessions.length : (Number(onlineSchedule.duration) / 60)).toString())
+            formData.append('sessions', JSON.stringify(sessionsPayload))
+
+            if (imageFile) {
+                formData.append('image', imageFile)
+            }
+
+            await instituteService.createCourse(formData);
+
+            toast.success(status === 'DRAFT' ? 'تم حفظ المسودة بنجاح' : 'تم إنشاء الدورة بنجاح');
+            router.push('/institute/courses');
+
+        } catch (err: any) {
+            toast.error(err.message || 'حدث خطأ أثناء إنشاء الدورة');
+            console.error(err);
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    // --- Handlers (Add/Remove) ---
+    const addObjective = () => {
+        if (currentObjective.trim()) {
+            setCourseData(prev => ({ ...prev, objectives: [...prev.objectives, currentObjective.trim()] }))
+            setCurrentObjective("")
+        }
+    }
+    const removeObjective = (i: number) => setCourseData(prev => ({ ...prev, objectives: prev.objectives.filter((_, idx) => idx !== i) }))
+
+    const addPrerequisite = () => {
+        if (currentPrerequisite.trim()) {
+            setCourseData(prev => ({ ...prev, prerequisites: [...prev.prerequisites, currentPrerequisite.trim()] }))
+            setCurrentPrerequisite("")
+        }
+    }
+    const removePrerequisite = (i: number) => setCourseData(prev => ({ ...prev, prerequisites: prev.prerequisites.filter((_, idx) => idx !== i) }))
+
+    const addTag = () => {
+        if (currentTag.trim() && !courseData.tags.includes(currentTag.trim())) {
+            setCourseData(prev => ({ ...prev, tags: [...prev.tags, currentTag.trim()] }))
+            setCurrentTag("")
+        }
+    }
+    const removeTag = (t: string) => setCourseData(prev => ({ ...prev, tags: prev.tags.filter(tag => tag !== t) }))
+
+    // --- Validation ---
+    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && courseData.trainerId;
+    const isLocationValid = () => {
+        if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
+        if (courseData.deliveryType === 'online') return !!onlineSchedule.startDate && !!onlineSchedule.startTime;
+        return true; // capacity_based doesn't need location yet
+    }
+
+    if (loading) {
+        return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    }
+
+    return (
+        <div className="max-w-5xl mx-auto pb-12" dir="rtl">
+            {/* Header */}
+            <div className="mb-8">
+                <div className="flex items-center gap-4 mb-4">
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/institute/courses">
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            العودة للدورات
+                        </Link>
+                    </Button>
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">إنشاء دورة تدريبية جديدة</h1>
+                <p className="text-gray-600">اتبع الخطوات التالية لإنشاء ونشر دورتك التدريبية</p>
             </div>
-        </div>
 
-        {/* Tab 1: Course Info */}
-        <TabsContent value="info" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2">
-            <div className="space-y-6">
-                
-                {/* 1. Basic Info */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>المعلومات الأساسية</CardTitle>
-                        <CardDescription>تفاصيل الدورة والعنوان</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                        <Label htmlFor="title">عنوان الدورة *</Label>
-                        <Input
-                            id="title"
-                            placeholder="مثال: تعلم React من الصفر"
-                            value={courseData.title}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
-                        />
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="category">الفئة *</Label>
-                        <Select value={courseData.category} onValueChange={(value) => setCourseData(prev => ({ ...prev, category: value }))}>
-                            <SelectTrigger>
-                            <SelectValue placeholder="اختر فئة الدورة" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {categories.map(category => (
-                                <SelectItem key={category} value={category}>
-                                {category}
-                                </SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                        <Label htmlFor="shortDescription">وصف الترويجي (قصير) *</Label>
-                        <Textarea
-                            id="shortDescription"
-                            placeholder="وصف يظهر في بطاقة الدورة..."
-                            value={courseData.shortDescription}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, shortDescription: e.target.value }))}
-                            rows={2}
-                        />
-                        </div>
-                        
-                        <div className="space-y-2">
-                        <Label htmlFor="description">الوصف التفصيلي *</Label>
-                        <Textarea
-                            id="description"
-                            placeholder="ماذا سيتعلم الطالب؟ المتطلبات..."
-                            value={courseData.description}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
-                            rows={4}
-                        />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* 2. التسعير */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-start justify-between text-right">
-                            <CardDescription className="text-right">حدد الحد الأدنى والأقصى للمقاعد والتسعير.</CardDescription>
-                            <div className="flex items-center gap-2">
-                                <Banknote className="h-5 w-5 text-blue-600" />
-                                <CardTitle>العدد والتسعير</CardTitle>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="price">سعر الدورة *</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="price"
-                                        type="number"
-                                        value={courseData.price}
-                                        onChange={(e) => setCourseData(prev => ({ ...prev, price: e.target.value }))}
-                                        disabled={courseData.isFree}
-                                        className="pl-12"
-                                    />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">ر.ي</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-slate-500">
-                                    <input
-                                        id="isFree"
-                                        type="checkbox"
-                                        checked={courseData.isFree}
-                                        onChange={(e) =>
-                                            setCourseData(prev => ({
-                                                ...prev,
-                                                isFree: e.target.checked,
-                                                price: e.target.checked ? "0" : prev.price
-                                            }))
-                                        }
-                                    />
-                                    <label htmlFor="isFree">مجانية</label>
-                                </div>
-                                {!isPriceValid && (
-                                    <p className="text-xs text-red-500">يرجى إدخال سعر صحيح.</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="minCapacity">الحد الأدنى للمقاعد *</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="minCapacity"
-                                        type="number"
-                                        value={courseData.minStudents}
-                                        onChange={(e) => setCourseData(prev => ({ ...prev, minStudents: e.target.value }))}
-                                        className="pl-12"
-                                    />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">مقعد</span>
-                                </div>
-                                {!isCapacityValid && (
-                                    <p className="text-xs text-red-500">يرجى إدخال حد أدنى صحيح.</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="capacity">الحد الأقصى للمقاعد *</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="capacity"
-                                        type="number"
-                                        value={courseData.maxStudents}
-                                        onChange={(e) => setCourseData(prev => ({ ...prev, maxStudents: e.target.value }))}
-                                        className="pl-12"
-                                    />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">مقعد</span>
-                                </div>
-                                {!isCapacityValid && (
-                                    <p className="text-xs text-red-500">يرجى إدخال حد أقصى صحيح.</p>
-                                )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* 3. Media & Attributes */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Objectives */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">أهداف الدورة</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                            <Input
-                                placeholder="أضف هدف..."
-                                value={currentObjective}
-                                onChange={(e) => setCurrentObjective(e.target.value)}
-                                className="h-8 text-sm"
-                            />
-                            <Button type="button" size="sm" onClick={addObjective}><Plus className="h-4 w-4" /></Button>
-                            </div>
-                            <div className="space-y-2">
-                                {courseData.objectives.map((obj, i) => (
-                                <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                                    <span>{obj}</span>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => removeObjective(i)} className="h-6 w-6 p-0"><X className="h-3 w-3" /></Button>
-                                </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Tags */}
-                    <Card>
-                        <CardHeader><CardTitle className="text-base">الكلمات المفتاحية</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                                <Input placeholder="أضف كلمة..." value={currentTag} onChange={(e) => setCurrentTag(e.target.value)} className="h-8 text-sm"/>
-                                <Button type="button" size="sm" onClick={addTag}><Plus className="h-4 w-4" /></Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {courseData.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                                    {tag}
-                                    <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(tag)}/>
-                                </Badge>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
+                <div className="w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100 sticky top-0 z-10">
+                    <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-50/50">
+                        <TabsTrigger value="info" className="data-[state=active]:bg-white h-10 gap-2">1. بيانات الدورة</TabsTrigger>
+                        <TabsTrigger value="pricing" disabled={!isInfoValid} className="data-[state=active]:bg-white h-10 gap-2">2. الحجز والمواعيد</TabsTrigger>
+                    </TabsList>
                 </div>
 
-            </div>
-
-            <div className="flex justify-end gap-3 pt-6">
-                <Button variant="outline" onClick={() => handleSubmit('draft')}>حفظ كمسودة</Button>
-                <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid()}>التالي: التسعير والمواعيد</Button>
-            </div>
-        </TabsContent>
-
-                {/* Tab 2: Pricing & Schedule */}
-        <TabsContent value="pricing" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2">
-            <div className="space-y-6">
-                {/* Course Mode Card */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Users className="h-5 w-5 text-blue-600" />
-                            نوع الدورة
-                        </CardTitle>
-                        <CardDescription>اختر طريقة تقديم الدورة.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <RadioGroup
-                            value={courseData.deliveryType}
-                            onValueChange={(value) => setCourseData(prev => ({ ...prev, deliveryType: value }))}
-                            className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                        >
-                            <label className={`relative flex items-center justify-between gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all ${courseData.deliveryType === 'online' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200'}`}>
-                                <RadioGroupItem value="online" className="sr-only" />
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-full bg-blue-100 text-blue-600">
-                                        <Globe className="h-5 w-5" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">أونلاين</p>
-                                        <p className="text-xs text-gray-500">عبر الإنترنت بالكامل</p>
-                                    </div>
-                                </div>
-                                {courseData.deliveryType === 'online' && (
-                                    <CheckCircle className="h-5 w-5 text-blue-600" />
-                                )}
-                            </label>
-                            <label className={`relative flex items-center justify-between gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all ${courseData.deliveryType === 'in_person' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200'}`}>
-                                <RadioGroupItem value="in_person" className="sr-only" />
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-full bg-purple-100 text-purple-600">
-                                        <Building className="h-5 w-5" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">حضوري</p>
-                                        <p className="text-xs text-gray-500">داخل القاعة التدريبية</p>
-                                    </div>
-                                </div>
-                                {courseData.deliveryType === 'in_person' && (
-                                    <CheckCircle className="h-5 w-5 text-blue-600" />
-                                )}
-                            </label>
-                        </RadioGroup>
-                        {!isModeSelected && (
-                            <p className="text-xs text-red-500">يرجى اختيار نوع الدورة.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* In-person flow */}
-                {courseData.deliveryType === "in_person" && (
-                    <>
+                {/* --- Tab 1: Info --- */}
+                <TabsContent value="info" className="space-y-6">
+                    <div className="space-y-6">
                         <Card>
-                            <CardHeader>
-                                <CardTitle>اختيار القاعة</CardTitle>
-                                <CardDescription>حدد القاعة المناسبة للدورة.</CardDescription>
-                            </CardHeader>
-                        <CardContent className="space-y-4">
+                            <CardHeader><CardTitle>المعلومات الأساسية</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label>القاعة *</Label>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="w-full justify-between"
-                                        onClick={() => setIsHallDialogOpen(true)}
-                                    >
-                                        <span>{selectedHall ? selectedHall.name : "اختر القاعة"}</span>
-                                        <MapPin className="h-4 w-4 text-gray-400" />
-                                    </Button>
-                                    {!courseData.hallId && (
-                                        <p className="text-xs text-red-500">يرجى اختيار القاعة.</p>
-                                    )}
+                                    <Label>عنوان الدورة *</Label>
+                                    <Input value={courseData.title} onChange={e => setCourseData({ ...courseData, title: e.target.value })} placeholder="مثال: تعلم React" />
                                 </div>
-                                <Dialog open={isHallDialogOpen} onOpenChange={setIsHallDialogOpen}>
-                                    <DialogContent dir="rtl" className="max-w-6xl">
-                                        <DialogHeader>
-                                            <DialogTitle>دليل القاعات</DialogTitle>
-                                            <DialogDescription>اختر القاعة المناسبة للدورة.</DialogDescription>
-                                        </DialogHeader>
-                                        <ExploreHallsPage
-                                            hideTitle
-                                            basePath="/institute/halls"
-                                            actionLabel="اختيار"
-                                            onSelectHall={(hallId) => {
-                                                setCourseData(prev => ({ ...prev, hallId }))
-                                                setIsHallDialogOpen(false)
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>الفئة *</Label>
+                                        <Select
+                                            value={courseData.categoryId}
+                                            onValueChange={v => {
+                                                if (v === '__add_new__') {
+                                                    setIsAddingCategory(true)
+                                                } else {
+                                                    setCourseData({ ...courseData, categoryId: v })
+                                                    setIsAddingCategory(false)
+                                                }
                                             }}
-                                        />
-                                    </DialogContent>
-                                </Dialog>
-                                {selectedHall && (
-                                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                                        <div className="flex flex-col gap-4 sm:flex-row-reverse sm:items-start sm:gap-2">
-                                            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-100">
-                                                <Image
-                                                    src={selectedHall.image}
-                                                    alt={selectedHall.name}
-                                                    fill
-                                                    className="object-cover"
-                                                />
-                                            </div>
-                                            <div className="min-w-0 flex-1 space-y-2 text-right" dir="rtl">
-                                                <div className="flex items-center gap-2 justify-end flex-row-reverse">
-                                                    <h4 className="text-base font-semibold text-slate-900">{selectedHall.name}</h4>
-                                                    <Badge variant="secondary">{selectedHall.type}</Badge>
-                                                </div>
-                                                <p className="text-sm text-slate-600">{selectedHall.description}</p>
-                                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                                                    <a
-                                                        className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 hover:text-blue-700"
-                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedHall.location)}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        <MapPin className="h-3.5 w-3.5" />
-                                                        {selectedHall.location}
-                                                    </a>
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
-                                                        <Users className="h-3.5 w-3.5" />
-                                                        السعة: {selectedHall.capacity} شخص
-                                                    </span>
-                                                </div>
-                                                <div className="text-sm font-semibold text-blue-700">
-                                                    {selectedHall.hourlyRate} ر.ي / ساعة
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                        </CardContent>
-                    </Card>
-
-                        {courseData.hallId && (
-                            <Card>
-                                <CardHeader>
-                                <CardTitle className="flex items-center gap-2 justify-end text-right w-full">
-                                    <Calendar className="h-5 w-5 text-blue-600" />
-                                    اختيار المواعيد
-                                </CardTitle>
-                                <CardDescription className="text-right">اختر الأيام والأوقات المتاحة لهذه القاعة.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_1.1fr]">
-            <div className="order-2 rounded-2xl border border-slate-100 p-4 lg:order-2">
-                <div className="flex items-center justify-between flex-row-reverse">
-                    <p className="text-sm font-semibold text-slate-700">{monthLabel}</p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
-                            onClick={() => setCalendarOffset((prev) => Math.max(0, prev - 1))}
-                            disabled={calendarOffset === 0}
-                        >
-                            الشهر السابق
-                        </button>
-                        <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
-                            onClick={() => setCalendarOffset((prev) => Math.min(maxMonthsAhead, prev + 1))}
-                            disabled={calendarOffset === maxMonthsAhead}
-                        >
-                            الشهر التالي
-                        </button>
-                    </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs text-slate-500">
-                    {weekDaysShort.map((day) => (
-                        <div key={day}>{day}</div>
-                    ))}
-                </div>
-
-                <div className="mt-3 grid grid-cols-7 gap-2">
-                    {calendarDays.map((cell, index) => {
-                        if (!cell) return <div key={`empty-${index}`} />
-                        const meta = getDayMeta(cell.day, cell.dateKey, cell.isPast)
-                        const isSelected = selectedDate === cell.dateKey
-                        const isToday = formatDateKey(new Date()) === cell.dateKey
-                        const hasSelection = selectedSessions.some((s) => s.date === cell.dateKey)
-                        return (
-                            <button
-                                key={cell.dateKey}
-                                type="button"
-                                title={!meta.isSelectable ? meta.reason : ""}
-                                disabled={!meta.isSelectable}
-                                onClick={() => handleSelectDay(cell.dateKey, meta.isSelectable, meta.reason)}
-                                className={`h-9 rounded-lg text-sm transition ${
-                                    isSelected
-                                        ? "bg-blue-600 text-white shadow-sm"
-                                        : !meta.isSelectable
-                                            ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                                            : hasSelection
-                                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                                : "bg-white text-slate-700 hover:bg-blue-50 border border-slate-200"
-                                }`}
-                            >
-                                <span className={`${isToday && !isSelected ? "rounded-full border border-blue-300 px-2 py-0.5" : ""}`}>
-                                    {cell.day}
-                                </span>
-                            </button>
-                        )
-                    })}
-                </div>
-
-                {unavailableMessage && (
-                    <p className="mt-2 text-xs text-red-500 text-right">{unavailableMessage}</p>
-                )}
-            </div>
-
-            <div className="order-1 rounded-2xl border border-slate-100 p-4 lg:order-1">
-                <h4 className="text-sm font-semibold text-slate-700 text-right">الأوقات المتاحة</h4>
-                {!hasAvailability && (
-                    <p className="mt-3 text-sm text-slate-500 text-right">لا توجد مواعيد متاحة لهذه القاعة في هذا الشهر.</p>
-                )}
-                {selectedDate ? (
-                    <>
-                        <p className="mt-3 text-sm text-slate-500 text-right">اليوم المحدد: {formatDateLabel(selectedDate)}</p>
-                        {slotsForSelectedDate.length === 0 ? (
-                            <div className="mt-4 text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-4 text-right">
-                                لا توجد أوقات متاحة في هذا اليوم
-                            </div>
-                        ) : (
-                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                                {timeSlots.map((slot) => {
-                                    const isBooked = bookedSlotsForSelectedDate.includes(slot)
-                                    const isAvailable = slotsForSelectedDate.includes(slot)
-                                    if (!isAvailable && !isBooked) return null
-                                    const selected = selectedSessionsForDay.some((s) => s.slot === slot)
-                                    return (
-                                        <button
-                                            key={slot}
-                                            type="button"
-                                            disabled={!isAvailable}
-                                            onClick={() => isAvailable && toggleSessionSlot(selectedDate, slot)}
-                                            className={`rounded-lg border px-3 py-2 text-sm transition ${
-                                                selected
-                                                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                                                    : !isAvailable
-                                                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                                                        : "border-blue-200 text-blue-700 hover:bg-blue-50"
-                                            }`}
                                         >
-                                            <div className="flex items-center justify-center gap-1">
-                                                {!isAvailable && <Lock className="h-3 w-3" />}
-                                                <span>{slot}</span>
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <p className="mt-3 text-sm text-slate-500 text-right">اختر يوماً من التقويم لعرض الأوقات.</p>
-                )}
-
-                {selectedSessions.length === 0 && (
-                    <p className="mt-3 text-xs text-red-500 text-right">يرجى اختيار جلسة واحدة على الأقل</p>
-                )}
-
-                {selectedSessions.length > 0 && (
-                    <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-right">
-                        <p className="font-semibold text-slate-800">تم اختيار {selectedSessions.length} جلسات</p>
-                        <ul className="mt-2 space-y-1 text-slate-600">
-                            {sortedSessions.map((session) => (
-                                <li key={`${session.date}-${session.slot}`}>{formatDateLabel(session.date)} • {session.slot}</li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-
-                {selectedSessions.length > 0 && (
-                    <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3 text-sm text-right">
-                        <p className="font-semibold text-slate-800">الإجمالي</p>
-                        <p className="mt-2 text-slate-600">
-                            عدد الأيام: {totalSelectedDays} | عدد الساعات: {totalSelectedHours} | المبلغ: {totalSelectedPrice} ر.ي
-                        </p>
-                    </div>
-                )}
-
-            </div>
-        </div>
-    
-</CardContent>
-                            </Card>
-                        )}
-                    </>
-                )}
-
-                {/* Online flow */}
-                {courseData.deliveryType === "online" && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>مواعيد الدورة (أونلاين)</CardTitle>
-                            <CardDescription>حدد تاريخ ووقت الجلسة الأولى.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <Label>تاريخ البداية *</Label>
-                                    <Input
-                                        type="date"
-                                        value={onlineSchedule.startDate}
-                                        onChange={(e) => setOnlineSchedule(prev => ({ ...prev, startDate: e.target.value }))}
-                                    />
-                                    {!onlineSchedule.startDate && (
-                                        <p className="text-xs text-red-500">يرجى اختيار تاريخ البداية.</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>وقت البداية *</Label>
-                                    <Input
-                                        type="time"
-                                        value={onlineSchedule.startTime}
-                                        onChange={(e) => setOnlineSchedule(prev => ({ ...prev, startTime: e.target.value }))}
-                                    />
-                                    {!onlineSchedule.startTime && (
-                                        <p className="text-xs text-red-500">يرجى تحديد وقت البداية.</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>مدة الجلسة *</Label>
-                                    <Select value={onlineSchedule.duration} onValueChange={(value) => setOnlineSchedule(prev => ({ ...prev, duration: value }))}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="اختر المدة" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="60">60 دقيقة</SelectItem>
-                                            <SelectItem value="90">90 دقيقة</SelectItem>
-                                            <SelectItem value="120">120 دقيقة</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {!onlineSchedule.duration && (
-                                        <p className="text-xs text-red-500">يرجى اختيار مدة الجلسة.</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>المنصة (اختياري)</Label>
-                                    <Select value={onlineSchedule.platform} onValueChange={(value) => setOnlineSchedule(prev => ({ ...prev, platform: value }))}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="اختر المنصة" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {platforms.map(platform => (
-                                                <SelectItem key={platform.value} value={platform.value}>
-                                                    {platform.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>رابط الاجتماع (اختياري)</Label>
-                                    <Input
-                                        type="text"
-                                        value={onlineSchedule.meetingLink}
-                                        onChange={(e) => setOnlineSchedule(prev => ({ ...prev, meetingLink: e.target.value }))}
-                                        placeholder="https://"
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-
-            <div className="flex justify-between pt-6">
-                <Button variant="outline" onClick={() => setActiveTab("info")}>السابق</Button>
-                <Button
-                    onClick={() => handleSubmit('submit')}
-                    disabled={
-                        isSubmitting ||
-                        (courseData.deliveryType === "in_person" && selectedSessions.length === 0) ||
-                        (courseData.deliveryType === "online" && !isOnlineValid)
-                    }
-                >
-                    {isSubmitting ? 'جاري الحجز...' : 'حجز'}
-                </Button>
-            </div>
-        </TabsContent>
-
-        {/* Tab 3: Location & Publish */}
-        <TabsContent value="location" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2">
-            <Card>
-                <CardHeader>
-                    <CardTitle>طريقة التقديم والمكان</CardTitle>
-                    <CardDescription>حدد كيفية تقديم الدورة ومكان الانعقاد</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                    <div className="space-y-4">
-                         <Label className="text-base">اختر طريقة التقديم المفضلة</Label>
-                         <RadioGroup
-                            value={courseData.deliveryType}
-                            onValueChange={(value) => setCourseData(prev => ({ ...prev, deliveryType: value }))}
-                            className="grid grid-cols-1 md:grid-cols-3 gap-4"
-                        >
-                            {/* Option 1: Online */}
-                            <label className={`
-                                relative flex flex-col items-center gap-3 rounded-lg border-2 p-6 cursor-pointer hover:bg-gray-50 transition-all
-                                ${courseData.deliveryType === 'online' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200'}
-                            `}>
-                                <RadioGroupItem value="online" className="sr-only" />
-                                <div className="p-3 bg-blue-100 rounded-full text-blue-600">
-                                    <Globe className="h-6 w-6" />
-                                </div>
-                                <div className="text-center">
-                                    <span className="font-bold block">أونلاين (عن بعد)</span>
-                                    <span className="text-xs text-gray-500">تقديم الدورة عبر الإنترنت بالكامل</span>
-                                </div>
-                                {courseData.deliveryType === 'online' && <CheckCircle className="absolute top-3 right-3 h-5 w-5 text-blue-600" />}
-                            </label>
-
-                            {/* Option 2: In-Person (Book Hall) */}
-                            <label className={`
-                                relative flex flex-col items-center gap-3 rounded-lg border-2 p-6 cursor-pointer hover:bg-gray-50 transition-all
-                                ${courseData.deliveryType === 'in_person' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200'}
-                            `}>
-                                <RadioGroupItem value="in_person" className="sr-only" />
-                                <div className="p-3 bg-green-100 rounded-full text-green-600">
-                                    <Building className="h-6 w-6" />
-                                </div>
-                                <div className="text-center">
-                                    <span className="font-bold block">حضوري (حجز قاعة)</span>
-                                    <span className="text-xs text-gray-500">يتطلب حجز قاعة الآن</span>
-                                </div>
-                                {courseData.deliveryType === 'in_person' && <CheckCircle className="absolute top-3 right-3 h-5 w-5 text-blue-600" />}
-                            </label>
-
-                            {/* Option 3: Capacity Based (Risk Free) */}
-                            <label className={`
-                                relative flex flex-col items-center gap-3 rounded-lg border-2 p-6 cursor-pointer hover:bg-gray-50 transition-all
-                                ${courseData.deliveryType === 'capacity_based' ? 'border-purple-600 bg-purple-50/50' : 'border-gray-200'}
-                            `}>
-                                <RadioGroupItem value="capacity_based" className="sr-only" />
-                                <div className="p-3 bg-purple-100 rounded-full text-purple-600">
-                                    <Users className="h-6 w-6" />
-                                </div>
-                                <div className="text-center">
-                                    <span className="font-bold block">تحديد القاعة عند القبول</span>
-                                    <span className="text-xs text-gray-500">نشر الدورة أولاً وتحديد القاعة عند اكتمال العدد</span>
-                                </div>
-                                {courseData.deliveryType === 'capacity_based' && <CheckCircle className="absolute top-3 right-3 h-5 w-5 text-purple-600" />}
-                            </label>
-                         </RadioGroup>
-                    </div>
-
-                    {/* Conditional Logic Content */}
-                    <div className="pt-4 border-t">
-                         {courseData.deliveryType === 'capacity_based' && (
-                             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 flex gap-3">
-                                 <AlertCircle className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
-                                 <div>
-                                     <h4 className="font-bold text-purple-900">وضع الحجز المرن (Risk-Free)</h4>
-                                     <p className="text-purple-700 text-sm mt-1">
-                                         عند اختيار هذا الوضع، سيتم نشر الدورة للطلاب للتسجيل المبدئي بدون حجز قاعة فعلية.
-                                         يمكنك حجز القاعة وتحديد الموعد النهائي لاحقاً من لوحة التحكم عندما يكتمل العدد المطلوب.
-                                     </p>
-                                 </div>
-                             </div>
-                         )}
-
-                         {courseData.deliveryType === 'in_person' && (
-                             <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                                <Label htmlFor="hall" className="mb-2 block">اختيار القاعة *</Label>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full justify-between"
-                                    onClick={() => setIsHallDialogOpen(true)}
-                                >
-                                    <span>{selectedHall ? selectedHall.name : "اختر القاعة المناسبة"}</span>
-                                    <MapPin className="h-4 w-4 text-gray-400" />
-                                </Button>
-                                {selectedHall && (
-                                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                                        <div className="flex flex-col gap-4 sm:flex-row-reverse sm:items-start sm:gap-2">
-                                            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-100">
-                                                <Image
-                                                    src={selectedHall.image}
-                                                    alt={selectedHall.name}
-                                                    fill
-                                                    className="object-cover"
+                                            <SelectTrigger><SelectValue placeholder="اختر الفئة" /></SelectTrigger>
+                                            <SelectContent>
+                                                {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                <SelectItem value="__add_new__" className="text-blue-600 font-medium border-t mt-1">+ إضافة تصنيف جديد</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        {isAddingCategory && (
+                                            <div className="flex gap-2 items-center mt-1">
+                                                <Input
+                                                    value={newCategoryInput}
+                                                    onChange={e => setNewCategoryInput(e.target.value)}
+                                                    placeholder="اسم التصنيف الجديد..."
+                                                    className="h-8 text-sm"
+                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(); } }}
+                                                    autoFocus
                                                 />
+                                                <Button type="button" size="sm" onClick={handleAddCategory} disabled={isCreatingCategory}>
+                                                    {isCreatingCategory ? <Loader2 className="h-3 w-3 animate-spin" /> : 'إضافة'}
+                                                </Button>
+                                                <Button type="button" size="sm" variant="ghost" onClick={() => { setIsAddingCategory(false); setNewCategoryInput(''); }}>إلغاء</Button>
                                             </div>
-                                            <div className="min-w-0 flex-1 space-y-2 text-right" dir="rtl">
-                                                <div className="flex items-center gap-2 justify-end flex-row-reverse">
-                                                    <h4 className="text-base font-semibold text-slate-900">{selectedHall.name}</h4>
-                                                    <Badge variant="secondary">{selectedHall.type}</Badge>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>المدرب *</Label>
+                                        <Select value={courseData.trainerId} onValueChange={v => setCourseData({ ...courseData, trainerId: v })}>
+                                            <SelectTrigger><SelectValue placeholder="اختر المدرب" /></SelectTrigger>
+                                            <SelectContent>
+                                                {trainers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>وصف مختصر *</Label>
+                                    <Textarea value={courseData.shortDescription} onChange={e => setCourseData({ ...courseData, shortDescription: e.target.value })} rows={2} />
+                                </div>
+                                <div className="space-y-4">
+                                    <Label>صورة الدورة</Label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                        <div className="relative h-32 w-48 rounded-lg border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                            {imagePreview ? (
+                                                <Image src={imagePreview} alt="Course Preview" fill className="object-cover" />
+                                            ) : (
+                                                <div className="flex flex-col items-center text-gray-400">
+                                                    <Plus className="h-8 w-8 mb-2" />
+                                                    <span className="text-xs">إضافة صورة</span>
                                                 </div>
-                                                <p className="text-sm text-slate-600">{selectedHall.description}</p>
-                                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                                                    <a
-                                                        className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 hover:text-blue-700"
-                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedHall.location)}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        <MapPin className="h-3.5 w-3.5" />
-                                                        {selectedHall.location}
-                                                    </a>
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
-                                                        <Users className="h-3.5 w-3.5" />
-                                                        السعة: {selectedHall.capacity} شخص
-                                                    </span>
-                                                </div>
-                                                <div className="text-sm font-semibold text-blue-700">
-                                                    {selectedHall.hourlyRate} ر.ي / ساعة
-                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <p className="text-sm text-gray-500">اختر صورة معبرة عن الدورة التدريبية. يفضل أن تكون صورتك بصيغة JPG أو PNG وبجودة عالية.</p>
+                                            <div className="flex gap-2">
+                                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                                                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>تغيير الصورة</Button>
+                                                {imageFile && <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => { setImageFile(null); setImagePreview(""); }}>إزالة</Button>}
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                             </div>
-                         )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>الوصف التفصيلي *</Label>
+                                    <Textarea value={courseData.description} onChange={e => setCourseData({ ...courseData, description: e.target.value })} rows={4} />
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                         {!courseData.deliveryType && (
-                             <div className="text-center text-gray-500 py-8 italic">
-                                 يرجى اختيار طريقة التقديم للمتابعة
-                             </div>
-                         )}
+                        <Card>
+                            <CardHeader><CardTitle>العدد والتسعير</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label>سعر الدورة (ر.ي) *</Label>
+                                    <Input type="number" value={courseData.price} onChange={e => setCourseData({ ...courseData, price: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>أقل عدد مقاعد *</Label>
+                                    <Input type="number" value={courseData.minStudents} onChange={e => setCourseData({ ...courseData, minStudents: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>أقصى عدد مقاعد *</Label>
+                                    <Input type="number" value={courseData.maxStudents} onChange={e => setCourseData({ ...courseData, maxStudents: e.target.value })} />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <Card>
+                                <CardHeader><CardTitle className="text-base">الأهداف</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <Input value={currentObjective} onChange={e => setCurrentObjective(e.target.value)} placeholder="أضف هدف..." />
+                                        <Button onClick={addObjective} size="icon"><Plus className="h-4 w-4" /></Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {courseData.objectives.map((o, i) => (
+                                            <div key={i} className="flex justify-between p-2 bg-gray-50 rounded text-sm">
+                                                <span>{o}</span>
+                                                <X className="h-4 w-4 cursor-pointer text-red-500" onClick={() => removeObjective(i)} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle className="text-base">المتطلبات السابقة</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <Input value={currentPrerequisite} onChange={e => setCurrentPrerequisite(e.target.value)} placeholder="أضف متطلب..." />
+                                        <Button onClick={addPrerequisite} size="icon"><Plus className="h-4 w-4" /></Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {courseData.prerequisites.map((p, i) => (
+                                            <div key={i} className="flex justify-between p-2 bg-gray-50 rounded text-sm">
+                                                <span>{p}</span>
+                                                <X className="h-4 w-4 cursor-pointer text-red-500" onClick={() => removePrerequisite(i)} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle className="text-base">الوسوم</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <Input value={currentTag} onChange={e => setCurrentTag(e.target.value)} placeholder="أضف وسم..." />
+                                        <Button onClick={addTag} size="icon"><Plus className="h-4 w-4" /></Button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {courseData.tags.map(t => (
+                                            <Badge key={t} variant="secondary">
+                                                {t} <X className="ml-1 h-3 w-3 cursor-pointer" onClick={() => removeTag(t)} />
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                    <div className="flex justify-end pt-6">
+                        <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي</Button>
+                    </div>
+                </TabsContent>
 
-            {/* Action Buttons */}
-            <div className="flex justify-between items-center pt-6 border-t mt-8">
-                <Button variant="outline" onClick={() => setActiveTab("pricing")}>السابق</Button>
-                
-                <div className="flex gap-3">
-                     <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                        <DialogTrigger asChild>
-                        <Button variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            حذف
-                        </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>تأكيد الحذف</DialogTitle>
-                            <DialogDescription>
-                            هل أنت متأكد من حذف هذه الدورة؟
-                            </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>إلغاء</Button>
-                            <Button variant="destructive" onClick={handleDelete}>حذف</Button>
-                        </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                {/* --- Tab 2: Pricing & Schedule --- */}
+                <TabsContent value="pricing" className="space-y-6">
+                    <Card>
+                        <CardHeader><CardTitle>طريقة التقديم</CardTitle></CardHeader>
+                        <CardContent>
+                            <RadioGroup value={courseData.deliveryType} onValueChange={v => setCourseData({ ...courseData, deliveryType: v })} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'online' ? 'border-blue-600 bg-blue-50' : ''}`}>
+                                    <RadioGroupItem value="online" className="sr-only" />
+                                    <Globe className="h-6 w-6 text-blue-600" />
+                                    <span className="font-bold">أونلاين</span>
+                                </label>
+                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'in_person' ? 'border-green-600 bg-green-50' : ''}`}>
+                                    <RadioGroupItem value="in_person" className="sr-only" />
+                                    <Building className="h-6 w-6 text-green-600" />
+                                    <span className="font-bold">حضوري</span>
+                                </label>
+                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'capacity_based' ? 'border-purple-600 bg-purple-50' : ''}`}>
+                                    <RadioGroupItem value="capacity_based" className="sr-only" />
+                                    <Users className="h-6 w-6 text-purple-600" />
+                                    <span className="font-bold">حجز مرن</span>
+                                </label>
+                            </RadioGroup>
+                        </CardContent>
+                    </Card>
 
-                    <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => handleSubmit('draft')}
-                        disabled={isSubmitting}
-                    >
-                        <Save className="mr-2 h-4 w-4" />
-                        حفظ كمسودة
-                    </Button>
+                    {/* In-Person Flow */}
+                    {courseData.deliveryType === 'in_person' && (
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader><CardTitle>اختيار القاعة</CardTitle></CardHeader>
+                                <CardContent>
+                                    <Button variant="outline" className="w-full justify-between h-12" onClick={() => setIsHallDialogOpen(true)}>
+                                        <span className="flex items-center gap-2"><MapPin className="h-4 w-4" /> {selectedHall ? selectedHall.name : "اختر القاعة"}</span>
+                                    </Button>
+                                    {selectedHall && (
+                                        <div className="mt-4 p-4 border rounded-xl flex gap-4 items-center">
+                                            <div className="relative h-16 w-16 rounded-lg overflow-hidden"><Image src={selectedHall.image} fill alt="" className="object-cover" /></div>
+                                            <div>
+                                                <h4 className="font-bold">{selectedHall.name}</h4>
+                                                <p className="text-sm text-gray-500">السعة: {selectedHall.capacity} | السعر: {selectedHall.hourlyRate} ر.ي/ساعة</p>
+                                            </div>
+                                        </div>
+                                    )}
 
-                    <Button
-                        type="button"
-                        onClick={() => handleSubmit('submit')}
-                        disabled={!isLocationValid() || isSubmitting}
-                        className="bg-blue-600 hover:bg-blue-700 w-40"
-                    >
-                        <Send className="mr-2 h-4 w-4" />
-                        {isSubmitting ? 'جاري النشر...' : 'نشر الدورة'}
-                    </Button>
-                </div>
-            </div>
-        </TabsContent>
-        
-      </Tabs>
-    </div>
-  )
+                                    <Dialog open={isHallDialogOpen} onOpenChange={setIsHallDialogOpen}>
+                                        <DialogContent className="max-w-4xl h-[80vh] overflow-y-auto">
+                                            <DialogHeader className="sr-only">
+                                                <DialogTitle>اختيار القاعة</DialogTitle>
+                                                <DialogDescription>اختر قاعة من القائمة</DialogDescription>
+                                            </DialogHeader>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                                                {mappedHalls.map((hall) => (
+                                                    <div key={hall.id} className="border rounded-xl overflow-hidden hover:border-blue-500 transition-colors cursor-pointer" onClick={() => { setCourseData(p => ({ ...p, hallId: hall.id })); setIsHallDialogOpen(false); }}>
+                                                        <div className="relative h-32 bg-slate-100">
+                                                            {hall.image ? <Image src={hall.image} fill alt="" className="object-cover" /> : <div className="h-full flex items-center justify-center text-slate-400">لا توجد صورة</div>}
+                                                        </div>
+                                                        <div className="p-4">
+                                                            <h4 className="font-bold whitespace-nowrap overflow-hidden text-ellipsis">{hall.name}</h4>
+                                                            <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+                                                                <span>السعة: {hall.capacity}</span>
+                                                                <span className="text-blue-600 font-medium">{hall.hourlyRate} ر.ي/ساعة</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {mappedHalls.length === 0 && (
+                                                    <div className="col-span-full py-12 text-center text-gray-500">لا توجد قاعات متاحة للاختيار</div>
+                                                )}
+                                            </div>                                        </DialogContent>
+                                    </Dialog>
+                                </CardContent>
+                            </Card>
+
+                            {selectedHall && (
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex justify-between items-center">
+                                            <CardTitle>جدول المواعيد - {monthLabel}</CardTitle>
+                                            <div className="flex gap-2">
+                                                <Button variant="ghost" size="sm" onClick={() => setCalendarOffset(p => Math.max(0, p - 1))} disabled={calendarOffset === 0}>السابق</Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setCalendarOffset(p => Math.min(maxMonthsAhead, p + 1))}>التالي</Button>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        {/* Calendar Grid */}
+                                        <div>
+                                            <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2">{weekDaysShort.map(d => <div key={d}>{d}</div>)}</div>
+                                            <div className="grid grid-cols-7 gap-2">
+                                                {calendarDays.map((d, i) => {
+                                                    if (!d) return <div key={i} />
+                                                    const isSelected = selectedDate === d.dateKey
+                                                    const hasSessions = selectedSessions.some(s => s.date === d.dateKey)
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => handleSelectDay(d.dateKey)}
+                                                            disabled={d.isPast}
+                                                            className={`h-10 rounded-lg text-sm transition-all
+                                                        ${isSelected ? 'bg-blue-600 text-white' :
+                                                                    d.isPast ? 'bg-gray-100 text-gray-300' :
+                                                                        hasSessions ? 'bg-blue-100 text-blue-800 border-blue-200 border' : 'bg-white border hover:bg-gray-50'
+                                                                }`}
+                                                        >
+                                                            {d.day}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {selectedDate && (
+                                            <div className="border-t pt-4">
+                                                <h4 className="font-semibold mb-3">الأوقات المتاحة ليوم {formatDateLabel(selectedDate)}</h4>
+                                                {isSlotsLoading ? (
+                                                    <div className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
+                                                ) : availableSlots.length > 0 ? (
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {availableSlots.map(slot => {
+                                                            const isSelected = selectedSessions.some(s => s.date === selectedDate && s.slot === slot)
+                                                            return (
+                                                                <button
+                                                                    key={slot}
+                                                                    type="button"
+                                                                    onClick={() => toggleSessionSlot(selectedDate, slot)}
+                                                                    className={`p-2 text-sm rounded border ${isSelected ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
+                                                                >
+                                                                    {slot}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500 text-center py-4">{unavailableMessage || "لا يوجد أوقات متاحة"}</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {selectedSessions.length > 0 && (
+                                            <div className="bg-blue-50 p-4 rounded-lg">
+                                                <h4 className="font-bold text-blue-800 mb-2">تم اختيار {selectedSessions.length} جلسات</h4>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {selectedSessions.map((s, i) => (
+                                                        <Badge key={i} variant="secondary" className="bg-white">{formatDateLabel(s.date)} ({s.slot})</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Online Flow */}
+                    {courseData.deliveryType === 'online' && (
+                        <Card>
+                            <CardHeader><CardTitle>بيانات الجلسة</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>تاريخ البدء</Label><Input type="date" value={onlineSchedule.startDate} onChange={e => setOnlineSchedule({ ...onlineSchedule, startDate: e.target.value })} /></div>
+                                <div className="space-y-2"><Label>وقت البدء</Label><Input type="time" value={onlineSchedule.startTime} onChange={e => setOnlineSchedule({ ...onlineSchedule, startTime: e.target.value })} /></div>
+                                <div className="space-y-2"><Label>المدة (دقيقة)</Label>
+                                    <Select value={onlineSchedule.duration} onValueChange={v => setOnlineSchedule({ ...onlineSchedule, duration: v })}>
+                                        <SelectTrigger><SelectValue placeholder="المدة" /></SelectTrigger>
+                                        <SelectContent><SelectItem value="60">60</SelectItem><SelectItem value="90">90</SelectItem><SelectItem value="120">120</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <div className="flex justify-between pt-6 border-t mt-8">
+                        <Button variant="outline" onClick={() => setActiveTab("info")}>السابق</Button>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting}>حفظ كمسودة</Button>
+                            <Button onClick={() => handleSubmit('ACTIVE')} disabled={!isLocationValid() || isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                نشر الدورة
+                            </Button>
+                        </div>
+                    </div>
+                </TabsContent>
+            </Tabs>
+        </div>
+    )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

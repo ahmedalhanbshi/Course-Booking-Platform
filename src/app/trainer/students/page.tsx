@@ -1,170 +1,141 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, Search, Mail, Phone, Calendar, BookOpen, MessageSquare, MoreHorizontal } from "lucide-react"
+import { Users, Search, Mail, Phone, BookOpen, MoreHorizontal, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { formatDate } from "@/lib/utils"
+import { trainerService } from "@/lib/trainer-service"
+import { toast } from "sonner"
 
-// Mock students data
-const students = [
-  {
-    id: "1",
-    name: "أحمد محمد",
-    email: "ahmed@example.com",
-    phone: "+966501234567",
-    avatar: null,
-    enrolledCourses: [
-      {
-        courseId: "1",
-        courseTitle: "تعلم React من الصفر",
-        enrollmentDate: new Date("2025-01-15"),
-        progress: 75,
-        status: 'active' as const,
-        rating: 5,
-      },
-      {
-        courseId: "2",
-        courseTitle: "تصميم واجهات المستخدم",
-        enrollmentDate: new Date("2025-01-20"),
-        progress: 45,
-        status: 'active' as const,
-        rating: null,
-      }
-    ],
-    totalCourses: 2,
-    lastActivity: new Date("2025-01-22"),
-  },
-  {
-    id: "2",
-    name: "سارة أحمد",
-    email: "sara@example.com",
-    phone: "+966507654321",
-    avatar: null,
-    enrolledCourses: [
-      {
-        courseId: "1",
-        courseTitle: "تعلم React من الصفر",
-        enrollmentDate: new Date("2025-01-10"),
-        progress: 90,
-        status: 'active' as const,
-        rating: 4,
-      }
-    ],
-    totalCourses: 1,
-    lastActivity: new Date("2025-01-21"),
-  },
-  {
-    id: "3",
-    name: "محمد علي",
-    email: "mohamed@example.com",
-    phone: "+966509876543",
-    avatar: null,
-    enrolledCourses: [
-      {
-        courseId: "3",
-        courseTitle: "إدارة المشاريع الرقمية",
-        enrollmentDate: new Date("2024-12-15"),
-        progress: 100,
-        status: 'completed' as const,
-        rating: 5,
-      }
-    ],
-    totalCourses: 1,
-    lastActivity: new Date("2025-01-15"),
-  },
-  {
-    id: "4",
-    name: "فاطمة حسن",
-    email: "fatima.h@example.com",
-    phone: "+966502468135",
-    avatar: null,
-    enrolledCourses: [
-      {
-        courseId: "2",
-        courseTitle: "تصميم واجهات المستخدم",
-        enrollmentDate: new Date("2025-01-05"),
-        progress: 30,
-        status: 'active' as const,
-        rating: null,
-      }
-    ],
-    totalCourses: 1,
-    lastActivity: new Date("2025-01-20"),
-  },
-]
+type EnrolledCourse = {
+  courseId: string
+  courseTitle: string
+  enrollmentId: string
+  status: string
+  enrolledAt: string
+}
+
+type Student = {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  avatar: string | null
+  enrolledCourses: EnrolledCourse[]
+  totalCourses: number
+  lastActivity: string
+}
+
+type StudentsData = {
+  students: Student[]
+  totalStudents: number
+  totalEnrollments: number
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  active: { label: "نشط", variant: "default" },
+  completed: { label: "مكتمل", variant: "outline" },
+  preliminary: { label: "أولي", variant: "secondary" },
+  pending_payment: { label: "بانتظار الدفع", variant: "secondary" },
+  cancelled: { label: "ملغي", variant: "destructive" },
+}
+
+function getInitials(name: string) {
+  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+}
 
 export default function TrainerStudentsPage() {
+  const [data, setData] = useState<StudentsData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [courseFilter, setCourseFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
 
-  // Get unique courses for filter
-  const courses = Array.from(new Set(students.flatMap(student =>
-    student.enrolledCourses.map(ec => ec.courseTitle)
-  )))
-
-  // Filter and sort students
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesCourse = courseFilter === "all" ||
-      student.enrolledCourses.some(ec => ec.courseTitle === courseFilter)
-
-    return matchesSearch && matchesCourse
-  })
-
-  const sortedStudents = [...filteredStudents].sort((a, b) => {
-    switch (sortBy) {
-      case "name":
-        return a.name.localeCompare(b.name)
-      case "courses":
-        return b.totalCourses - a.totalCourses
-      case "lastActivity":
-        return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
-      default:
-        return 0
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const result = await trainerService.getAllStudents()
+        setData(result)
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || "فشل في تحميل بيانات الطلاب")
+      } finally {
+        setLoading(false)
+      }
     }
-  })
+    load()
+  }, [])
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase()
-  }
+  // Build unique course list for filter dropdown
+  const courses = useMemo(() => {
+    if (!data) return []
+    const seen = new Set<string>()
+    const list: { id: string; title: string }[] = []
+    for (const s of data.students) {
+      for (const ec of s.enrolledCourses) {
+        if (!seen.has(ec.courseId)) {
+          seen.add(ec.courseId)
+          list.push({ id: ec.courseId, title: ec.courseTitle })
+        }
+      }
+    }
+    return list
+  }, [data])
 
-  const getProgressColor = (progress: number) => {
-    if (progress >= 80) return 'text-green-600'
-    if (progress >= 60) return 'text-blue-600'
-    if (progress >= 40) return 'text-yellow-600'
-    return 'text-red-600'
+  const filteredStudents = useMemo(() => {
+    if (!data) return []
+    return data.students.filter(s => {
+      const q = searchQuery.toLowerCase()
+      const matchesSearch = !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)
+      const matchesCourse = courseFilter === "all" ||
+        s.enrolledCourses.some(ec => ec.courseId === courseFilter)
+      return matchesSearch && matchesCourse
+    })
+  }, [data, searchQuery, courseFilter])
+
+  const sortedStudents = useMemo(() => {
+    return [...filteredStudents].sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name, "ar")
+      if (sortBy === "courses") return b.totalCourses - a.totalCourses
+      if (sortBy === "lastActivity")
+        return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+      return 0
+    })
+  }, [filteredStudents, sortBy])
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto" dir="rtl">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">إدارة الطلاب</h1>
-        <p className="text-gray-600">
-          متابعة وإدارة جميع الطلاب المسجلين في دوراتك التدريبية
-        </p>
+        <p className="text-gray-600">متابعة وإدارة جميع الطلاب المسجلين في دوراتك التدريبية</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center">
               <Users className="h-8 w-8 text-blue-600" />
               <div className="mr-4">
                 <p className="text-sm font-medium text-gray-600">إجمالي الطلاب</p>
-                <p className="text-2xl font-bold">{students.length}</p>
+                <p className="text-2xl font-bold">{data?.totalStudents ?? 0}</p>
               </div>
             </div>
           </CardContent>
@@ -176,135 +147,156 @@ export default function TrainerStudentsPage() {
               <BookOpen className="h-8 w-8 text-green-600" />
               <div className="mr-4">
                 <p className="text-sm font-medium text-gray-600">إجمالي التسجيلات</p>
-                <p className="text-2xl font-bold">
-                  {students.reduce((acc, student) => acc + student.totalCourses, 0)}
-                </p>
+                <p className="text-2xl font-bold">{data?.totalEnrollments ?? 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
-
       </div>
 
-      {/* Filters and Search */}
-      <div className="mb-6">
-        <div className="flex flex-wrap items-center justify-start gap-3 text-right border-b border-slate-100 pb-2">
-          <div className="relative flex-1 min-w-[260px] max-w-[520px]">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="البحث في الطلاب..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-11 rounded-full bg-white pr-4 pl-10 text-sm text-right"
-            />
-          </div>
-
-          <Select value={courseFilter} onValueChange={setCourseFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="الدورة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الدورات</SelectItem>
-              {courses.map(course => (
-                <SelectItem key={course} value={course}>
-                  {course}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Filters */}
+      <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-slate-100 pb-4">
+        <div className="relative flex-1 min-w-[260px] max-w-[520px]">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="البحث بالاسم أو البريد..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="h-11 rounded-full bg-white pr-4 pl-10 text-sm text-right"
+          />
         </div>
+
+        <Select value={courseFilter} onValueChange={setCourseFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="تصفية حسب الدورة" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">جميع الدورات</SelectItem>
+            {courses.map(c => (
+              <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="الترتيب" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">الاسم</SelectItem>
+            <SelectItem value="courses">عدد الدورات</SelectItem>
+            <SelectItem value="lastActivity">آخر نشاط</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Students Table */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle>الطلاب ({sortedStudents.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>الطالب</TableHead>
-                <TableHead>الدورات</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedStudents.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={student.avatar || undefined} />
-                        <AvatarFallback>{getInitials(student.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{student.name}</div>
-                        <div className="text-sm text-gray-500 flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {student.email}
-                        </div>
-                        <div className="text-sm text-gray-500 flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {student.phone}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {student.enrolledCourses.slice(0, 2).map((course) => (
-                        <div key={course.courseId} className="text-sm">
-                          <div className="font-medium line-clamp-1">{course.courseTitle}</div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                             {/* Progress and Rating Removed */}
-                          </div>
-                        </div>
-                      ))}
-                      {student.enrolledCourses.length > 2 && (
-                        <div className="text-xs text-gray-500">
-                          +{student.enrolledCourses.length - 2} دورة أخرى
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          إرسال رسالة
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/trainer/courses/${student.enrolledCourses[0]?.courseId}/students`}>
-                            عرض التفاصيل
-                          </Link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {sortedStudents.length === 0 && (
+          {sortedStudents.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                لا يوجد طلاب
+                {data?.totalStudents === 0 ? "لا يوجد طلاب مسجلون حتى الآن" : "لا يوجد طلاب مطابقون للبحث"}
               </h3>
               <p className="text-gray-500">
-                لم يتم العثور على طلاب مطابقين لمعايير البحث
+                {data?.totalStudents === 0
+                  ? "سيظهر الطلاب هنا بمجرد تسجيلهم في إحدى دوراتك"
+                  : "جرّب تغيير معايير البحث أو التصفية"}
               </p>
             </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">الطالب</TableHead>
+                  <TableHead className="text-right">الدورات المسجلة</TableHead>
+                  <TableHead className="text-right">آخر نشاط</TableHead>
+                  <TableHead className="text-right">الإجراءات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedStudents.map(student => (
+                  <TableRow key={student.id}>
+                    {/* Student info */}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage
+                            src={student.avatar ? `${API_URL}${student.avatar}` : undefined}
+                            alt={student.name}
+                          />
+                          <AvatarFallback>{getInitials(student.name)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{student.name}</div>
+                          <div className="text-sm text-gray-500 flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {student.email}
+                          </div>
+                          {student.phone && (
+                            <div className="text-sm text-gray-500 flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {student.phone}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    {/* Enrolled courses */}
+                    <TableCell>
+                      <div className="space-y-1">
+                        {student.enrolledCourses.slice(0, 2).map(ec => {
+                          const s = statusBadge[ec.status] ?? { label: ec.status, variant: "secondary" as const }
+                          return (
+                            <div key={ec.enrollmentId} className="text-sm">
+                              <span className="font-medium line-clamp-1">{ec.courseTitle}</span>
+                              <Badge variant={s.variant} className="mr-2 text-xs mt-0.5">{s.label}</Badge>
+                            </div>
+                          )
+                        })}
+                        {student.enrolledCourses.length > 2 && (
+                          <div className="text-xs text-gray-400">
+                            +{student.enrolledCourses.length - 2} دورة أخرى
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Last activity */}
+                    <TableCell className="text-sm text-gray-500">
+                      {new Date(student.lastActivity).toLocaleDateString("ar-SA", {
+                        year: "numeric", month: "short", day: "numeric"
+                      })}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {student.enrolledCourses[0] && (
+                            <DropdownMenuItem asChild>
+                              <Link href={`/trainer/courses/${student.enrolledCourses[0].courseId}/students`}>
+                                عرض في الدورة
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

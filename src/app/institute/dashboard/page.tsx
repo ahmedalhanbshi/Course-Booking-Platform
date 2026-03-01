@@ -1,65 +1,74 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Users, BookOpen, DollarSign, MapPin, Clock, Building2, TrendingUp, Plus, ArrowUpRight } from "lucide-react"
-
-// Mock data - in real app, this would come from API
-const mockInstitute = {
-  name: "معهد المستقبل للتقنية",
-  adminName: "محمد المدير"
-}
-
-const mockStats = {
-  activeCourses: 12,
-  roomBookingsToday: 8,
-  totalStudents: 245,
-  monthlyRevenue: 45000
-}
-
-const mockRecentBookings = [
-  {
-    id: "1",
-    courseTitle: "دورة البرمجة الأساسية",
-    trainer: "فاطمة علي",
-    room: "قاعة 101",
-    date: "2024-01-15",
-    time: "10:00 - 12:00",
-    status: "pending" as const
-  },
-  {
-    id: "2",
-    courseTitle: "دورة التصميم الجرافيكي",
-    trainer: "محمد أحمد",
-    room: "قاعة 203",
-    date: "2024-01-15",
-    time: "14:00 - 16:00",
-    status: "approved" as const
-  }
-]
-
-const mockUpcomingCourses = [
-  {
-    id: "1",
-    title: "دورة تطوير التطبيقات",
-    trainer: "سارة خالد",
-    startDate: "2024-01-20",
-    enrolledStudents: 25,
-    maxStudents: 30
-  },
-  {
-    id: "2",
-    title: "دورة إدارة المشاريع",
-    trainer: "علي حسن",
-    startDate: "2024-01-25",
-    enrolledStudents: 18,
-    maxStudents: 25
-  }
-]
+import { Calendar, Users, BookOpen, MapPin, Clock, TrendingUp, Plus, Loader2 } from "lucide-react"
+import { instituteService } from "@/lib/institute-service"
+import { format } from "date-fns"
 
 export default function InstituteDashboard() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true)
+        const result = await instituteService.getDashboard()
+        setData(result)
+      } catch (err: any) {
+        setError(err?.response?.data?.message || "فشل في تحميل لوحة التحكم")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDashboard()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-2">جاري تحميل لوحة التحكم...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  const { institute, stats, recentBookings, upcomingCourses } = data
+
+  const getBookingStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-200">مقبول</Badge>
+      case 'pending_approval':
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200">قيد المراجعة</Badge>
+      case 'pending_payment':
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">بانتظار الدفع</Badge>
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200">مرفوض</Badge>
+      case 'cancelled':
+        return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200">ملغي</Badge>
+      default:
+        return <Badge variant="secondary">{status}</Badge>
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-10">
 
@@ -72,10 +81,10 @@ export default function InstituteDashboard() {
           <div className="space-y-3 text-center md:text-right max-w-2xl">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">
-                مرحباً بك، {mockInstitute.adminName} 👋
+                مرحباً بك، {institute.adminName} 👋
               </h1>
               <p className="text-purple-100 text-sm md:text-base opacity-90">
-                إدارة {mockInstitute.name} - لديك <span className="font-bold text-white">{mockStats.roomBookingsToday} حجوزات اليوم</span> و <span className="font-bold text-white">{mockStats.activeCourses} دورات نشطة</span>.
+                إدارة {institute.name} - لديك <span className="font-bold text-white">{stats.roomBookingsToday} حجوزات اليوم</span> و <span className="font-bold text-white">{stats.activeCourses} دورات نشطة</span>.
               </p>
             </div>
 
@@ -98,15 +107,15 @@ export default function InstituteDashboard() {
           {/* Compact Stats */}
           <div className="hidden lg:flex gap-4">
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">{mockStats.totalStudents}</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.totalStudents}</div>
               <div className="text-[10px] font-medium text-purple-200 uppercase">طالب</div>
             </div>
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">{mockStats.activeCourses}</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.activeCourses}</div>
               <div className="text-[10px] font-medium text-purple-200 uppercase">دورة</div>
             </div>
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[120px]">
-              <div className="text-2xl font-bold mb-0.5">{mockStats.monthlyRevenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.monthlyRevenue.toLocaleString()}</div>
               <div className="text-[10px] font-medium text-purple-200 uppercase">ريال يمني</div>
             </div>
           </div>
@@ -130,31 +139,35 @@ export default function InstituteDashboard() {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-gray-50">
-                {mockRecentBookings.map((booking) => (
-                  <div key={booking.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="mt-1 p-2 bg-purple-50 text-purple-600 rounded-lg">
-                          <MapPin className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-gray-900">{booking.courseTitle}</p>
-                          <p className="text-xs text-gray-500 mb-1">{booking.trainer}</p>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span className="font-medium text-gray-700">{booking.room}</span>
-                            <span>•</span>
-                            {booking.date} • {booking.time}
+              {recentBookings.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  لا توجد حجوزات حتى الآن
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {recentBookings.map((booking: any) => (
+                    <div key={booking.id} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 p-2 bg-purple-50 text-purple-600 rounded-lg">
+                            <MapPin className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm text-gray-900">{booking.courseTitle}</p>
+                            <p className="text-xs text-gray-500 mb-1">{booking.trainer}</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className="font-medium text-gray-700">{booking.room}</span>
+                              <span>•</span>
+                              {format(new Date(booking.startDate), 'yyyy-MM-dd')} → {format(new Date(booking.endDate), 'yyyy-MM-dd')}
+                            </div>
                           </div>
                         </div>
+                        {getBookingStatusBadge(booking.status)}
                       </div>
-                      <Badge variant={booking.status === 'approved' ? 'default' : 'secondary'} className={booking.status === 'approved' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}>
-                        {booking.status === 'approved' ? 'مقبول' : 'قيد المراجعة'}
-                      </Badge>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -170,25 +183,31 @@ export default function InstituteDashboard() {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-gray-50">
-                {mockUpcomingCourses.map((course) => (
-                  <div key={course.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="font-bold text-sm text-gray-900">{course.title}</h4>
-                        <p className="text-xs text-gray-500 mt-0.5">المدرب: {course.trainer}</p>
+              {upcomingCourses.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  لا توجد دورات قادمة
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {upcomingCourses.map((course: any) => (
+                    <div key={course.id} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-bold text-sm text-gray-900">{course.title}</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">المدرب: {course.trainer}</p>
+                        </div>
+                        <Badge variant="outline" className="bg-white">
+                          {course.enrolledStudents}/{course.maxStudents} طالب
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="bg-white">
-                        {course.enrolledStudents}/{course.maxStudents} طالب
-                      </Badge>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                        <Calendar className="h-3 w-3" />
+                        يبدأ في: {format(new Date(course.startDate), 'yyyy-MM-dd')}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
-                      <Calendar className="h-3 w-3" />
-                      يبدأ في: {course.startDate}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

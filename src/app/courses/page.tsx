@@ -1,12 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -17,140 +16,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Filter, Users, Clock, MapPin, Heart, BookOpen } from "lucide-react"
+import { Search, Filter, AlertCircle, Loader2 } from "lucide-react"
 import { CourseCard } from "@/components/course-card"
+import { trainerService, ExploreCourse } from "@/lib/trainer-service"
 
-// Mock data for courses
-const mockCourses = [
-  {
-    id: "1",
-    title: "تعلم React من الصفر",
-    description: "دورة شاملة في تعلم React.js مع مشاريع عملية. ستتعلم أساسيات React، إدارة الحالة، التوجيه، والعديد من المفاهيم المتقدمة.",
-    instructor: {
-      name: "أحمد محمد",
-      avatar: "/images/avatar-1.png"
-    },
-    price: 29900,
-    duration: "40 ساعة",
-    level: "مبتدئ",
-    studentsCount: 1250,
-    startDate: new Date("2025-02-01"),
-    endDate: new Date("2025-03-15"),
-    type: "أونلاين",
-    category: "تطوير الويب",
-    image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=800&auto=format&fit=crop", // React
-    rating: 4.8,
-    reviewCount: 156,
-    institute: "أكاديمية التكنولوجيا",
-  },
-  {
-    id: "2",
-    title: "تصميم واجهات المستخدم",
-    description: "تعلم مبادئ التصميم وأدوات التصميم الحديثة. اكتشف أسرار تجربة المستخدم وكيفية تصميم واجهات جذابة وعملية.",
-    instructor: {
-      name: "فاطمة علي",
-      avatar: "/images/avatar-2.png"
-    },
-    price: 39900,
-    duration: "30 ساعة",
-    level: "متوسط",
-    studentsCount: 850,
-    startDate: new Date("2025-02-15"),
-    endDate: new Date("2025-03-30"),
-    type: "حضوري",
-    category: "التصميم",
-    image: "https://images.unsplash.com/photo-1586717791821-3f44a5638d48?q=80&w=800&auto=format&fit=crop", // UI/UX
-    rating: 4.9,
-    reviewCount: 89,
-    institute: "معهد التصميم الرقمي",
-  },
-  {
-    id: "3",
-    title: "إدارة المشاريع الرقمية",
-    description: "تعلم إدارة المشاريع الرقمية باستخدام أدوات حديثة. منهجية Agile و Scrum وكيفية قيادة الفرق التقنية بنجاح.",
-    instructor: {
-      name: "محمد حسن",
-      avatar: "/images/avatar-3.png"
-    },
-    price: 49900,
-    duration: "50 ساعة",
-    level: "متقدم",
-    studentsCount: 2100,
-    startDate: new Date("2025-03-01"),
-    endDate: new Date("2025-04-30"),
-    type: "حضور وأونلاين",
-    category: "إدارة الأعمال",
-    image: "https://images.unsplash.com/photo-1531403009284-440f080d1e12?q=80&w=800&auto=format&fit=crop", // Project Management
-    rating: 4.7,
-    reviewCount: 203,
-    institute: "جامعة الأعمال",
-  },
-  {
-    id: "4",
-    title: "تعلم Python للمبتدئين",
-    description: "دورة شاملة في لغة Python مع تطبيقات عملية. ابدأ رحلتك في عالم البرمجة مع واحدة من أكثر اللغات طلباً.",
-    instructor: {
-      name: "سارة خالد",
-      avatar: "/images/avatar-1.png"
-    },
-    price: 24900,
-    duration: "35 ساعة",
-    level: "مبتدئ",
-    studentsCount: 1500,
-    startDate: new Date("2025-02-10"),
-    endDate: new Date("2025-03-25"),
-    type: "أونلاين",
-    category: "تطوير البرمجيات",
-    image: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?q=80&w=800&auto=format&fit=crop", // Python
-    rating: 4.6,
-    reviewCount: 120,
-    institute: "أكاديمية البرمجة",
-  },
-  {
-    id: "5",
-    title: "التسويق الرقمي الشامل",
-    description: "استراتيجيات التسويق الرقمي وإدارة الحملات الإعلانية. تعلم SEO و SEM والتسويق عبر وسائل التواصل الاجتماعي.",
-    instructor: {
-      name: "عمر يوسف",
-      avatar: "/images/avatar-2.png"
-    },
-    price: 34900,
-    duration: "28 ساعة",
-    level: "متوسط",
-    studentsCount: 950,
-    startDate: new Date("2025-02-20"),
-    endDate: new Date("2025-03-20"),
-    type: "حضوري",
-    category: "التسويق",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=800&auto=format&fit=crop", // Marketing
-    rating: 4.5,
-    reviewCount: 95,
-    institute: "معهد التسويق الحديث",
-  },
-  {
-    id: "6",
-    title: "تحليل البيانات باستخدام SQL",
-    description: "تعلم قواعد البيانات وتحليل البيانات باستخدام SQL. مهارة أساسية لكل محلل بيانات ومطور.",
-    instructor: {
-      name: "نورة عبدالله",
-      avatar: "/images/avatar-3.png"
-    },
-    price: 19900,
-    duration: "25 ساعة",
-    level: "مبتدئ",
-    studentsCount: 1100,
-    startDate: new Date("2025-03-05"),
-    endDate: new Date("2025-03-30"),
-    type: "أونلاين",
-    category: "قواعد البيانات",
-    image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?q=80&w=800&auto=format&fit=crop", // Data/SQL
-    institute: "أكاديمية البيانات",
-    rating: 4.8,
-    reviewCount: 140
-  },
-]
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-const categories = ["جميع الفئات", "تطوير الويب", "التصميم", "إدارة الأعمال", "تطوير البرمجيات", "التسويق", "قواعد البيانات"]
+function resolveImage(src: string | null): string {
+  if (!src) return "/images/course-web.png"
+  if (src.startsWith("http")) return src
+  const cleanSrc = src.replace(/\\/g, "/")
+  const separator = cleanSrc.startsWith("/") ? "" : "/"
+  return `${API_BASE}${separator}${cleanSrc}`
+}
+
+const deliveryTypesMap: Record<string, string> = {
+  "أونلاين": "online",
+  "حضوري": "in_person",
+  "حضور وأونلاين": "hybrid"
+}
+
 const deliveryTypes = ["أونلاين", "حضوري", "حضور وأونلاين"]
 
 interface CoursesPageProps {
@@ -158,48 +43,78 @@ interface CoursesPageProps {
 }
 
 export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps) {
-  const [searchQuery, setSearchQuery] = useState("")
+  const [courses, setCourses] = useState<ExploreCourse[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: "all", name: "جميع الفئات" }])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("جميع الفئات")
   const [selectedDeliveryTypes, setSelectedDeliveryTypes] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState([0, 100000])
   const [sortBy, setSortBy] = useState("newest")
-  const [favorites, setFavorites] = useState<string[]>([])
 
-  const toggleFavorite = (courseId: string) => {
-    if (favorites.includes(courseId)) {
-      setFavorites(favorites.filter(id => id !== courseId))
+  const fetchData = () => {
+    setLoading(true)
+    setError(null)
+    trainerService
+      .getExploreCourses()
+      .then((data) => {
+        setCourses(data.courses)
+        setCategories(
+          // Replace 'الكل' from API with 'جميع الفئات' to match existing UI
+          data.categories.map(c => c.id === 'all' ? { ...c, name: "جميع الفئات" } : c)
+        )
+      })
+      .catch((err) => {
+        console.error("Failed to load courses:", err)
+        setError("فشل تحميل الدورات. يرجى المحاولة مرة أخرى.")
+      })
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const toggleDeliveryType = (typeLabel: string) => {
+    const typeValue = deliveryTypesMap[typeLabel]
+    if (selectedDeliveryTypes.includes(typeValue)) {
+      setSelectedDeliveryTypes(selectedDeliveryTypes.filter(t => t !== typeValue))
     } else {
-      setFavorites([...favorites, courseId])
+      setSelectedDeliveryTypes([...selectedDeliveryTypes, typeValue])
     }
   }
 
-  const toggleDeliveryType = (type: string) => {
-    if (selectedDeliveryTypes.includes(type)) {
-      setSelectedDeliveryTypes(selectedDeliveryTypes.filter(t => t !== type))
+  const filteredCourses = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+
+    return courses.filter(course => {
+      const matchesSearch = query.length === 0 ||
+        course.title.toLowerCase().includes(query) ||
+        course.description?.toLowerCase().includes(query)
+
+      const matchesCategory = selectedCategory === "جميع الفئات" || course.category === selectedCategory
+
+      const matchesDelivery = selectedDeliveryTypes.length === 0 || selectedDeliveryTypes.includes(course.deliveryType)
+
+      const matchesPrice = course.price >= priceRange[0] && course.price <= priceRange[1]
+
+      return matchesSearch && matchesCategory && matchesDelivery && matchesPrice
+    })
+  }, [courses, searchQuery, selectedCategory, selectedDeliveryTypes, priceRange])
+
+  const visibleCourses = useMemo(() => {
+    const sorted = [...filteredCourses]
+    if (sortBy === "price-low") {
+      sorted.sort((a, b) => a.price - b.price)
+    } else if (sortBy === "price-high") {
+      sorted.sort((a, b) => b.price - a.price)
     } else {
-      setSelectedDeliveryTypes([...selectedDeliveryTypes, type])
+      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     }
-  }
-
-  const filteredCourses = mockCourses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === "جميع الفئات" || course.category === selectedCategory
-    const matchesDelivery = selectedDeliveryTypes.length === 0 || selectedDeliveryTypes.includes(course.type)
-    const matchesPrice = course.price >= priceRange[0] && course.price <= priceRange[1]
-
-    return matchesSearch && matchesCategory && matchesDelivery && matchesPrice
-  })
-
-  const sortedCourses = [...filteredCourses].sort((a, b) => {
-    switch (sortBy) {
-      case "price-low": return a.price - b.price
-      case "price-high": return b.price - a.price
-      case "price-high": return b.price - a.price
-      default: return new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-    }
-  })
+    return sorted
+  }, [filteredCourses, sortBy])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -241,13 +156,13 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                 <h3 className="font-semibold mb-3">الفئة</h3>
                 <div className="space-y-2">
                   {categories.map((category) => (
-                    <div key={category} className="flex items-center">
+                    <div key={category.id} className="flex items-center">
                       <button
-                        onClick={() => setSelectedCategory(category)}
-                        className={`text-sm hover:text-primary transition-colors ${selectedCategory === category ? "text-primary font-bold" : "text-muted-foreground"
+                        onClick={() => setSelectedCategory(category.name)}
+                        className={`text-sm hover:text-primary transition-colors ${selectedCategory === category.name ? "text-primary font-bold" : "text-muted-foreground"
                           }`}
                       >
-                        {category}
+                        {category.name}
                       </button>
                     </div>
                   ))}
@@ -292,11 +207,10 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
             </div>
           </div>
 
-          {/* Course Grid */}
           <div className="w-full lg:w-3/4">
             <div className="flex justify-between items-center mb-6">
               <p className="text-muted-foreground">
-                تم العثور على <span className="font-bold text-foreground">{sortedCourses.length}</span> دورة
+                تم العثور على <span className="font-bold text-foreground">{visibleCourses.length}</span> دورة
               </p>
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-[180px] bg-white/50">
@@ -310,14 +224,60 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
               </Select>
             </div>
 
+          </div>
+
+          {loading && (
+            <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
+              <Loader2 className="h-7 w-7 animate-spin" />
+              <span className="text-lg">جاري تحميل الدورات...</span>
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
+              <AlertCircle className="h-10 w-10" />
+              <p>{error}</p>
+              <Button variant="outline" onClick={fetchData}>إعادة المحاولة</Button>
+            </div>
+          )}
+
+          {!loading && !error && visibleCourses.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400 text-center">
+              <p className="text-lg">
+                {searchQuery || selectedCategory !== "جميع الفئات"
+                  ? "لا توجد نتائج تطابق بحثك"
+                  : "لا توجد دورات نشطة حالياً"}
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && visibleCourses.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {sortedCourses.map((course) => (
-                <CourseCard key={course.id} {...course} basePath={basePath} />
+              {visibleCourses.map((course) => (
+                <CourseCard
+                  key={course.id}
+                  id={course.id}
+                  title={course.title}
+                  description={course.shortDescription || course.description}
+                  level="عام" // Using a generic fallback for visually completing the design card
+                  price={course.price}
+                  studentsCount={course.studentsCount}
+                  duration={String(course.duration)}
+                  image={resolveImage(course.image)}
+                  category={course.category}
+                  instructor={{
+                    name: course.trainer.name,
+                    avatar: resolveImage(course.trainer.avatar)
+                  }}
+                  basePath={basePath}
+                />
               ))}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
+
   )
 }
+

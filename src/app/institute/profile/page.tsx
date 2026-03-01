@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,33 +9,109 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, Building, Eye, EyeOff, MapPin, Globe } from "lucide-react"
-import { UserRole } from "@/types"
-
-// Mock user data for Institute Admin
-const mockUser = {
-    id: "3",
-    name: "سعيد محمد",
-    email: "saeed@institute.com",
-    phone: "+966551234567",
-    role: 'institute_admin' as UserRole,
-    avatar: "",
-    instituteName: "معهد المستقبل للتقنية",
-    instituteLogo: "",
-    instituteAddress: "الرياض، حي العليا",
-    instituteWebsite: "www.future-tech.edu.sa",
-    instituteDescription: "معهد رائد في تقديم الدورات التقنية والمهنية."
-}
+import { User, Mail, Phone, Building, Eye, EyeOff, MapPin, Globe, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { instituteService } from "@/lib/institute-service"
+import { getFileUrl } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function InstituteProfilePage() {
-    const [user, setUser] = useState(mockUser)
+    const { updateUser } = useAuth()
+    const [user, setUser] = useState({
+        id: "",
+        name: "",
+        email: "",
+        phone: "",
+        role: "institute_admin",
+        avatar: "",
+        instituteName: "",
+        instituteLogo: "",
+        instituteAddress: "",
+        instituteWebsite: "",
+        instituteDescription: "",
+        verificationStatus: ""
+    })
     const [isEditing, setIsEditing] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
+    const [isSaving, setIsSaving] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [activeTab, setActiveTab] = useState("personal")
+    const [avatarFile, setAvatarFile] = useState<File | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const handleSave = () => {
-        // In real app, this would make an API call
-        setIsEditing(false)
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const data = await instituteService.getProfile()
+                if (data) {
+                    setUser({
+                        ...user,
+                        ...data,
+                        phone: data.phone || "",
+                        instituteAddress: data.instituteAddress || "",
+                        instituteWebsite: data.instituteWebsite || "",
+                        instituteDescription: data.instituteDescription || ""
+                    })
+                }
+            } catch (error) {
+                console.error("Failed to fetch profile", error)
+                toast.error("فشل في تحميل بيانات الملف الشخصي")
+            } finally {
+                setIsLoading(false)
+            }
+        }
+        fetchProfile()
+    }, [])
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]
+            setAvatarFile(file)
+            setUser({ ...user, avatar: URL.createObjectURL(file) })
+            setIsEditing(true) // auto-enable editing mode so they can save
+        }
+    }
+
+    const handleSave = async () => {
+        try {
+            setIsSaving(true)
+            const formData = new FormData()
+            formData.append("name", user.name)
+            formData.append("phone", user.phone)
+            formData.append("instituteName", user.instituteName)
+            formData.append("instituteAddress", user.instituteAddress)
+            formData.append("instituteWebsite", user.instituteWebsite)
+            formData.append("instituteDescription", user.instituteDescription)
+            if (avatarFile) {
+                formData.append("avatar", avatarFile)
+            }
+
+            const data = await instituteService.updateProfile(formData)
+
+            if (data?.avatar) {
+                setUser({ ...user, avatar: data.avatar })
+                updateUser({ name: user.name, avatar: data.avatar })
+            } else {
+                updateUser({ name: user.name })
+            }
+
+            toast.success("تم تحديث البيانات بنجاح")
+            setIsEditing(false)
+            setAvatarFile(null)
+        } catch (error) {
+            console.error(error)
+            toast.error("حدث خطأ أثناء حفظ البيانات")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[400px] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+        )
     }
 
     const renderPersonalInfo = () => (
@@ -48,13 +124,23 @@ export default function InstituteProfilePage() {
                 {/* Avatar */}
                 <div className="flex items-center gap-4">
                     <Avatar className="h-20 w-20">
-                        <AvatarImage src={user.avatar} alt={user.name} />
-                        <AvatarFallback className="text-lg">
-                            {user.name.charAt(0)}
-                        </AvatarFallback>
+                        {user.avatar ? (
+                            <AvatarImage src={getFileUrl(user.avatar)} alt={user.name} className="object-cover" />
+                        ) : (
+                            <AvatarFallback className="text-lg">
+                                {user.name.charAt(0)}
+                            </AvatarFallback>
+                        )}
                     </Avatar>
                     <div>
-                        <Button variant="outline" size="sm">
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={handleImageChange}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                             تغيير الصورة
                         </Button>
                         <p className="text-sm text-gray-500 mt-1">
@@ -122,8 +208,10 @@ export default function InstituteProfilePage() {
                 <div className="flex gap-2">
                     {isEditing ? (
                         <>
-                            <Button onClick={handleSave}>حفظ التغييرات</Button>
-                            <Button variant="outline" onClick={() => setIsEditing(false)}>
+                            <Button onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? "جاري الحفظ..." : "حفظ التغييرات"}
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
                                 إلغاء
                             </Button>
                         </>
@@ -201,8 +289,10 @@ export default function InstituteProfilePage() {
                 <div className="flex gap-2">
                     {isEditing ? (
                         <>
-                            <Button onClick={handleSave}>حفظ التغييرات</Button>
-                            <Button variant="outline" onClick={() => setIsEditing(false)}>
+                            <Button onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? "جاري الحفظ..." : "حفظ التغييرات"}
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
                                 إلغاء
                             </Button>
                         </>

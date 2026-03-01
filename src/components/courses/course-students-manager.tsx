@@ -10,135 +10,40 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, Mail, MessageSquare, Eye, CheckCircle, XCircle, Clock, ArrowLeft, Send, UserCheck, Phone, Calendar, BookOpen, Award, Trash2 } from "lucide-react"
+import { Users, Mail, MessageSquare, Eye, ArrowLeft, Send, UserCheck, Phone, Calendar, BookOpen, Trash2, Loader2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
-import { Enrollment, User, Course } from "@/types"
-import { useState } from "react"
-
-// ... (Rest of imports and mock data are fine, just ensuring the import line is updated)
+import { useState, useEffect } from "react"
+import { instituteService } from "@/lib/institute-service"
+import { toast } from "sonner"
 
 interface CourseStudentsManagerProps {
   courseId: string
   backLink: string
   backText: string
+  fetchStudentsOverride?: (courseId: string) => Promise<any>
+  unenrollOverride?: (courseId: string, enrollmentId: string, reason: string) => Promise<any>
 }
 
-// Mock user data
-const mockUser: User = {
-  id: "2",
-  name: "فاطمة علي",
-  email: "fatima@example.com",
-  role: 'trainer' as const,
-  status: 'active',
-  createdAt: new Date(),
-  updatedAt: new Date()
+interface EnrollmentData {
+  id: string
+  studentId: string
+  courseId: string
+  enrolledAt: string
+  status: string
+  student: {
+    id: string
+    name: string
+    email: string
+    phone?: string | null
+  }
 }
 
-// Mock course data
-const mockCourse: Course = {
-  id: "1",
-  title: "تعلم React من الصفر",
-  description: "دورة شاملة في تعلم React.js",
-  price: 29900,
-  duration: 40,
-  startDate: new Date("2025-02-01"),
-  endDate: new Date("2025-03-15"),
-  maxStudents: 50,
-  enrolledStudents: 23,
-  rating: 4.8,
-  reviewCount: 156,
-  status: 'active',
-  category: "تطوير الويب",
-  deliveryType: 'online',
-  trainerId: "2",
-  trainer: {
-    id: "2",
-    name: "فاطمة علي",
-    email: "fatima@example.com",
-    role: 'trainer' as const,
-    status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  createdAt: new Date(),
-  updatedAt: new Date()
-}
+export default function CourseStudentsManager({ courseId, backLink, backText, fetchStudentsOverride, unenrollOverride }: CourseStudentsManagerProps) {
+  const [enrollments, setEnrollments] = useState<EnrollmentData[]>([])
+  const [courseTitle, setCourseTitle] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-// Mock enrolled students
-const mockEnrollments: (Enrollment & { student: { id: string; name: string; email: string; phone?: string } })[] = [
-  {
-    id: "1",
-    studentId: "3",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-15"),
-    status: 'active',
-    progress: 75,
-    student: {
-      id: "3",
-      name: "أحمد محمد",
-      email: "ahmed@example.com",
-      phone: "+966501234567",
-    }
-  },
-  {
-    id: "2",
-    studentId: "4",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-16"),
-    status: 'active',
-    progress: 60,
-    student: {
-      id: "4",
-      name: "فاطمة أحمد",
-      email: "fatima.ahmed@example.com",
-      phone: "+966507654321",
-    }
-  },
-  {
-    id: "3",
-    studentId: "5",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-17"),
-    status: 'active',
-    progress: 0,
-    student: {
-      id: "5",
-      name: "محمد علي",
-      email: "mohamed.ali@example.com",
-      phone: "+966509876543",
-    }
-  },
-  {
-    id: "4",
-    studentId: "6",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-18"),
-    status: 'completed',
-    progress: 100,
-    student: {
-      id: "6",
-      name: "سارة حسن",
-      email: "sara.hassan@example.com",
-      phone: "+966502468135",
-    }
-  },
-  {
-    id: "5",
-    studentId: "7",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-14"),
-    status: 'cancelled',
-    progress: 20,
-    student: {
-      id: "7",
-      name: "خالد عمر",
-      email: "khaled.omar@example.com",
-      phone: "+966508642975",
-    }
-  },
-]
-export default function CourseStudentsManager({ courseId, backLink, backText }: CourseStudentsManagerProps) {
-  const [enrollments] = useState(mockEnrollments.filter(e => e.status !== 'completed'))
   const [showNotificationDialog, setShowNotificationDialog] = useState(false)
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [notificationData, setNotificationData] = useState({
@@ -146,45 +51,79 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
     message: "",
     type: "announcement",
   })
-  
+
   // Delete State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [studentToDelete, setStudentToDelete] = useState<(typeof mockEnrollments)[0] | null>(null)
+  const [studentToDelete, setStudentToDelete] = useState<EnrollmentData | null>(null)
   const [cancellationReason, setCancellationReason] = useState("")
 
   // Student Details Dialog State
-  const [viewStudent, setViewStudent] = useState<(typeof mockEnrollments)[0] | null>(null)
+  const [viewStudent, setViewStudent] = useState<EnrollmentData | null>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
-  const activeEnrollments = enrollments.filter(e => e.status === 'active')
-  const completedEnrollments = enrollments.filter(e => e.status === 'completed')
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const data = fetchStudentsOverride
+        ? await fetchStudentsOverride(courseId)
+        : await instituteService.getCourseStudents(courseId)
+      setCourseTitle(data.course?.title || "")
+      setEnrollments(data.enrollments || [])
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل في جلب بيانات الطلاب")
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const getStatusLabel = (status: Enrollment['status']) => {
+  useEffect(() => {
+    fetchData()
+  }, [courseId])
+
+  const activeEnrollments = enrollments.filter(e => e.status === 'active')
+
+  const getStatusLabel = (status: string) => {
     switch (status) {
       case 'active': return 'مستمر'
+      case 'completed': return 'مكتمل'
       case 'cancelled': return 'ملغى'
+      case 'preliminary': return 'مبدئي'
       default: return status
     }
   }
 
-  const getStatusColor = (status: Enrollment['status']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-green-600'
       case 'completed': return 'text-blue-600'
       case 'cancelled': return 'text-red-600'
+      case 'preliminary': return 'text-yellow-600'
       default: return 'text-gray-600'
     }
   }
-  
-  const handleDeleteClick = (enrollment: typeof mockEnrollments[0]) => {
+
+  const handleDeleteClick = (enrollment: EnrollmentData) => {
     setStudentToDelete(enrollment)
     setCancellationReason("")
     setIsDeleteDialogOpen(true)
   }
 
-  const handleConfirmDelete = () => {
-    // In a real app, you would call an API to unenroll the student here
-    console.log("Unenrolling student:", studentToDelete?.studentId, "Reason:", cancellationReason)
+  const handleConfirmDelete = async () => {
+    if (!studentToDelete) return
+    try {
+      if (unenrollOverride) {
+        await unenrollOverride(courseId, studentToDelete.id, cancellationReason)
+      } else {
+        await instituteService.unenrollStudent(courseId, studentToDelete.id, cancellationReason)
+      }
+      setEnrollments(enrollments.map(e =>
+        e.id === studentToDelete.id ? { ...e, status: 'cancelled' } : e
+      ))
+      toast.success("تم إلغاء تسجيل الطالب بنجاح")
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "فشل في إلغاء التسجيل")
+    }
     setIsDeleteDialogOpen(false)
     setStudentToDelete(null)
     setCancellationReason("")
@@ -192,10 +131,8 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
 
   const handleSendNotification = () => {
     if (!notificationData.title || !notificationData.message) return
-
-    // In real app, this would send notifications to selected students
     console.log('Sending notification to students:', selectedStudents, notificationData)
-
+    toast.success("تم إرسال الإشعار بنجاح")
     setShowNotificationDialog(false)
     setSelectedStudents([])
     setNotificationData({ title: "", message: "", type: "announcement" })
@@ -217,9 +154,29 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
     )
   }
 
-  const handleViewStudent = (enrollment: typeof mockEnrollments[0]) => {
+  const handleViewStudent = (enrollment: EnrollmentData) => {
     setViewStudent(enrollment)
     setShowDetailsDialog(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-2">جاري تحميل بيانات الطلاب...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+        <Button onClick={fetchData}>إعادة المحاولة</Button>
+      </div>
+    )
   }
 
   return (
@@ -238,11 +195,11 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
           إدارة المسجّلين
         </h1>
         <p className="text-gray-600">
-          {mockCourse.title}
+          {courseTitle}
         </p>
       </div>
-      
-       {/* Delete Confirmation Dialog */}
+
+      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -255,33 +212,33 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
           </DialogHeader>
 
           <div className="space-y-3 py-4">
-              <Label htmlFor="cancellation-reason" className="text-sm font-medium">
-                  سبب إلغاء التسجيل <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                  id="cancellation-reason"
-                  placeholder="يرجى كتابة سبب استبعاد الطالب من الدورة..."
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  className="min-h-[100px]"
-              />
-              <p className="text-xs text-gray-500">
-                  {cancellationReason.length < 5 ? (
-                      <span className="text-red-500">يجب كتابة 5 أحرف على الأقل</span>
-                  ) : (
-                      <span className="text-green-600">السبب مقبول</span>
-                  )}
-              </p>
+            <Label htmlFor="cancellation-reason" className="text-sm font-medium">
+              سبب إلغاء التسجيل <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              id="cancellation-reason"
+              placeholder="يرجى كتابة سبب استبعاد الطالب من الدورة..."
+              value={cancellationReason}
+              onChange={(e) => setCancellationReason(e.target.value)}
+              className="min-h-[100px]"
+            />
+            <p className="text-xs text-gray-500">
+              {cancellationReason.length < 5 ? (
+                <span className="text-red-500">يجب كتابة 5 أحرف على الأقل</span>
+              ) : (
+                <span className="text-green-600">السبب مقبول</span>
+              )}
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 mt-4">
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button 
-                variant="destructive" 
-                onClick={handleConfirmDelete}
-                disabled={cancellationReason.trim().length < 5}
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={cancellationReason.trim().length < 5}
             >
               نعم، إلغاء التسجيل
             </Button>
@@ -315,8 +272,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
             </div>
           </CardContent>
         </Card>
-
-
       </div>
 
       {/* Actions */}
@@ -436,21 +391,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                   </div>
                   <p className="text-gray-900">{formatDate(viewStudent.enrolledAt)}</p>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <BookOpen className="h-4 w-4" />
-                    <span className="text-sm font-medium">التقدم في الدورة</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-600 rounded-full"
-                        style={{ width: `${viewStudent.progress}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-bold">{viewStudent.progress}%</span>
-                  </div>
-                </div>
+
               </div>
 
               <div className="bg-gray-50 p-4 rounded-lg">
@@ -497,6 +438,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                   />
                 </TableHead>
                 <TableHead>الطالب</TableHead>
+                <TableHead>الحالة</TableHead>
                 <TableHead>تاريخ التسجيل</TableHead>
                 <TableHead>الإجراءات</TableHead>
               </TableRow>
@@ -525,6 +467,11 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                     </div>
                   </TableCell>
                   <TableCell>
+                    <Badge className={getStatusColor(enrollment.status)}>
+                      {getStatusLabel(enrollment.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
                     {formatDate(enrollment.enrolledAt)}
                   </TableCell>
                   <TableCell>
@@ -545,15 +492,17 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                           <MessageSquare className="h-4 w-4" />
                         </Button>
                       )}
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        onClick={() => handleDeleteClick(enrollment)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+
+                      {enrollment.status === 'active' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          onClick={() => handleDeleteClick(enrollment)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -583,11 +532,22 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-
               <div className="flex justify-between">
                 <span className="text-gray-600">نشطين:</span>
                 <span className="font-medium text-green-600">
                   {activeEnrollments.length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">ملغيين:</span>
+                <span className="font-medium text-red-600">
+                  {enrollments.filter(e => e.status === 'cancelled').length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">مكتملين:</span>
+                <span className="font-medium text-blue-600">
+                  {enrollments.filter(e => e.status === 'completed').length}
                 </span>
               </div>
             </div>
@@ -604,16 +564,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText }: 
                 <span className="text-gray-600">إجمالي التسجيلات:</span>
                 <span className="font-medium">{enrollments.length}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">معدل التسجيل الأسبوعي:</span>
-                <span className="font-medium">3.2</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">أعلى تقدم:</span>
-                <span className="font-medium">
-                  {Math.max(...enrollments.map(e => e.progress))}%
-                </span>
-              </div>
+
             </div>
           </CardContent>
         </Card>

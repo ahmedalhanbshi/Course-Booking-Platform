@@ -17,7 +17,7 @@ export interface CourseCardProps {
     price: number
     studentsCount: number
     duration: string
-    level: string
+    level?: string
     image: string
     instructor: {
         name: string
@@ -92,6 +92,7 @@ export function CourseCard({
                     fill
                     sizes="(max-width: 768px) 100vw, 300px"
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    unoptimized={true}
                     style={{ display: "block" }}
                 />
 
@@ -143,7 +144,7 @@ export function CourseCard({
                 {/* Instructor */}
                 <div className="flex items-center justify-start gap-2 mt-auto pt-3 border-t border-border/50">
                     <div className="relative w-6 h-6 rounded-full overflow-hidden border border-border">
-                        <Image src={instructor.avatar} alt={instructor.name} fill className="object-cover" />
+                        <Image src={instructor.avatar} alt={instructor.name} fill className="object-cover" unoptimized={true} />
                     </div>
                     <span className="text-xs font-medium text-muted-foreground">{instructor.name}</span>
                 </div>

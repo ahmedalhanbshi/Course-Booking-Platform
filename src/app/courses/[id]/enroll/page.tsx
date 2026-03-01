@@ -26,7 +26,7 @@ const mockCourse: Course = {
     id: "1",
     name: "أحمد محمد",
     email: "ahmed@example.com",
-    role: 'trainer' as const,
+    role: 'TRAINER' as const,
     status: 'active',
     avatar: "",
     createdAt: new Date("2024-01-01"),

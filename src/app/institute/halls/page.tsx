@@ -8,91 +8,71 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { Plus, X } from "lucide-react"
+import { Plus, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import ExploreHallsPage from "@/app/student/explore/halls/page"
+
 import InstituteRoomBookings from "@/app/institute/room-bookings/page"
+import { instituteService } from "@/lib/institute-service"
+import { getFileUrl } from "@/lib/utils"
 
 interface Hall {
   id: string
   name: string
   capacity: number
-  location: string
-  locationUrl: string
-  type: "قاعة محاضرات" | "قاعة اجتماعات" | "معمل" | "ورشة عمل"
-  hourlyRate: number
-  description: string
-  image: string
-  features: Array<"wifi" | "projector" | "screen" | "computers">
+  location: string | null
+  locationUrl: string | null
+  type: string
+  hourlyRate: number | string // from backend pricePerHour Decimal
+  description: string | null
+  image: string | null
+  features: string[] // from backend facilities[]
+  availability: { day: string; startTime: string; endTime: string }[]
 }
 
-const mockHalls: Hall[] = [
-  {
-    id: "hall-1",
-    name: "القاعة الرئيسية",
-    type: "قاعة محاضرات",
-    location: "الدور الأرضي • الجناح الشرقي",
-    locationUrl: "",
-    capacity: 80,
-    hourlyRate: 18000,
-    image:
-      "https://images.unsplash.com/photo-1760121788536-9797394e210e?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000",
-    features: ["wifi", "projector", "screen"],
-    description: "قاعة واسعة للمحاضرات والفعاليات الكبرى مع تجهيزات عرض متكاملة."
-  },
-  {
-    id: "hall-2",
-    name: "قاعة الاجتماعات الذكية",
-    type: "قاعة اجتماعات",
-    location: "الدور الأول • الجناح الغربي",
-    locationUrl: "",
-    capacity: 18,
-    hourlyRate: 12000,
-    image:
-      "https://images.unsplash.com/photo-1766802981801-4b4a9a1d8f1c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000",
-    features: ["wifi", "screen"],
-    description: "مساحة مريحة لاجتماعات الفرق مع شاشة تفاعلية وإضاءة هادئة."
-  },
-  {
-    id: "hall-3",
-    name: "معمل الحاسب المتقدم",
-    type: "معمل",
-    location: "الدور الثاني • الجناح الشرقي",
-    locationUrl: "",
-    capacity: 30,
-    hourlyRate: 15000,
-    image:
-      "https://images.unsplash.com/photo-1725274032244-9a8f0fa1e9a7?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000",
-    features: ["wifi", "projector", "computers"],
-    description: "معمل مجهز لأعمال التدريب العملي مع أجهزة حديثة وشبكة قوية."
-  },
-  {
-    id: "hall-4",
-    name: "قاعة التدريب (ج)",
-    type: "قاعة محاضرات",
-    location: "الدور الأول • الجناح الشرقي",
-    locationUrl: "",
-    capacity: 40,
-    hourlyRate: 14000,
-    image:
-      "https://images.unsplash.com/photo-1670348060135-d4c6662b4138?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000",
-    features: ["wifi", "projector"],
-    description: "قاعة متوسطة مناسبة للدورات وورش العمل القصيرة."
-  }
-]
-
 export default function InstituteHallsPage() {
-  const [halls, setHalls] = useState<Hall[]>(mockHalls)
+  const [halls, setHalls] = useState<Hall[]>([])
+  const [loading, setLoading] = useState(true)
+
   const [editingHall, setEditingHall] = useState<Hall | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [activeTab, setActiveTab] = useState<"halls" | "bookings">("halls")
   const [isImageDragging, setIsImageDragging] = useState(false)
   const [imagePreviewUrl, setImagePreviewUrl] = useState("")
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const hallImageInputRef = useRef<HTMLInputElement | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const loadHalls = async () => {
+    setLoading(true)
+    try {
+      const data = await instituteService.getHalls()
+      // Map backend fields to frontend interface
+      const mappedHalls = data.map((room: any) => ({
+        id: room.id,
+        name: room.name,
+        capacity: room.capacity,
+        location: room.location,
+        locationUrl: room.locationUrl,
+        type: room.type,
+        hourlyRate: room.pricePerHour,
+        description: room.description,
+        image: room.image,
+        features: room.facilities || [],
+        availability: room.availability || []
+      }))
+      setHalls(mappedHalls)
+    } catch {
+      toast.error("فشل تحميل بيانات القاعات")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadHalls() }, [])
 
   const createEmptyHall = (): Hall => ({
-    id: `hall-${Date.now()}`,
+    id: "",
     name: "",
     type: "قاعة محاضرات",
     location: "",
@@ -101,10 +81,11 @@ export default function InstituteHallsPage() {
     hourlyRate: 0,
     image: "",
     features: [],
+    availability: [],
     description: ""
   })
 
-  const isValidMapsUrl = (value: string) => {
+  const isValidMapsUrl = (value: string | null) => {
     if (!value) return true
     try {
       const url = new URL(value)
@@ -124,36 +105,76 @@ export default function InstituteHallsPage() {
     const hall = halls.find((item) => item.id === hallId)
     if (!hall) return
     setIsCreating(false)
-    setEditingHall(hall)
+    setEditingHall({ ...hall })
+    setSelectedImageFile(null)
     setIsEditOpen(true)
   }
 
   const handleOpenCreate = () => {
     setIsCreating(true)
     setEditingHall(createEmptyHall())
+    setSelectedImageFile(null)
     setIsEditOpen(true)
   }
 
   useEffect(() => {
-    setImagePreviewUrl(editingHall?.image ?? "")
+    let url = editingHall?.image ?? ""
+    setImagePreviewUrl(getFileUrl(url))
   }, [editingHall?.image])
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingHall) return
     if (editingHall.locationUrl && !isValidMapsUrl(editingHall.locationUrl)) {
       toast.error("رابط الموقع غير صالح. استخدم رابط Google Maps يبدأ بـ https://")
       return
     }
-    setHalls((prev) => {
-      const exists = prev.some((hall) => hall.id === editingHall.id)
-      if (exists) {
-        return prev.map((hall) => (hall.id === editingHall.id ? { ...editingHall } : hall))
+
+    setActionLoading(true)
+    try {
+      const payload = new FormData()
+      payload.append("name", editingHall.name)
+      payload.append("capacity", String(editingHall.capacity))
+      if (editingHall.location) payload.append("location", editingHall.location)
+      if (editingHall.locationUrl) payload.append("locationUrl", editingHall.locationUrl)
+      payload.append("type", editingHall.type)
+      if (editingHall.description) payload.append("description", editingHall.description)
+      payload.append("pricePerHour", String(editingHall.hourlyRate))
+      payload.append("facilities", JSON.stringify(editingHall.features))
+      payload.append("availability", JSON.stringify(editingHall.availability))
+
+      if (selectedImageFile) {
+        payload.append("image", selectedImageFile)
+      } else if (editingHall.image === "") {
+        payload.append("image", "")
       }
-      return [...prev, { ...editingHall }]
-    })
-    setIsEditOpen(false)
-    setIsCreating(false)
-    toast.success(isCreating ? "تم إضافة القاعة بنجاح" : "تم تحديث بيانات القاعة بنجاح")
+
+      if (isCreating) {
+        await instituteService.addHall(payload as any)
+        toast.success("تم إضافة القاعة بنجاح")
+      } else {
+        await instituteService.updateHall(editingHall.id, payload as any)
+        toast.success("تم تحديث بيانات القاعة بنجاح")
+      }
+      setIsEditOpen(false)
+      setIsCreating(false)
+      loadHalls()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "حدث خطأ أثناء حفظ القاعة")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDelete = async (hallId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذه القاعة؟")) return
+    try {
+      await instituteService.removeHall(hallId)
+      toast.success("تم حذف القاعة بنجاح")
+      setHalls(prev => prev.filter(h => h.id !== hallId))
+      setIsEditOpen(false)
+    } catch {
+      toast.error("فشل حذف القاعة")
+    }
   }
 
   const handleHallImageFile = (file?: File | null) => {
@@ -163,15 +184,11 @@ export default function InstituteHallsPage() {
       return
     }
     const previewUrl = URL.createObjectURL(file)
+    setSelectedImageFile(file)
     setEditingHall((prev) => (prev ? { ...prev, image: previewUrl } : prev))
   }
 
-  const editingForm = useMemo(() => {
-    if (!editingHall) return null
-    return {
-      ...editingHall
-    }
-  }, [editingHall])
+  const editingForm = editingHall
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -189,21 +206,19 @@ export default function InstituteHallsPage() {
           <div className="bg-gray-100 p-1 rounded-xl flex items-center w-fit">
             <button
               onClick={() => setActiveTab("halls")}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === "halls"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "halls"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-900"
+                }`}
             >
               القاعات
             </button>
             <button
               onClick={() => setActiveTab("bookings")}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === "bookings"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "bookings"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-900"
+                }`}
             >
               طلبات الحجز
             </button>
@@ -212,13 +227,73 @@ export default function InstituteHallsPage() {
       </div>
 
       {activeTab === "halls" && (
-        <ExploreHallsPage
-          hideTitle
-          basePath="/institute/halls"
-          actionLabel="تعديل"
-          onSelectHall={handleOpenEdit}
-          hallsData={halls}
-        />
+        loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : halls.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+            <p className="mb-4">لم يتم إضافة قاعات حتى الآن</p>
+            <Button onClick={handleOpenCreate} variant="outline">إضافة أول قاعة</Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {halls.map((hall) => (
+              <div
+                key={hall.id}
+                className="group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-md hover:ring-blue-200 dark:bg-slate-900 dark:ring-slate-800"
+              >
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
+                  {hall.image ? (
+                    <img
+                      src={getFileUrl(hall.image)}
+                      alt={hall.name}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-400">
+                      لا توجد صورة
+                    </div>
+                  )}
+                  <div className="absolute top-3 right-3 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-sm">
+                    {hall.type}
+                  </div>
+                </div>
+
+                <div className="flex flex-1 flex-col p-5">
+                  <h3 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white line-clamp-1">
+                    {hall.name}
+                  </h3>
+
+                  {hall.location && (
+                    <p className="mb-4 text-sm text-slate-500 line-clamp-1">
+                      {hall.location}
+                    </p>
+                  )}
+
+                  <div className="mb-6 grid flex-1 grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-xs">السعة</span>
+                      <span className="font-medium text-slate-700">{hall.capacity} شخص</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-xs">السعر / ساعة</span>
+                      <span className="font-medium text-slate-700">{hall.hourlyRate} ريال</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => handleOpenEdit(hall.id)}
+                    className="w-full bg-slate-50 hover:bg-slate-100 text-blue-600 hover:text-blue-700 border-none shadow-none"
+                    variant="outline"
+                  >
+                    تعديل القاعة
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
       {activeTab === "bookings" && <InstituteRoomBookings />}
 
@@ -259,9 +334,8 @@ export default function InstituteHallsPage() {
                   <div className="space-y-3 lg:items-start">
                     <Label className="text-sm font-semibold">صورة القاعة</Label>
                     <div
-                      className={`relative aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border-2 border-dashed bg-slate-50/60 transition-shadow ${
-                        isImageDragging ? "ring-2 ring-blue-500 ring-offset-2 border-blue-300" : "border-slate-200"
-                      }`}
+                      className={`relative aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border-2 border-dashed bg-slate-50/60 transition-shadow ${isImageDragging ? "ring-2 ring-blue-500 ring-offset-2 border-blue-300" : "border-slate-200"
+                        }`}
                       onDragOver={(event) => {
                         event.preventDefault()
                         setIsImageDragging(true)
@@ -364,7 +438,7 @@ export default function InstituteHallsPage() {
                           type="number"
                           dir="rtl"
                           className="h-11 text-right"
-                          value={editingForm.capacity}
+                          value={editingForm.capacity || ""}
                           onChange={(event) =>
                             setEditingHall((prev) =>
                               prev ? { ...prev, capacity: Number(event.target.value) } : prev
@@ -379,7 +453,7 @@ export default function InstituteHallsPage() {
                           type="number"
                           dir="rtl"
                           className="h-11 text-right"
-                          value={editingForm.hourlyRate}
+                          value={editingForm.hourlyRate || ""}
                           onChange={(event) =>
                             setEditingHall((prev) =>
                               prev ? { ...prev, hourlyRate: Number(event.target.value) } : prev
@@ -399,7 +473,7 @@ export default function InstituteHallsPage() {
                             dir="rtl"
                             className="h-11 text-right"
                             placeholder="مثال: صنعاء - التحرير - شارع الزبيري"
-                            value={editingForm.location}
+                            value={editingForm.location || ""}
                             onChange={(event) =>
                               setEditingHall((prev) =>
                                 prev ? { ...prev, location: event.target.value } : prev
@@ -415,7 +489,7 @@ export default function InstituteHallsPage() {
                             dir="ltr"
                             className="h-11 text-right"
                             placeholder="https://maps.app.goo.gl/..."
-                            value={editingForm.locationUrl ?? ""}
+                            value={editingForm.locationUrl || ""}
                             onChange={(event) =>
                               setEditingHall((prev) =>
                                 prev ? { ...prev, locationUrl: event.target.value } : prev
@@ -432,7 +506,7 @@ export default function InstituteHallsPage() {
                         value={editingForm.type}
                         onValueChange={(value) =>
                           setEditingHall((prev) =>
-                            prev ? { ...prev, type: value as Hall["type"] } : prev
+                            prev ? { ...prev, type: value } : prev
                           )
                         }
                       >
@@ -455,7 +529,7 @@ export default function InstituteHallsPage() {
                         dir="rtl"
                         className="min-h-[96px] text-right"
                         rows={4}
-                        value={editingForm.description}
+                        value={editingForm.description || ""}
                         onChange={(event) =>
                           setEditingHall((prev) =>
                             prev ? { ...prev, description: event.target.value } : prev
@@ -470,12 +544,12 @@ export default function InstituteHallsPage() {
                         {["wifi", "projector", "screen", "computers"].map((feature) => (
                           <label key={feature} className="flex items-center gap-2 text-sm">
                             <Checkbox
-                              checked={editingForm.features.includes(feature as Hall["features"][number])}
+                              checked={editingForm.features.includes(feature)}
                               onCheckedChange={(checked) => {
                                 setEditingHall((prev) => {
                                   if (!prev) return prev
                                   const next = checked
-                                    ? [...prev.features, feature as Hall["features"][number]]
+                                    ? [...prev.features, feature]
                                     : prev.features.filter((item) => item !== feature)
                                   return { ...prev, features: next }
                                 })
@@ -494,17 +568,122 @@ export default function InstituteHallsPage() {
                         ))}
                       </div>
                     </div>
+
+                    <div className="grid gap-4 border-t pt-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">أوقات العمل المتاحة للرواق</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingHall(prev => prev ? { ...prev, availability: [...prev.availability, { day: "SUNDAY", startTime: "08:00", endTime: "16:00" }] } : prev)}
+                        >
+                          <Plus className="h-4 w-4 ml-1" /> إضافة فترة
+                        </Button>
+                      </div>
+                      {(!editingForm.availability || editingForm.availability.length === 0) ? (
+                        <p className="text-sm text-gray-500">لم يتم تحديد أوقات. سيتم اعتبار القاعة متاحة دائماً ما لم يتم تحديد ساعات عمل.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {editingForm.availability.map((period, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <Select
+                                value={period.day}
+                                onValueChange={(val) => {
+                                  setEditingHall(prev => {
+                                    if (!prev) return prev;
+                                    const newAv = [...prev.availability];
+                                    newAv[index].day = val;
+                                    return { ...prev, availability: newAv };
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="w-[130px] h-10 text-right" dir="rtl">
+                                  <SelectValue placeholder="اليوم" />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {[
+                                    { value: "SUNDAY", label: "الأحد" },
+                                    { value: "MONDAY", label: "الإثنين" },
+                                    { value: "TUESDAY", label: "الثلاثاء" },
+                                    { value: "WEDNESDAY", label: "الأربعاء" },
+                                    { value: "THURSDAY", label: "الخميس" },
+                                    { value: "FRIDAY", label: "الجمعة" },
+                                    { value: "SATURDAY", label: "السبت" },
+                                  ].map(d => (
+                                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="time"
+                                className="w-24 h-10 text-center"
+                                value={period.startTime}
+                                onChange={(e) => {
+                                  setEditingHall(prev => {
+                                    if (!prev) return prev;
+                                    const newAv = [...prev.availability];
+                                    newAv[index].startTime = e.target.value;
+                                    return { ...prev, availability: newAv };
+                                  });
+                                }}
+                              />
+                              <span className="text-gray-500">-</span>
+                              <Input
+                                type="time"
+                                className="w-24 h-10 text-center"
+                                value={period.endTime}
+                                onChange={(e) => {
+                                  setEditingHall(prev => {
+                                    if (!prev) return prev;
+                                    const newAv = [...prev.availability];
+                                    newAv[index].endTime = e.target.value;
+                                    return { ...prev, availability: newAv };
+                                  });
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 w-10 shrink-0"
+                                onClick={() => {
+                                  setEditingHall(prev => {
+                                    if (!prev) return prev;
+                                    const newAv = [...prev.availability];
+                                    newAv.splice(index, 1);
+                                    return { ...prev, availability: newAv };
+                                  });
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
             <div className="sticky bottom-0 z-10 border-t border-slate-100 bg-white px-6 py-4">
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                  إلغاء
-                </Button>
-                <Button onClick={handleSaveEdit}>حفظ التغييرات</Button>
+              <div className="flex justify-between items-center w-full">
+                {!isCreating && (
+                  <Button variant="destructive" onClick={() => handleDelete(editingForm!.id)}>
+                    حذف القاعة
+                  </Button>
+                )}
+                <div className="flex gap-2 mr-auto">
+                  <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={actionLoading}>
+                    إلغاء
+                  </Button>
+                  <Button onClick={handleSaveEdit} disabled={actionLoading || !editingForm?.name}>
+                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
+                    حفظ التغييرات
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

@@ -14,20 +14,17 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 
-// Mock trainer for header
-const mockTrainer = {
-    name: "فاطمة المدربة",
-    email: "trainer@demo.com",
-    avatar: "/images/avatar-2.png",
-}
-
 interface TrainerHeaderProps {
   onMenuClick: () => void
 }
 
 export function TrainerHeader({ onMenuClick }: TrainerHeaderProps) {
-  const { logout } = useAuth()
-  
+  const { user, logout } = useAuth()
+
+  const avatarSrc = user?.avatar
+    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${user.avatar}?t=${Date.now()}`
+    : ""
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm">
       {/* Menu Toggle */}
@@ -38,21 +35,21 @@ export function TrainerHeader({ onMenuClick }: TrainerHeaderProps) {
 
       {/* Left Side: Profile & Notifications - As requested, keeping them on the left */}
       <div className="mr-auto flex items-center gap-2">
-        
+
         {/* Wishlist */}
         <Button variant="ghost" size="icon" asChild className="rounded-full text-gray-500 hover:text-red-600 hover:bg-red-50">
-            <Link href="/trainer/wishlist" title="قائمة الرغبات">
-                <Heart className="h-5 w-5" />
-                <span className="sr-only">قائمة الرغبات</span>
-            </Link>
+          <Link href="/trainer/wishlist" title="قائمة الرغبات">
+            <Heart className="h-5 w-5" />
+            <span className="sr-only">قائمة الرغبات</span>
+          </Link>
         </Button>
 
         {/* Notifications */}
         <Button variant="ghost" size="icon" asChild className="rounded-full text-gray-500 hover:text-primary hover:bg-primary/10">
-            <Link href="/trainer/notifications" title="الإشعارات">
-                <Bell className="h-5 w-5" />
-                <span className="sr-only">الإشعارات</span>
-            </Link>
+          <Link href="/trainer/notifications" title="الإشعارات">
+            <Bell className="h-5 w-5" />
+            <span className="sr-only">الإشعارات</span>
+          </Link>
         </Button>
 
         {/* User Profile Dropdown */}
@@ -60,31 +57,31 @@ export function TrainerHeader({ onMenuClick }: TrainerHeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar className="h-10 w-10 border border-gray-200">
-                <AvatarImage src={mockTrainer.avatar} alt={mockTrainer.name} />
-                <AvatarFallback>TA</AvatarFallback>
+                <AvatarImage src={avatarSrc} alt={user?.name ?? ""} />
+                <AvatarFallback>{user?.name?.charAt(0) ?? "؟"}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{mockTrainer.name}</p>
+                <p className="text-sm font-medium leading-none">{user?.name ?? "—"}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {mockTrainer.email}
+                  {user?.email ?? "—"}
                 </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-                <Link href="/profile">الملف الشخصي</Link>
+              <Link href="/trainer/profile">الملف الشخصي</Link>
             </DropdownMenuItem>
-             <DropdownMenuItem asChild>
-                <Link href="/trainer/notifications">الإشعارات</Link>
+            <DropdownMenuItem asChild>
+              <Link href="/trainer/notifications">الإشعارات</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-                onClick={() => logout()}
-                className="text-red-600 focus:text-red-600 cursor-pointer"
+            <DropdownMenuItem
+              onClick={() => logout()}
+              className="text-red-600 focus:text-red-600 cursor-pointer"
             >
               <LogOut className="ml-2 h-4 w-4" />
               تسجيل الخروج

@@ -18,13 +18,13 @@ export default function AdminLayout({
         <div className="min-h-screen bg-gray-50 dark:bg-background" dir="rtl">
             <Navbar />
             <div className="flex relative">
-                <div 
+                <div
                     className={cn(
                         "sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto transition-all duration-300 ease-in-out border-l border-gray-200 dark:border-gray-800",
                         isSidebarOpen ? "w-64 opacity-100 translate-x-0" : "w-0 opacity-0 translate-x-10 overflow-hidden border-none"
                     )}
                 >
-                    <Sidebar role="platform_admin" className="h-full border-none w-64" />
+                    <Sidebar role="PLATFORM_ADMIN" className="h-full border-none w-64" />
                 </div>
                 <main className="flex-1 p-6 transition-all duration-300 min-w-0">
                     <div className="mb-4">

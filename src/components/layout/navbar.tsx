@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { getFileUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { UserRole } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
@@ -29,29 +30,30 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
-      case 'student': return 'طالب'
-      case 'trainer': return 'مدرّب'
-      case 'institute_admin': return 'مسؤول معهد'
-      case 'platform_admin': return 'مسؤول منصّة'
+      case 'STUDENT': return 'طالب'
+      case 'TRAINER': return 'مدرّب'
+      case 'INSTITUTE_ADMIN': return 'مسؤول معهد'
+      case 'PLATFORM_ADMIN': return 'مسؤول منصّة'
       default: return role
     }
   }
 
   const getProfileLink = (role: UserRole) => {
     switch (role) {
-      case 'student': return '/student/profile'
-      case 'trainer': return '/trainer/profile'
-      // Add other roles as they are implemented
-      default: return '/profile'
+      case 'STUDENT': return '/student/profile'
+      case 'TRAINER': return '/trainer/profile'
+      case 'INSTITUTE_ADMIN': return '/institute/profile'
+      case 'PLATFORM_ADMIN': return '/admin/profile'
+      default: return '/'
     }
   }
 
   const getNotificationsLink = (role: UserRole) => {
     switch (role) {
-      case 'student': return '/student/notifications'
-      case 'trainer': return '/trainer/notifications'
-      case 'institute_admin': return '/institute/notifications'
-      case 'platform_admin': return '/admin/announcements'
+      case 'STUDENT': return '/student/notifications'
+      case 'TRAINER': return '/trainer/notifications'
+      case 'INSTITUTE_ADMIN': return '/institute/notifications'
+      case 'PLATFORM_ADMIN': return '/admin/announcements'
       default: return '/'
     }
   }
@@ -88,22 +90,22 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
                     <Link href="/institutes">المعاهد</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {user?.role === 'trainer' && (
+                  {user?.role === 'TRAINER' && (
                     <DropdownMenuItem asChild>
                       <Link href="/trainer/dashboard">لوحة التحكم</Link>
                     </DropdownMenuItem>
                   )}
-                  {user?.role === 'institute_admin' && (
+                  {user?.role === 'INSTITUTE_ADMIN' && (
                     <DropdownMenuItem asChild>
                       <Link href="/institute/dashboard">لوحة التحكم</Link>
                     </DropdownMenuItem>
                   )}
-                  {user?.role === 'platform_admin' && (
+                  {user?.role === 'PLATFORM_ADMIN' && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin/dashboard">لوحة التحكم</Link>
                     </DropdownMenuItem>
                   )}
-                  {user?.role === 'student' && (
+                  {user?.role === 'STUDENT' && (
                     <DropdownMenuItem asChild>
                       <Link href="/student/dashboard">لوحة التحكم</Link>
                     </DropdownMenuItem>
@@ -122,10 +124,10 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
               </DropdownMenu>
             )}
           </div>
-          
+
           <Link href="/" className="flex items-center gap-4 group">
             <div className="relative w-16 h-16 group-hover:scale-105 transition-transform duration-300">
-               <Image src="/images/logo.png" alt="منصة د" fill className="object-contain" />
+              <Image src="/images/logo.png" alt="منصة د" fill className="object-contain" />
             </div>
             <span className="font-extrabold text-3xl block bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-600">منصة د</span>
           </Link>
@@ -133,14 +135,14 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
 
         {/* Center Search Bar - Hidden on mobile, visible on md+ */}
         <div className="hidden md:flex flex-1 max-w-xl mx-8 relative">
-           <div className="relative w-full">
-              <input 
-                type="text" 
-                placeholder="ماذا تريد أن تتعلم اليوم؟" 
-                className="w-full h-10 pr-10 pl-4 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm outline-none dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 placeholder:text-slate-400"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-           </div>
+          <div className="relative w-full">
+            <input
+              type="text"
+              placeholder="ماذا تريد أن تتعلم اليوم؟"
+              className="w-full h-10 pr-10 pl-4 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm outline-none dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+            />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          </div>
         </div>
 
         {/* Navigation Links - Hidden on mobile, now part of right side or condensed */}
@@ -151,25 +153,25 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
           <Button variant="ghost" asChild className="font-semibold text-foreground hover:text-primary hover:bg-primary/5 dark:text-foreground dark:hover:text-primary dark:hover:bg-primary/10">
             <Link href="/institutes">المعاهد</Link>
           </Button>
-          
+
           {/* Role specific links... */}
 
-          {user?.role === 'trainer' && (
+          {user?.role === 'TRAINER' && (
             <Button variant="ghost" asChild className="font-semibold text-foreground hover:text-primary hover:bg-primary/5 dark:text-foreground dark:hover:text-primary dark:hover:bg-primary/10">
               <Link href="/trainer/dashboard">لوحة التحكم</Link>
             </Button>
           )}
-          {user?.role === 'institute_admin' && (
+          {user?.role === 'INSTITUTE_ADMIN' && (
             <Button variant="ghost" asChild className="font-semibold text-foreground hover:text-primary hover:bg-primary/5 dark:text-foreground dark:hover:text-primary dark:hover:bg-primary/10">
               <Link href="/institute/dashboard">لوحة التحكم</Link>
             </Button>
           )}
-          {user?.role === 'platform_admin' && (
+          {user?.role === 'PLATFORM_ADMIN' && (
             <Button variant="ghost" asChild className="font-semibold text-foreground hover:text-primary hover:bg-primary/5 dark:text-foreground dark:hover:text-primary dark:hover:bg-primary/10">
               <Link href="/admin/dashboard">لوحة التحكم</Link>
             </Button>
           )}
-          {user?.role === 'student' && (
+          {user?.role === 'STUDENT' && (
             <Button variant="ghost" asChild className="font-semibold text-foreground hover:text-primary hover:bg-primary/5 dark:text-foreground dark:hover:text-primary dark:hover:bg-primary/10">
               <Link href="/student/dashboard">لوحة التحكم</Link>
             </Button>
@@ -198,7 +200,7 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
                   <Button variant="ghost" className="pl-2 pr-1 py-1 h-auto rounded-full hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all dark:hover:bg-slate-800 dark:border-transparent dark:hover:border-slate-700">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9 border border-slate-200 dark:border-slate-700">
-                        <AvatarImage src={user.avatar} alt={user.name} />
+                        <AvatarImage src={getFileUrl(user.avatar)} alt={user.name} />
                         <AvatarFallback className="bg-primary/10 text-primary font-medium">
                           {user.name.charAt(0)}
                         </AvatarFallback>

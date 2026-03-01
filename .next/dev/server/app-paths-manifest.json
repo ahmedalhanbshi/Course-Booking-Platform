@@ -1,0 +1,20 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/institute/courses/create/page": "app/institute/courses/create/page.js",
+  "/institute/courses/page": "app/institute/courses/page.js",
+  "/institute/dashboard/page": "app/institute/dashboard/page.js",
+  "/institute/halls/page": "app/institute/halls/page.js",
+  "/institute/staff/page": "app/institute/staff/page.js",
+  "/page": "app/page.js",
+  "/trainer/announcements/page": "app/trainer/announcements/page.js",
+  "/trainer/courses/create/page": "app/trainer/courses/create/page.js",
+  "/trainer/courses/page": "app/trainer/courses/page.js",
+  "/trainer/dashboard/page": "app/trainer/dashboard/page.js",
+  "/trainer/enrollments/page": "app/trainer/enrollments/page.js",
+  "/trainer/explore/page": "app/trainer/explore/page.js",
+  "/trainer/halls/[id]/page": "app/trainer/halls/[id]/page.js",
+  "/trainer/halls/page": "app/trainer/halls/page.js",
+  "/trainer/room-bookings/page": "app/trainer/room-bookings/page.js",
+  "/trainer/students/page": "app/trainer/students/page.js"
+}

@@ -1,0 +1,427 @@
+import { Response, NextFunction } from 'express';
+import { AuthRequest } from '../middleware/authenticate';
+import { sendSuccess, sendError } from '../utils/response';
+import instituteService from '../services/institute.service';
+
+class InstituteController {
+    async getDashboard(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const data = await instituteService.getDashboardData(req.user.userId);
+            return sendSuccess(res, 'تم جلب بيانات لوحة التحكم بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    // =====================================================
+    // PROFILE
+    // =====================================================
+
+    async getProfile(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const data = await instituteService.getInstituteProfile(req.user.userId);
+            return sendSuccess(res, 'تم جلب الملف الشخصي بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateProfile(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const payload = { ...req.body };
+            if (req.file) {
+                payload.avatar = `/uploads/${req.file.filename}`;
+            }
+            const data = await instituteService.updateInstituteProfile(req.user.userId, payload);
+            return sendSuccess(res, 'تم تحديث الملف الشخصي بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    // =====================================================
+    // COURSES
+    // =====================================================
+
+    async getCourses(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const courses = await instituteService.getInstituteCourses(req.user.userId);
+            return sendSuccess(res, 'تم جلب الدورات بنجاح', courses);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async deleteCourse(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const result = await instituteService.deleteCourse(req.user.userId, id);
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async changeTrainer(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const { trainerId } = req.body;
+            const result = await instituteService.changeTrainer(req.user.userId, id, trainerId);
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getTrainers(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const trainers = await instituteService.getInstituteTrainers(req.user.userId);
+            return sendSuccess(res, 'تم جلب المدربين بنجاح', trainers);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getCourseStudents(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const data = await instituteService.getCourseStudents(req.user.userId, id);
+            return sendSuccess(res, 'تم جلب بيانات الطلاب بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async unenrollStudent(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id, enrollmentId } = req.params;
+            const { reason } = req.body;
+            const result = await instituteService.unenrollStudent(req.user.userId, id, enrollmentId, reason);
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getCourseById(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const course = await instituteService.getCourseById(req.user.userId, id);
+            return sendSuccess(res, 'تم جلب تفاصيل الدورة بنجاح', course);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateCourse(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const payload = { ...req.body };
+
+            // Parse JSON fields from formData
+            if (typeof payload.sessions === 'string') {
+                try { payload.sessions = JSON.parse(payload.sessions); } catch (e) { }
+            }
+            if (typeof payload.objectives === 'string') {
+                try { payload.objectives = JSON.parse(payload.objectives); } catch (e) { }
+            }
+            if (typeof payload.prerequisites === 'string') {
+                try { payload.prerequisites = JSON.parse(payload.prerequisites); } catch (e) { }
+            }
+            if (typeof payload.tags === 'string') {
+                try { payload.tags = JSON.parse(payload.tags); } catch (e) { }
+            }
+            if (payload.isFree === 'true') payload.isFree = true;
+            if (payload.isFree === 'false') payload.isFree = false;
+
+            if (req.file) {
+                payload.image = `/uploads/${req.file.filename}`;
+            }
+
+            const updatedCourse = await instituteService.updateCourse(req.user.userId, id, payload);
+            return sendSuccess(res, 'تم تحديث الدورة بنجاح', updatedCourse);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getCategories(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            // Allow both INSTITUTE_ADMIN and TRAINER to get categories
+            if (!req.user || (req.user.role !== 'INSTITUTE_ADMIN' && req.user.role !== 'TRAINER')) {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const categories = await instituteService.getCategories();
+            return sendSuccess(res, 'تم جلب التصنيفات بنجاح', categories);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async createCategory(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            // Allow both INSTITUTE_ADMIN and TRAINER to create categories
+            if (!req.user || (req.user.role !== 'INSTITUTE_ADMIN' && req.user.role !== 'TRAINER')) {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { name } = req.body;
+            const category = await instituteService.createCategory(name);
+            return sendSuccess(res, 'تم إضافة التصنيف بنجاح', category);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getHalls(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const halls = await instituteService.getInstituteHalls(req.user.userId);
+            return sendSuccess(res, 'تم جلب القاعات بنجاح', halls);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getHallAvailability(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (!req.user || (req.user.role !== 'INSTITUTE_ADMIN' && req.user.role !== 'STUDENT' && req.user.role !== 'TRAINER')) {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const dateStr = req.query.date as string | undefined;
+            const hallId = req.params.hallId;
+
+            let result;
+            if (req.user.role === 'INSTITUTE_ADMIN') {
+                // Institute admins do an ownership check
+                result = await instituteService.getInstituteHallAvailability(req.user.userId, hallId, dateStr);
+            } else {
+                // Trainers and students just need availability — no ownership check
+                result = await instituteService.getHallAvailabilityPublic(hallId, dateStr);
+            }
+            return sendSuccess(res, 'تم جلب الأوقات المتاحة للقاعة', result);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async addHall(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+
+            const payload = { ...req.body };
+
+            // Parse numbers
+            if (payload.capacity) payload.capacity = Number(payload.capacity);
+            if (payload.pricePerHour) payload.pricePerHour = Number(payload.pricePerHour);
+
+            // Parse array if sent as JSON string
+            if (typeof payload.facilities === 'string') {
+                try { payload.facilities = JSON.parse(payload.facilities); } catch { /* ignore */ }
+            }
+            if (typeof payload.availability === 'string') {
+                try { payload.availability = JSON.parse(payload.availability); } catch { /* ignore */ }
+            }
+
+            // Handle file upload
+            if (req.file) {
+                payload.image = `/uploads/${req.file.filename}`;
+            }
+
+            const data = await instituteService.addInstituteHall(req.user.userId, payload);
+            return sendSuccess(res, 'تم إضافة القاعة بنجاح', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async updateHall(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+
+            const payload = { ...req.body };
+
+            // Parse numbers
+            if (payload.capacity) payload.capacity = Number(payload.capacity);
+            if (payload.pricePerHour) payload.pricePerHour = Number(payload.pricePerHour);
+
+            // Parse array if sent as JSON string
+            if (typeof payload.facilities === 'string') {
+                try { payload.facilities = JSON.parse(payload.facilities); } catch { /* ignore */ }
+            }
+            if (typeof payload.availability === 'string') {
+                try { payload.availability = JSON.parse(payload.availability); } catch { /* ignore */ }
+            }
+
+            // Handle file upload
+            if (req.file) {
+                payload.image = `/uploads/${req.file.filename}`;
+            }
+
+            const data = await instituteService.updateInstituteHall(req.user.userId, req.params.hallId, payload);
+            return sendSuccess(res, 'تم تحديث القاعة بنجاح', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async removeHall(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            await instituteService.removeInstituteHall(req.user.userId, req.params.hallId);
+            return sendSuccess(res, 'تم حذف القاعة بنجاح', null);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async getRoomBookings(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const bookings = await instituteService.getInstituteRoomBookings(req.user.userId);
+            return sendSuccess(res, 'تم جلب طلبات الحجز بنجاح', bookings);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async updateRoomBookingStatus(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+
+            const { status, notes, roomId } = req.body;
+            if (!status || !['APPROVED', 'REJECTED'].includes(status)) {
+                return sendError(res, 'حالة غير صحيحة', 400);
+            }
+
+            const updatedBooking = await instituteService.updateRoomBookingStatus(
+                req.user.userId,
+                req.params.bookingId,
+                { status, notes, adminId: req.user.userId, roomId }
+            );
+            return sendSuccess(res, 'تم تحديث حالة الطلب بنجاح', updatedBooking);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async createCourse(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const payload = { ...req.body };
+
+            // Parse JSON fields from formData
+            if (typeof payload.sessions === 'string') {
+                try { payload.sessions = JSON.parse(payload.sessions); } catch (e) { }
+            }
+            if (typeof payload.objectives === 'string') {
+                try { payload.objectives = JSON.parse(payload.objectives); } catch (e) { }
+            }
+            if (typeof payload.prerequisites === 'string') {
+                try { payload.prerequisites = JSON.parse(payload.prerequisites); } catch (e) { }
+            }
+            if (typeof payload.tags === 'string') {
+                try { payload.tags = JSON.parse(payload.tags); } catch (e) { }
+            }
+            if (payload.isFree === 'true') payload.isFree = true;
+            if (payload.isFree === 'false') payload.isFree = false;
+
+            if (req.file) {
+                payload.image = `/uploads/${req.file.filename}`;
+            }
+            const course = await instituteService.createCourse(req.user.userId, payload);
+            return sendSuccess(res, 'تم إنشاء الدورة بنجاح', course);
+        } catch (error: any) {
+            console.error('Course Creation Error:', error);
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                require('fs').writeFileSync('debug_course.json', JSON.stringify({
+                    message: error.message,
+                    stack: error.stack,
+                    payload: req.body
+                }, null, 2));
+            } catch (e) { }
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getStudents(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const students = await instituteService.getInstituteStudents(req.user.userId);
+            return sendSuccess(res, 'تم جلب الطلاب بنجاح', students);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getStaff(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.getInstituteStaff(req.user.userId);
+            return sendSuccess(res, 'تم جلب الطاقم بنجاح', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async addStaff(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.addInstituteStaff(req.user.userId, req.body);
+            return sendSuccess(res, 'تمت إضافة عضو الطاقم بنجاح', data, 201);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async removeStaff(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            await instituteService.removeInstituteStaff(req.user.userId, req.params.staffId);
+            return sendSuccess(res, 'تم إزالة عضو الطاقم بنجاح', null);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async updateStaffStatus(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.updateInstituteStaffStatus(req.user.userId, req.params.staffId, req.body.status);
+            return sendSuccess(res, 'تم تحديث حالة عضو الطاقم', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
+    async updateStaff(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.updateInstituteStaff(req.user.userId, req.params.staffId, req.body);
+            return sendSuccess(res, 'تم تحديث بيانات المدرب', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+}
+
+export default new InstituteController();

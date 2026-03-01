@@ -1,20 +1,19 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { BookOpen, Plus, Search, Users, Calendar, Eye, Edit, MoreHorizontal, Star, Clock, DollarSign, UploadCloud, FileText, ChevronDown, X } from "lucide-react"
+import { BookOpen, Plus, Search, Users, Calendar, Edit, MoreHorizontal, DollarSign, UploadCloud, FileText, ChevronDown, X, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { formatDate } from "@/lib/utils"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
+import { trainerService } from "@/lib/trainer-service"
 
 const bankAccounts = [
   {
@@ -25,97 +24,44 @@ const bankAccounts = [
   }
 ]
 
-// Mock courses data
-const courses = [
-  {
-    id: "1",
-    title: "تعلم React من الصفر",
-    description: "دورة شاملة في تعلم React.js مع مشاريع عملية",
-    status: 'active' as const,
-    enrolledStudents: 23,
-    maxStudents: 50,
-    price: 29900,
-    rating: 4.8,
-    reviewCount: 156,
-    startDate: new Date("2025-02-01"),
-    endDate: new Date("2025-03-15"),
-    category: "تطوير الويب",
-    institute: "أكاديمية التكنولوجيا",
-  },
-  {
-    id: "2",
-    title: "تصميم واجهات المستخدم",
-    description: "تعلم مبادئ التصميم وأدوات التصميم الحديثة",
-    status: 'payment_required' as const, // New Status Example
-    enrolledStudents: 18,
-    maxStudents: 30,
-    price: 39900,
-    rating: 4.9,
-    reviewCount: 89,
-    startDate: new Date("2025-02-15"),
-    endDate: new Date("2025-03-30"),
-    category: "التصميم",
-    institute: "معهد التصميم الرقمي",
-  },
-  {
-    id: "3",
-    title: "إدارة المشاريع الرقمية",
-    description: "تعلم إدارة المشاريع الرقمية باستخدام أدوات حديثة",
-    status: 'processing_payment' as const, // New Status Example
-    enrolledStudents: 0,
-    maxStudents: 40,
-    price: 49900,
-    rating: 0,
-    reviewCount: 0,
-    startDate: new Date("2025-03-01"),
-    endDate: new Date("2025-04-30"),
-    category: "إدارة الأعمال",
-    institute: "جامعة الأعمال",
-  },
-  {
-    id: "4",
-    title: "تعلم Python للمبتدئين",
-    description: "دورة شاملة في لغة Python مع تطبيقات عملية",
-    status: 'pending_approval' as const, // New Status Example
-    enrolledStudents: 0,
-    maxStudents: 45,
-    price: 24900,
-    rating: 0,
-    reviewCount: 0,
-    startDate: new Date("2025-02-10"),
-    endDate: new Date("2025-03-25"),
-    category: "تطوير البرمجيات",
-    institute: null,
-  },
-]
-
 export default function TrainerCoursesPage() {
+  const [courses, setCourses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true)
+        const data = await trainerService.getCourses()
+        setCourses(data)
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || "فشل في تحميل الدورات")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchCourses()
+  }, [])
+
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
 
   // Filter and sort courses
   const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.description.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = (course.title ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (course.shortDescription ?? course.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === "all" || course.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
   const sortedCourses = [...filteredCourses].sort((a, b) => {
     switch (sortBy) {
-      case "title":
-        return a.title.localeCompare(b.title)
-      case "students":
-        return b.enrolledStudents - a.enrolledStudents
-      case "rating":
-        return b.rating - a.rating
-      case "price-low":
-        return a.price - b.price
-      case "price-high":
-        return b.price - a.price
-      default:
-        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      case "title": return a.title.localeCompare(b.title)
+      case "students": return (b.enrolledStudents ?? 0) - (a.enrolledStudents ?? 0)
+      case "price-low": return a.price - b.price
+      case "price-high": return b.price - a.price
+      default: return new Date(b.createdAt ?? b.startDate).getTime() - new Date(a.createdAt ?? a.startDate).getTime()
     }
   })
 
@@ -131,7 +77,7 @@ export default function TrainerCoursesPage() {
       case 'payment_required':
         return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 border-orange-200">بانتظار سداد الرسوم</Badge>
       case 'processing_payment':
-         return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">جارٍ التحقق من الدفع</Badge>  
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">جارٍ التحقق من الدفع</Badge>
       case 'completed':
         return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">مكتمل</Badge>
       default:
@@ -140,7 +86,7 @@ export default function TrainerCoursesPage() {
   }
 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
-  const [selectedCourse, setSelectedCourse] = useState<typeof courses[0] | null>(null)
+  const [selectedCourse, setSelectedCourse] = useState<any>(null)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptInfo, setReceiptInfo] = useState<{ name: string; note: string }>({
     name: "",
@@ -151,19 +97,19 @@ export default function TrainerCoursesPage() {
   const [expandedBankId, setExpandedBankId] = useState<string | null>(bankAccounts[0]?.id ?? null)
   const paymentFileRef = useRef<HTMLInputElement | null>(null)
 
-  const handlePaymentClick = (course: typeof courses[0]) => {
-      setSelectedCourse(course)
-      setPaymentModalOpen(true)
+  const handlePaymentClick = (course: any) => {
+    setSelectedCourse(course)
+    setPaymentModalOpen(true)
   }
 
   const handlePaymentSubmit = () => {
-      if (!receiptFile && !receiptInfo.name) {
-        setPaymentError("يرجى رفع سند الدفع قبل التأكيد.")
-        return
-      }
-      setPaymentError("")
-      setPaymentModalOpen(false)
-      toast.success("تم رفع السند بنجاح وبانتظار المراجعة")
+    if (!receiptFile && !receiptInfo.name) {
+      setPaymentError("يرجى رفع سند الدفع قبل التأكيد.")
+      return
+    }
+    setPaymentError("")
+    setPaymentModalOpen(false)
+    toast.success("تم رفع السند بنجاح وبانتظار المراجعة")
   }
 
   const formatYER = (value: number) =>
@@ -184,6 +130,14 @@ export default function TrainerCoursesPage() {
       setReceiptInfo((prev) => ({ ...prev, name: file.name }))
     }
     setPaymentError("")
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -226,9 +180,8 @@ export default function TrainerCoursesPage() {
                     handleReceiptFile(file)
                   }}
                   onClick={() => paymentFileRef.current?.click()}
-                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${
-                    isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
-                  }`}
+                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
+                    }`}
                 >
                   <UploadCloud className="h-6 w-6 text-blue-600" />
                   <span className="font-medium text-slate-700">اسحب الملف هنا</span>
@@ -318,9 +271,8 @@ export default function TrainerCoursesPage() {
                             {bank.bankName}
                           </span>
                           <ChevronDown
-                            className={`h-4 w-4 text-slate-400 transition-transform ${
-                              isOpen ? "rotate-180" : ""
-                            }`}
+                            className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""
+                              }`}
                           />
                         </button>
                         {isOpen && (
@@ -410,7 +362,7 @@ export default function TrainerCoursesPage() {
               <div className="mr-4">
                 <p className="text-sm font-medium text-gray-600">إجمالي الطلاب</p>
                 <p className="text-2xl font-bold">
-                  {courses.reduce((acc, course) => acc + course.enrolledStudents, 0)}
+                  {courses.reduce((acc, course) => acc + (course.enrolledStudents ?? 0), 0)}
                 </p>
               </div>
             </div>
@@ -456,7 +408,6 @@ export default function TrainerCoursesPage() {
               <SelectItem value="newest">الأحدث</SelectItem>
               <SelectItem value="title">الاسم</SelectItem>
               <SelectItem value="students">عدد الطلاب</SelectItem>
-              <SelectItem value="rating">التقييم</SelectItem>
               <SelectItem value="price-low">السعر: من الأقل</SelectItem>
               <SelectItem value="price-high">السعر: من الأعلى</SelectItem>
             </SelectContent>
@@ -488,26 +439,24 @@ export default function TrainerCoursesPage() {
                     <div>
                       <div className="font-medium">{course.title}</div>
                       <div className="text-sm text-gray-500 line-clamp-1">
-                        {course.description}
+                        {course.shortDescription || course.description}
                       </div>
-                      {course.institute && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          {course.institute}
-                        </div>
+                      {course.category && (
+                        <div className="text-xs text-gray-400 mt-1">{course.category}</div>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</TableCell>
+                  <TableCell>{new Intl.NumberFormat('en-US').format(course.price)} ر.ي</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4 text-gray-400" />
-                      <span>{course.enrolledStudents}/{course.maxStudents}</span>
+                      <span>{course.enrolledStudents ?? 0}/{course.maxStudents}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      <span>{formatDate(course.startDate)}</span>
+                      <span>{course.startDate ? formatDate(new Date(course.startDate)) : '—'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -515,40 +464,40 @@ export default function TrainerCoursesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                        {/* Conditional Payment Button */}
-                        {course.status === 'payment_required' && (
-                             <Button 
-                                size="sm" 
-                                className="bg-orange-600 hover:bg-orange-700 text-white h-8 px-2 text-xs"
-                                onClick={() => handlePaymentClick(course)}
-                             >
-                                <DollarSign className="h-3 w-3 ml-1" />
-                                تأكيد الدفع
-                             </Button>
-                        )}
-                        
-                        <DropdownMenu>
+                      {/* Conditional Payment Button */}
+                      {course.status === 'payment_required' && (
+                        <Button
+                          size="sm"
+                          className="bg-orange-600 hover:bg-orange-700 text-white h-8 px-2 text-xs"
+                          onClick={() => handlePaymentClick(course)}
+                        >
+                          <DollarSign className="h-3 w-3 ml-1" />
+                          تأكيد الدفع
+                        </Button>
+                      )}
+
+                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm">
                             <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                          </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
 
-                            <DropdownMenuItem asChild>
+                          <DropdownMenuItem asChild>
                             <Link href={`/trainer/courses/${course.id}`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                تعديل
+                              <Edit className="mr-2 h-4 w-4" />
+                              تعديل
                             </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
                             <Link href={`/trainer/courses/${course.id}/students`}>
-                                <Users className="mr-2 h-4 w-4" />
-                                إدارة الطلاب
+                              <Users className="mr-2 h-4 w-4" />
+                              إدارة الطلاب
                             </Link>
-                            </DropdownMenuItem>
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
-                        </DropdownMenu>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -560,7 +509,7 @@ export default function TrainerCoursesPage() {
             <div className="text-center py-12">
               <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                لا توجد دورات
+                {searchQuery || statusFilter !== "all" ? "لا توجد دورات تطابق البحث" : "لا توجد دورات بعد"}
               </h3>
               <p className="text-gray-500 mb-6">
                 ابدأ بإنشاء دورة تدريبية جديدة

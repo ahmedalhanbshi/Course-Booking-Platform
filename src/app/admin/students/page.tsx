@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,67 +14,22 @@ import { Eye, UserX, Users, BookOpen, Trash2, Edit } from "lucide-react"
 import { User } from "@/types"
 import { formatDate } from "@/lib/utils"
 import { AdminPageHeader } from "@/components/admin/page-header"
-
-// Mock data
-const mockStudents: User[] = [
-  {
-    id: "student1",
-    name: "علي أحمد",
-    email: "ali@example.com",
-    phone: "0501234567",
-    role: "student",
-    status: "active",
-    avatar: "/avatars/ali.jpg",
-    createdAt: new Date("2023-01-15")
-  },
-  {
-    id: "student2",
-    name: "فاطمة محمد",
-    email: "fatima.m@example.com",
-    phone: "0507654321",
-    role: "student",
-    status: "active",
-    avatar: "/avatars/fatima.jpg",
-    createdAt: new Date("2023-02-20")
-  },
-  {
-    id: "student3",
-    name: "أحمد حسن",
-    email: "ahmed.h@example.com",
-    phone: "0509876543",
-    role: "student",
-    status: "suspended",
-    avatar: "/avatars/ahmed.jpg",
-    createdAt: new Date("2023-03-10")
-  },
-  {
-    id: "student4",
-    name: "سارة خالد",
-    email: "sara.k@example.com",
-    phone: "0501122334",
-    role: "student",
-    status: "pending",
-    avatar: "/avatars/sara.jpg",
-    createdAt: new Date("2023-04-05")
-  }
-]
-
-const mockStudentStats = [
-  { id: "student1", enrolledCourses: 3, completedCourses: 2 },
-  { id: "student2", enrolledCourses: 2, completedCourses: 1 },
-  { id: "student3", enrolledCourses: 4, completedCourses: 3 },
-  { id: "student4", enrolledCourses: 1, completedCourses: 0 }
-]
+import { adminService } from "@/lib/admin-service"
 
 export default function AdminStudents() {
-  const [students, setStudents] = useState<User[]>(mockStudents)
+  const [students, setStudents] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null)
   const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'view' | 'suspend' | 'delete' | 'edit' | null }>({
     open: false,
     type: null
   })
   const [deleteReason, setDeleteReason] = useState("")
+  const [suspendReason, setSuspendReason] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [editForm, setEditForm] = useState({
     name: "",
     email: "",
@@ -85,9 +40,26 @@ export default function AdminStudents() {
     password: ""
   })
 
+  useEffect(() => {
+    loadStudents()
+  }, [])
+
+  const loadStudents = async () => {
+    try {
+      setLoading(true)
+      const data = await adminService.getAllStudents()
+      setStudents(data)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل تحميل بيانات الطلاب")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (statusFilter === "all" || student.status === statusFilter) &&
+    (student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const handleViewStudent = (student: User) => {
@@ -97,6 +69,7 @@ export default function AdminStudents() {
 
   const handleSuspendStudent = (student: User) => {
     setSelectedStudent(student)
+    setSuspendReason("")
     setActionDialog({ open: true, type: 'suspend' })
   }
 
@@ -120,40 +93,52 @@ export default function AdminStudents() {
     setActionDialog({ open: true, type: 'edit' })
   }
 
-  const executeAction = () => {
+  const executeAction = async () => {
     if (!selectedStudent) return
 
-    if (actionDialog.type === 'delete') {
-      console.log(`Deleting student ${selectedStudent.id} with reason: ${deleteReason}`)
-      setStudents(students.filter(s => s.id !== selectedStudent.id))
-    } else if (actionDialog.type === 'edit') {
-      setStudents(students.map(s =>
-        s.id === selectedStudent.id ? {
-          ...s,
-          name: editForm.name,
-          email: editForm.email,
-          phone: editForm.phone,
-          role: editForm.role as any,
-          status: editForm.status as any,
-          avatar: editForm.avatar
-        } as User : s
-      ))
-    }
+    try {
+      setError("")
+      setSuccess("")
 
-    setActionDialog({ open: false, type: null })
-    setSelectedStudent(null)
-  }
+      if (actionDialog.type === 'delete') {
+        if (deleteReason.length < 5) return;
+        await adminService.deleteStudent(selectedStudent.id);
+        setSuccess("تم حذف الطالب بنجاح");
+      } else if (actionDialog.type === 'edit') {
+        await adminService.updateStudent(selectedStudent.id, editForm);
+        setSuccess("تم تحديث بيانات الطالب بنجاح");
+      } else if (actionDialog.type === 'suspend') {
+        if (!suspendReason) return;
+        await adminService.suspendStudent(selectedStudent.id, suspendReason);
+        setSuccess("تم تعليق حساب الطالب");
+      }
 
-  const getStudentStats = (studentId: string) => {
-    return mockStudentStats.find(stat => stat.id === studentId) || {
-      enrolledCourses: 0,
-      completedCourses: 0,
+      setActionDialog({ open: false, type: null })
+      setSelectedStudent(null)
+      loadStudents() // Reload data
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "فشل تنفيذ الإجراء")
     }
   }
 
   const totalStudents = students.length
   const activeStudents = students.filter(s => s.status === 'active').length
-  const totalEnrollments = mockStudentStats.reduce((sum, stat) => sum + stat.enrolledCourses, 0)
+  // Mock data for enrollments since we don't have it in the user object yet
+  const totalEnrollments = 0
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="إدارة الطلاب"
+          description="مراجعة وإدارة الطلاب المسجلين في المنصة"
+        />
+        <div className="flex justify-center p-12">
+          <p>جاري التحميل...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -161,6 +146,18 @@ export default function AdminStudents() {
         title="إدارة الطلاب"
         description="مراجعة وإدارة الطلاب المسجلين في المنصة"
       />
+
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4 text-red-800">{error}</CardContent>
+        </Card>
+      )}
+
+      {success && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4 text-green-800">{success}</CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -182,7 +179,7 @@ export default function AdminStudents() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeStudents}</div>
-            <p className="text-xs text-muted-foreground">نشط هذا الشهر</p>
+            <p className="text-xs text-muted-foreground">حساب نشط</p>
           </CardContent>
         </Card>
 
@@ -209,6 +206,16 @@ export default function AdminStudents() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">الكل</SelectItem>
+                <SelectItem value="active">نشط</SelectItem>
+                <SelectItem value="suspended">معلق</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -223,54 +230,57 @@ export default function AdminStudents() {
             <TableHeader>
               <TableRow>
                 <TableHead>الطالب</TableHead>
-                <TableHead>الدورات المسجلة</TableHead>
-                <TableHead>الدورات المكتملة</TableHead>
                 <TableHead>تاريخ التسجيل</TableHead>
+                <TableHead>الحالة</TableHead>
                 <TableHead>الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredStudents.map((student) => {
-                const stats = getStudentStats(student.id)
-                return (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        {student.avatar && (
-                          <img
-                            src={student.avatar}
-                            alt={student.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        )}
-                        <div>
-                          <div className="font-medium">{student.name}</div>
-                          <div className="text-sm text-gray-500">{student.email}</div>
+              {filteredStudents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-6 text-gray-500">
+                    لا يوجد طلاب مطابقين للبحث
+                  </TableCell>
+                </TableRow>
+              ) : filteredStudents.map((student) => (
+                <TableRow key={student.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      {student.avatar ? (
+                        <img
+                          src={student.avatar}
+                          alt={student.name}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-gray-500" />
                         </div>
+                      )}
+                      <div>
+                        <div className="font-medium">{student.name}</div>
+                        <div className="text-sm text-gray-500">{student.email}</div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="h-4 w-4" />
-                        {stats.enrolledCourses}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {stats.completedCourses}/{stats.enrolledCourses}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(student.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleViewStudent(student)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {formatDate(student.createdAt)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={student.status === 'active' ? 'default' : 'secondary'}>
+                      {student.status === 'active' ? 'نشط' :
+                        student.status === 'suspended' ? 'معلق' : student.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewStudent(student)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleEditStudent(student)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      {(student.status === 'active') && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -280,19 +290,19 @@ export default function AdminStudents() {
                           <UserX className="h-4 w-4 mr-1" />
                           تعليق
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteStudent(student)}
-                          className="border-red-300 text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteStudent(student)}
+                        className="border-red-300 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -318,6 +328,9 @@ export default function AdminStudents() {
                   <h3 className="text-lg font-semibold">{selectedStudent.name}</h3>
                   <p className="text-gray-600">{selectedStudent.email}</p>
                   <p className="text-sm text-gray-500">
+                    {selectedStudent.phone || "لا يوجد رقم هاتف"}
+                  </p>
+                  <p className="text-sm text-gray-500">
                     انضم في {formatDate(selectedStudent.createdAt)}
                   </p>
                   <div className="flex gap-2 mt-2">
@@ -325,49 +338,6 @@ export default function AdminStudents() {
                       {selectedStudent.status === 'active' ? 'نشط' : selectedStudent.status === 'suspended' ? 'معلق' : 'قيد المراجعة'}
                     </Badge>
                     <Badge variant="outline">{selectedStudent.role}</Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {getStudentStats(selectedStudent.id).enrolledCourses}
-                      </div>
-                      <div className="text-sm text-gray-600">دورة مسجل</div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {getStudentStats(selectedStudent.id).completedCourses}
-                      </div>
-                      <div className="text-sm text-gray-600">دورة مكتملة</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-semibold">الدورات المسجلة</h4>
-                <div className="space-y-2">
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">دورة البرمجة الأساسية</span>
-                      <Badge>مكتملة</Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">فاطمة علي</p>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">دورة تطوير التطبيقات</span>
-                      <Badge variant="outline">قيد الدراسة</Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">محمد أحمد</p>
                   </div>
                 </div>
               </div>
@@ -397,27 +367,22 @@ export default function AdminStudents() {
             )}
             <div>
               <Label htmlFor="suspend-reason">سبب التعليق</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر السبب" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="violation">انتهاك القواعد</SelectItem>
-                  <SelectItem value="payment">مشاكل دفع</SelectItem>
-                  <SelectItem value="inactive">عدم نشاط</SelectItem>
-                  <SelectItem value="other">أخرى</SelectItem>
-                </SelectContent>
-              </Select>
+              <Textarea
+                id="suspend-reason"
+                placeholder="سبب التعليق"
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+              />
             </div>
             <div className="flex gap-2">
-              <Button onClick={executeAction} className="bg-red-600 hover:bg-red-700">
-                تعليق الحساب
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => setActionDialog({ open: false, type: null })}
               >
                 إلغاء
+              </Button>
+              <Button onClick={executeAction} className="bg-red-600 hover:bg-red-700">
+                تعليق الحساب
               </Button>
             </div>
           </div>
@@ -434,19 +399,19 @@ export default function AdminStudents() {
             {selectedStudent && (
               <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                 <div>
-                   <p className="text-red-600 font-medium">هل أنت متأكد من حذف حساب الطالب <strong>{selectedStudent.name}</strong>؟</p>
-                   <p className="text-sm text-gray-600 mt-1">لا يمكن التراجع عن هذا الإجراء.</p>
+                  <p className="text-red-600 font-medium">هل أنت متأكد من حذف حساب الطالب <strong>{selectedStudent.name}</strong>؟</p>
+                  <p className="text-sm text-gray-600 mt-1">لا يمكن التراجع عن هذا الإجراء.</p>
                 </div>
-                
-                 <div className="space-y-2">
-                    <Label htmlFor="delete-reason" className="text-sm">سبب الحذف <span className="text-red-500">*</span></Label>
-                    <Textarea 
-                        id="delete-reason" 
-                        placeholder="يرجى كتابة سبب الحذف..." 
-                        value={deleteReason}
-                        onChange={(e) => setDeleteReason(e.target.value)}
-                        className="bg-white"
-                    />
+
+                <div className="space-y-2">
+                  <Label htmlFor="delete-reason" className="text-sm">سبب الحذف <span className="text-red-500">*</span></Label>
+                  <Textarea
+                    id="delete-reason"
+                    placeholder="يرجى كتابة سبب الحذف..."
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    className="bg-white"
+                  />
                 </div>
               </div>
             )}
@@ -457,8 +422,8 @@ export default function AdminStudents() {
               >
                 إلغاء
               </Button>
-              <Button 
-                onClick={executeAction} 
+              <Button
+                onClick={executeAction}
                 variant="destructive"
                 disabled={deleteReason.length < 5}
               >
@@ -501,15 +466,6 @@ export default function AdminStudents() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-avatar">رابط الصورة الشخصية</Label>
-              <Input
-                id="edit-avatar"
-                value={editForm.avatar}
-                onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
-                placeholder="https://example.com/avatar.jpg"
-              />
-            </div>
-            <div>
               <Label htmlFor="edit-password">كلمة المرور الجديدة</Label>
               <Input
                 id="edit-password"
@@ -518,23 +474,6 @@ export default function AdminStudents() {
                 onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                 placeholder="اتركها فارغة إذا لم ترد التغيير"
               />
-            </div>
-            <div>
-              <Label htmlFor="edit-role">الدور</Label>
-              <Select
-                value={editForm.role}
-                onValueChange={(value) => setEditForm({ ...editForm, role: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر الدور" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student">طالب</SelectItem>
-                  <SelectItem value="trainer">مدرب</SelectItem>
-                  <SelectItem value="institute_admin">مسؤول معهد</SelectItem>
-                  <SelectItem value="platform_admin">مسؤول منصة</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div>
               <Label htmlFor="edit-status">الحالة</Label>
@@ -548,7 +487,6 @@ export default function AdminStudents() {
                 <SelectContent>
                   <SelectItem value="active">نشط</SelectItem>
                   <SelectItem value="suspended">معلق</SelectItem>
-                  <SelectItem value="pending">قيد المراجعة</SelectItem>
                 </SelectContent>
               </Select>
             </div>

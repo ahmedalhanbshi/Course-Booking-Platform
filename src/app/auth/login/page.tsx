@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -14,13 +14,22 @@ import { Loader2, AlertCircle } from "lucide-react"
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { login } = useAuth()
+  const { login, user, isLoading: authLoading } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
+
+  // Check if user just registered
+  const registered = searchParams.get('registered')
+  useEffect(() => {
+    if (registered === 'true') {
+      setSuccessMessage("تم إنشاء حسابك بنجاح! يرجى تسجيل الدخول")
+    }
+  }, [registered])
 
   // Auto-fill for demo purposes if role param exists
   const role = searchParams.get('role')
@@ -31,25 +40,43 @@ export default function LoginPage() {
     if (role === 'admin') setFormData(prev => ({ ...prev, email: 'admin@demo.com', password: '123456' }))
   })
 
+  // Role-based redirection after successful login
+  useEffect(() => {
+    if (user && !authLoading) {
+      // Redirect based on user role from backend
+      switch (user.role) {
+        case 'STUDENT':
+          router.push('/student/dashboard')
+          break
+        case 'TRAINER':
+          router.push('/trainer/dashboard')
+          break
+        case 'INSTITUTE_ADMIN':
+          router.push('/institute/dashboard')
+          break
+        case 'PLATFORM_ADMIN':
+          router.push('/admin/dashboard')
+          break
+        default:
+          router.push('/')
+      }
+    }
+  }, [user, authLoading, router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('Login form submitted', { email: formData.email })
     setIsLoading(true)
     setError("")
 
     try {
-      const success = await login(formData.email, formData.password)
-      if (success) {
-        // Redirect based on role (handled by the context/component logic usually, but here we force it)
-        if (formData.email.includes('student')) router.push('/student/dashboard')
-        else if (formData.email.includes('trainer')) router.push('/trainer/dashboard')
-        else if (formData.email.includes('institute')) router.push('/institute/dashboard')
-        else if (formData.email.includes('admin')) router.push('/admin/dashboard')
-        else router.push('/')
-      } else {
-        setError("البريد الإلكتروني أو كلمة المرور غير صحيحة")
-      }
-    } catch (err) {
-      setError("حدث خطأ أثناء تسجيل الدخول")
+      console.log('Calling login function...')
+      await login(formData.email, formData.password)
+      console.log('Login successful')
+      // Redirect will be handled by useEffect when user state updates
+    } catch (err: any) {
+      console.error('Login error:', err)
+      setError(err?.message || "حدث خطأ أثناء تسجيل الدخول")
     } finally {
       setIsLoading(false)
     }
@@ -66,6 +93,12 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {successMessage && (
+              <Alert className="bg-green-50 text-green-900 border-green-200">
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
+            )}
+
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />

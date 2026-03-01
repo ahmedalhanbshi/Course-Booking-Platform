@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatTime } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ import {
   FileText,
   Globe,
   Heart,
+  Loader2,
   MapPin,
   Tag,
   UploadCloud,
@@ -36,58 +37,23 @@ import {
   X
 } from "lucide-react"
 import { toast } from "sonner"
+import { trainerService, CourseDetail } from "@/lib/trainer-service"
 
-interface CourseScheduleItem {
-  date: string
-  startTime: string
-  endTime: string
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+function resolveImage(src: string | null | undefined): string {
+  if (!src) return "/images/course-web.png"
+  if (src.startsWith("http")) return src
+  const cleanSrc = src.replace(/\\/g, "/")
+  const separator = cleanSrc.startsWith("/") ? "" : "/"
+  return `${API_BASE}${separator}${cleanSrc}`
 }
 
-interface CourseHall {
-  name: string
-  location: string
-}
-
-interface CourseView {
-  id: string
-  title: string
-  category: string
-  shortDescription: string
-  description: string
-  image: string
-  price: number
-  startDate: string
-  endDate: string
-  startTime?: string
-  endTime?: string
-  maxStudents: number
-  deliveryType: "online" | "in_person" | "hybrid" | "capacity_based"
-  onlinePlatform?: string
-  meetingLink?: string
-  surveyLink?: string
-  surveyRequired?: boolean
-  hall?: CourseHall
-  prerequisites: string[]
-  objectives: string[]
-  tags: string[]
-  schedule: CourseScheduleItem[]
-  instructor: {
-    name: string
-    title: string
-    bio: string
-    avatar: string
-    bankName: string
-    iban: string
-    bankAccounts?: Array<{
-      id: string
-      bankName: string
-      iban: string
-      beneficiary: string
-      accountNumber?: string
-    }>
-    email?: string
-    linkedin?: string
-  }
+const deliveryLabels: Record<string, string> = {
+  online: "أونلاين",
+  in_person: "حضوري",
+  hybrid: "مدمج",
+  capacity_based: "تحديد القاعة عند اكتمال العدد"
 }
 
 type RegistrationStatus =
@@ -111,310 +77,27 @@ const steps = [
   { id: 4, label: "تم التسجيل" }
 ]
 
-const coursesDatabase: Record<string, CourseView> = {
-  "6": {
-    id: "6",
-    title: "تحليل البيانات باستخدام SQL",
-    category: "قواعد البيانات",
-    shortDescription: "دورة عملية تركز على مهارات SQL الأساسية والمتقدمة لتحليل البيانات وبناء التقارير.",
-    description:
-      "ستتعلم في هذه الدورة كيفية كتابة استعلامات SQL بكفاءة، وتنظيم البيانات، وبناء تقارير قابلة للمشاركة. الدورة مصممة بأسلوب عملي مع أمثلة واقعية وتمارين قصيرة.",
-    image: "/images/course-web.png",
-    price: 19900,
-    startDate: "2025-02-10",
-    endDate: "2025-03-20",
-    startTime: "18:00",
-    endTime: "20:00",
-    maxStudents: 25,
-    deliveryType: "online",
-    onlinePlatform: "Google Meet",
-    meetingLink: "https://meet.google.com/abc-defg-hij",
-    surveyLink: "https://forms.gle/example-survey",
-    surveyRequired: true,
-    prerequisites: [
-      "معرفة أساسية بالحاسب والإنترنت",
-      "يفضل الإلمام بالمفاهيم العامة للبيانات"
-    ],
-    objectives: [
-      "كتابة استعلامات SQL دقيقة وسريعة",
-      "تنظيم البيانات باستخدام التصفية والتجميع",
-      "إنشاء تقارير بسيطة من البيانات",
-      "قراءة المخططات وفهم العلاقات بين الجداول"
-    ],
-    tags: ["SQL", "تحليل البيانات", "قواعد البيانات"],
-    schedule: [
-      { date: "2025-02-10", startTime: "18:00", endTime: "20:00" },
-      { date: "2025-02-13", startTime: "18:00", endTime: "20:00" },
-      { date: "2025-02-17", startTime: "18:00", endTime: "20:00" }
-    ],
-    instructor: {
-      name: "أحمد محمد",
-      title: "مدرب برمجة – SQL وتحليل البيانات",
-      bio: "خبرة في بناء حلول بيانات عملية وتدريب فرق تقنية على كتابة الاستعلامات وتحليل البيانات.",
-      avatar: "/images/avatar-1.png",
-      bankName: "بنك اليمن الدولي",
-      iban: "YE12 0001 2345 6789 0000 12",
-      bankAccounts: [
-        {
-          id: "ycb",
-          bankName: "بنك اليمن الدولي",
-          iban: "YE12 0001 2345 6789 0000 12",
-          beneficiary: "أحمد محمد",
-          accountNumber: "00123456"
-        },
-        {
-          id: "cby",
-          bankName: "البنك المركزي اليمني",
-          iban: "YE34 0002 9876 5432 1000 98",
-          beneficiary: "أحمد محمد",
-          accountNumber: "76543210"
-        }
-      ],
-      email: "instructor@example.com",
-      linkedin: "https://www.linkedin.com/in/ahmed"
-    }
-  },
-  "1": {
-    id: "1",
-    title: "تعلم React من الصفر",
-    category: "تطوير الويب",
-    shortDescription: "دورة مكثفة لبناء واجهات تفاعلية باستخدام React خطوة بخطوة.",
-    description:
-      "تركز الدورة على بناء أساس قوي في React من خلال تطبيقات صغيرة وتمارين عملية، مع توضيح المفاهيم الأساسية بطريقة مبسطة.",
-    image: "/images/course-web.png",
-    price: 29900,
-    startDate: "2025-02-01",
-    endDate: "2025-03-15",
-    startTime: "19:00",
-    endTime: "21:00",
-    maxStudents: 30,
-    deliveryType: "hybrid",
-    onlinePlatform: "Zoom",
-    meetingLink: "https://zoom.us/j/000000000",
-    surveyLink: "https://forms.gle/example-survey-2",
-    surveyRequired: false,
-    hall: {
-      name: "القاعة التدريبية (ج)",
-      location: "الدور الأول - الجناح الشرقي"
-    },
-    prerequisites: ["أساسيات HTML و CSS", "معرفة عامة بـ JavaScript"],
-    objectives: [
-      "فهم هيكل React ومكونات الواجهة",
-      "بناء مكونات قابلة لإعادة الاستخدام",
-      "إدارة الحالة والتعامل مع الأحداث"
-    ],
-    tags: ["React", "Frontend", "JavaScript"],
-    schedule: [
-      { date: "2025-02-01", startTime: "19:00", endTime: "21:00" },
-      { date: "2025-02-04", startTime: "19:00", endTime: "21:00" }
-    ],
-    instructor: {
-      name: "أحمد محمد",
-      title: "مدرب برمجة – React",
-      bio: "خبرة عملية في تطوير الواجهات وبناء منتجات تعليمية تفاعلية لمؤسسات محلية وعالمية.",
-      avatar: "/images/avatar-1.png",
-      bankName: "بنك اليمن الدولي",
-      iban: "YE12 0001 2345 6789 0000 12",
-      bankAccounts: [
-        {
-          id: "ycb-react",
-          bankName: "بنك اليمن الدولي",
-          iban: "YE12 0001 2345 6789 0000 12",
-          beneficiary: "أحمد محمد",
-          accountNumber: "00123456"
-        },
-        {
-          id: "alqura",
-          bankName: "بنك القُرى الإسلامي",
-          iban: "YE55 0003 1122 3344 5566 77",
-          beneficiary: "أحمد محمد",
-          accountNumber: "99887766"
-        }
-      ],
-      email: "instructor@example.com",
-      linkedin: "https://www.linkedin.com/in/ahmed"
-    }
-  },
-  "2": {
-    id: "2",
-    title: "تصميم واجهات المستخدم الاحترافية",
-    category: "تصميم وجرافيك",
-    shortDescription: "أسس تصميم واجهات واضحة وتجربة مستخدم عملية لمنتجات الويب والتطبيقات.",
-    description:
-      "تغطي الدورة مبادئ التصميم المرئي، بناء الأنظمة المرنة، وتطبيق معايير تجربة المستخدم في مشاريع واقعية.",
-    image: "/images/course-design.png",
-    price: 25000,
-    startDate: "2025-03-05",
-    endDate: "2025-04-10",
-    startTime: "18:00",
-    endTime: "20:00",
-    maxStudents: 24,
-    deliveryType: "online",
-    onlinePlatform: "Google Meet",
-    meetingLink: "https://meet.google.com/ui-ux-design",
-    surveyLink: "https://forms.gle/example-survey-ui",
-    surveyRequired: false,
-    prerequisites: ["معرفة أساسية بالتصميم", "اهتمام بتجربة المستخدم"],
-    objectives: [
-      "تصميم واجهات متوازنة وواضحة",
-      "تحسين تجربة المستخدم عبر تدفقات مبسطة",
-      "بناء مكتبة مكونات قابلة لإعادة الاستخدام"
-    ],
-    tags: ["UI", "UX", "Design"],
-    schedule: [
-      { date: "2025-03-05", startTime: "18:00", endTime: "20:00" },
-      { date: "2025-03-09", startTime: "18:00", endTime: "20:00" },
-      { date: "2025-03-12", startTime: "18:00", endTime: "20:00" }
-    ],
-    instructor: {
-      name: "سارة خالد",
-      title: "مصممة تجربة مستخدم",
-      bio: "خبرة في تصميم منتجات رقمية وتبسيط الرحلات للمستخدمين.",
-      avatar: "/images/avatar-2.png",
-      bankName: "بنك القُرى الإسلامي",
-      iban: "YE55 0003 1122 3344 5566 77",
-      bankAccounts: [
-        {
-          id: "alqura-ui",
-          bankName: "بنك القُرى الإسلامي",
-          iban: "YE55 0003 1122 3344 5566 77",
-          beneficiary: "سارة خالد",
-          accountNumber: "44556677"
-        },
-        {
-          id: "ycb-ui",
-          bankName: "بنك اليمن الدولي",
-          iban: "YE12 0001 2345 6789 0000 12",
-          beneficiary: "سارة خالد",
-          accountNumber: "22334455"
-        }
-      ],
-      email: "sara@example.com",
-      linkedin: "https://www.linkedin.com/in/sara"
-    }
-  },
-  "3": {
-    id: "3",
-    title: "أساسيات تحليل البيانات",
-    category: "إدارة أعمال",
-    shortDescription: "تعلم تحليل البيانات وبناء التقارير لاتخاذ قرارات أفضل.",
-    description:
-      "دورة عملية لبناء مهارات تحليل البيانات باستخدام جداول البيانات وأدوات التصور.",
-    image: "/images/course-web.png",
-    price: 18000,
-    startDate: "2025-03-15",
-    endDate: "2025-04-20",
-    startTime: "19:00",
-    endTime: "21:00",
-    maxStudents: 30,
-    deliveryType: "hybrid",
-    onlinePlatform: "Zoom",
-    meetingLink: "https://zoom.us/j/111222333",
-    surveyLink: "https://forms.gle/example-survey-data",
-    surveyRequired: false,
-    hall: {
-      name: "قاعة التدريب (ب)",
-      location: "الدور الثاني - الجناح الغربي"
-    },
-    prerequisites: ["معرفة أساسية بالجداول", "اهتمام بالأرقام"],
-    objectives: [
-      "تحليل البيانات وبناء مؤشرات",
-      "استخدام جداول محورية",
-      "تصميم تقارير بسيطة"
-    ],
-    tags: ["Data", "Analytics", "Business"],
-    schedule: [
-      { date: "2025-03-15", startTime: "19:00", endTime: "21:00" },
-      { date: "2025-03-18", startTime: "19:00", endTime: "21:00" },
-      { date: "2025-03-22", startTime: "19:00", endTime: "21:00" }
-    ],
-    instructor: {
-      name: "محمد علي",
-      title: "محلل بيانات",
-      bio: "متخصص في التحليل وبناء لوحات البيانات للمؤسسات.",
-      avatar: "/images/avatar-3.png",
-      bankName: "البنك المركزي اليمني",
-      iban: "YE34 0002 9876 5432 1000 98",
-      bankAccounts: [
-        {
-          id: "cby-data",
-          bankName: "البنك المركزي اليمني",
-          iban: "YE34 0002 9876 5432 1000 98",
-          beneficiary: "محمد علي",
-          accountNumber: "88990011"
-        }
-      ],
-      email: "mohamed@example.com",
-      linkedin: "https://www.linkedin.com/in/mohamed"
-    }
-  },
-  "4": {
-    id: "4",
-    title: "إدارة المشاريع بأسلوب عملي",
-    category: "إدارة أعمال",
-    shortDescription: "من التخطيط إلى التنفيذ، تعلم إدارة المشاريع خطوة بخطوة.",
-    description:
-      "يغطي المسار أدوات التخطيط، إدارة المخاطر، والتواصل مع أصحاب المصلحة.",
-    image: "/images/course-abstract.svg",
-    price: 22000,
-    startDate: "2025-04-01",
-    endDate: "2025-05-05",
-    startTime: "17:00",
-    endTime: "19:00",
-    maxStudents: 28,
-    deliveryType: "online",
-    onlinePlatform: "Microsoft Teams",
-    meetingLink: "https://teams.microsoft.com/l/meetup-join/project",
-    surveyLink: "https://forms.gle/example-survey-pm",
-    surveyRequired: false,
-    prerequisites: ["خبرة عامة بالعمل الجماعي"],
-    objectives: [
-      "وضع خطة عمل واضحة",
-      "تحديد المخاطر وإدارتها",
-      "متابعة تقدم الفريق بفعالية"
-    ],
-    tags: ["PM", "Management", "Leadership"],
-    schedule: [
-      { date: "2025-04-01", startTime: "17:00", endTime: "19:00" },
-      { date: "2025-04-05", startTime: "17:00", endTime: "19:00" },
-      { date: "2025-04-08", startTime: "17:00", endTime: "19:00" }
-    ],
-    instructor: {
-      name: "ليلى حسن",
-      title: "مديرة مشاريع",
-      bio: "تقود فرق متعددة التخصصات وتبني خطط تنفيذ عملية.",
-      avatar: "/images/avatar-2.png",
-      bankName: "بنك اليمن الدولي",
-      iban: "YE12 0001 2345 6789 0000 12",
-      bankAccounts: [
-        {
-          id: "ycb-pm",
-          bankName: "بنك اليمن الدولي",
-          iban: "YE12 0001 2345 6789 0000 12",
-          beneficiary: "ليلى حسن",
-          accountNumber: "55443322"
-        }
-      ],
-      email: "layla@example.com",
-      linkedin: "https://www.linkedin.com/in/layla"
-    }
-  }
-}
-
-const deliveryLabels: Record<CourseView["deliveryType"], string> = {
-  online: "أونلاين",
-  in_person: "حضوري",
-  hybrid: "مدمج",
-  capacity_based: "تحديد القاعة عند اكتمال العدد"
-}
-
 export default function CourseDetailsPage() {
   const { user } = useAuth()
   const params = useParams()
   const router = useRouter()
-  const courseId = typeof params.id === "string" ? params.id : "6"
-  const course = coursesDatabase[courseId] ?? coursesDatabase["6"]
+  const courseId = typeof params.id === "string" ? params.id : ""
 
+  // ── Real data fetching ───────────────────────────────────────────────────────
+  const [course, setCourse] = useState<CourseDetail | null>(null)
+  const [courseLoading, setCourseLoading] = useState(true)
+  const [courseError, setCourseError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!courseId) return
+    setCourseLoading(true)
+    trainerService
+      .getPublicCourseById(courseId)
+      .then(setCourse)
+      .catch(() => setCourseError("الدورة غير موجودة أو غير متاحة"))
+      .finally(() => setCourseLoading(false))
+  }, [courseId])
+  // ────────────────────────────────────────────────────────────────────────────
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -446,20 +129,18 @@ export default function CourseDetailsPage() {
   const [registrationId, setRegistrationId] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
 
-  const shouldShowSurvey = Boolean(course.surveyLink)
-  const bankAccounts = useMemo(() => {
-    if (course.instructor.bankAccounts?.length) {
-      return course.instructor.bankAccounts
+  // surveyLink and bank accounts are not in the DB model yet
+  const shouldShowSurvey = false
+  const bankAccounts = useMemo(() => [
+    {
+      id: "primary",
+      bankName: "—",
+      iban: "—",
+      accountNumber: "—",
+      beneficiary: course?.instructor?.name ?? "—"
     }
-    return [
-      {
-        id: "primary",
-        bankName: course.instructor.bankName,
-        iban: course.instructor.iban,
-        beneficiary: course.instructor.name
-      }
-    ]
-  }, [course.instructor])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [course?.instructor?.name])
 
   const formatFileSize = (size?: number) => {
     if (!size || Number.isNaN(size)) return ""
@@ -563,11 +244,11 @@ export default function CourseDetailsPage() {
 
   const toggleFavorite = () => {
     const favorites = readFavorites()
-    const nextFavorites = favorites.includes(course.id)
-      ? favorites.filter((id) => id !== course.id)
-      : [...favorites, course.id]
+    const nextFavorites = favorites.includes(course?.id ?? "")
+      ? favorites.filter((id) => id !== course?.id)
+      : [...favorites, course?.id ?? ""]
     writeFavorites(nextFavorites)
-    setIsFavorite(nextFavorites.includes(course.id))
+    setIsFavorite(nextFavorites.includes(course?.id ?? ""))
   }
 
   const handleReceiptFile = (file: File | null) => {
@@ -609,7 +290,7 @@ export default function CourseDetailsPage() {
   }
 
   const saveEnrollment = () => {
-    if (typeof window === "undefined") return
+    if (!course || typeof window === "undefined") return
     try {
       const stored = window.localStorage.getItem(ENROLLMENTS_KEY)
       const list = stored ? (JSON.parse(stored) as any[]) : []
@@ -982,7 +663,7 @@ export default function CourseDetailsPage() {
   useEffect(() => {
     const syncFavorite = () => {
       const favorites = readFavorites()
-      setIsFavorite(favorites.includes(course.id))
+      setIsFavorite(favorites.includes(course?.id ?? ""))
     }
 
     syncFavorite()
@@ -995,31 +676,31 @@ export default function CourseDetailsPage() {
       window.removeEventListener("favorites-updated", handleUpdate)
       window.removeEventListener("storage", handleUpdate)
     }
-  }, [course.id])
+  }, [course?.id])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
-    if (reduceMotion.matches) return
-
-    const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"))
-    if (!elements.length) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-revealed")
-            observer.unobserve(entry.target)
-          }
-        })
-      },
-      { threshold: 0.15 }
-    )
-
-    elements.forEach((element) => observer.observe(element))
-    return () => observer.disconnect()
+    // We removed the IntersectionObserver logic and replaced it with pure CSS animations
+    // to prevent race conditions that keep cards hidden.
   }, [])
+  // ── Loading / error guards ───────────────────────────────────────────────
+  if (courseLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="text-lg">جاري تحميل تفاصيل الدورة...</span>
+      </div>
+    )
+  }
+
+  if (courseError || !course) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-gray-500">
+        <p className="text-xl">{courseError ?? "الدورة غير موجودة"}</p>
+        <Button variant="outline" onClick={() => router.back()}>العودة</Button>
+      </div>
+    )
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1061,83 +742,72 @@ export default function CourseDetailsPage() {
                     {formatDate(course.startDate)} - {formatDate(course.endDate)}
                   </span>
                 </div>
-                {(course.startTime || course.endTime) && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {course.startTime ?? ""} {course.endTime ? `- ${course.endTime}` : ""}
-                    </span>
-                  </div>
-                )}
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   <span>المقاعد المتاحة: {course.maxStudents}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {course.deliveryType === "online" ? <Globe className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
-                  <span>{deliveryLabels[course.deliveryType]}</span>
+                  {course.deliveryType === "online" || course.deliveryType === "hybrid" ? <Globe className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                  <span>{deliveryLabels[course.deliveryType] ?? course.deliveryType}</span>
                 </div>
-                {course.onlinePlatform && (
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    <span>المنصة: {course.onlinePlatform}</span>
-                  </div>
-                )}
-                {course.hall && (
+                {course.sessions[0]?.room && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    <span>{course.hall.name}</span>
+                    <span>{course.sessions[0].room.name}</span>
                   </div>
                 )}
               </div>
-              {(course.meetingLink ||
-                registrationStatus === "PAYMENT_PENDING" ||
-                registrationStatus === "PENDING_APPROVAL" ||
-                registrationStatus === "PAYMENT_REJECTED") && (
-                <div className="flex flex-wrap items-center gap-4">
-                  {course.meetingLink && (
-                    <a
-                      href={course.meetingLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-200 underline underline-offset-4 self-start"
-                    >
-                      رابط الاجتماع
-                    </a>
-                  )}
-                  {registrationStatus === "PENDING_APPROVAL" && (
-                    <button
-                      type="button"
-                      onClick={handleTrainerApprovalSimulation}
-                      disabled={isUpdatingStatus}
-                      className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
-                    >
-                      محاكاة الموافقة المبدئية
-                    </button>
-                  )}
-                  {registrationStatus === "PAYMENT_PENDING" && (
-                    <button
-                      type="button"
-                      onClick={handlePaymentApprovalSimulation}
-                      disabled={isUpdatingStatus}
-                      className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
-                    >
-                      محاكاة تأكيد الدفع
-                    </button>
-                  )}
-                  {registrationStatus === "PAYMENT_PENDING" && (
-                    <button
-                      type="button"
-                      onClick={handlePaymentRejectionSimulation}
-                      className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white"
-                    >
-                      محاكاة رفض الدفع
-                    </button>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const firstMeetingLink = course.sessions.find(s => s.meetingLink)?.meetingLink
+                return (firstMeetingLink ||
+                  registrationStatus === "PAYMENT_PENDING" ||
+                  registrationStatus === "PENDING_APPROVAL" ||
+                  registrationStatus === "PAYMENT_REJECTED") && (
+                    <div className="flex flex-wrap items-center gap-4">
+                      {firstMeetingLink && (
+                        <a
+                          href={firstMeetingLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-200 underline underline-offset-4 self-start"
+                        >
+                          رابط الاجتماع
+                        </a>
+                      )}
+                      {registrationStatus === "PENDING_APPROVAL" && (
+                        <button
+                          type="button"
+                          onClick={handleTrainerApprovalSimulation}
+                          disabled={isUpdatingStatus}
+                          className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
+                        >
+                          محاكاة الموافقة المبدئية
+                        </button>
+                      )}
+                      {registrationStatus === "PAYMENT_PENDING" && (
+                        <button
+                          type="button"
+                          onClick={handlePaymentApprovalSimulation}
+                          disabled={isUpdatingStatus}
+                          className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
+                        >
+                          محاكاة تأكيد الدفع
+                        </button>
+                      )}
+                      {registrationStatus === "PAYMENT_PENDING" && (
+                        <button
+                          type="button"
+                          onClick={handlePaymentRejectionSimulation}
+                          className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white"
+                        >
+                          محاكاة رفض الدفع
+                        </button>
+                      )}
+                    </div>
+                  )
+              })()}
               <div className="flex flex-wrap gap-2">
-                {course.tags.map((tag) => (
+                {(course.tags ?? []).map((tag) => (
                   <Badge
                     key={tag}
                     variant="secondary"
@@ -1149,68 +819,68 @@ export default function CourseDetailsPage() {
                 ))}
               </div>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              {registrationStatus === "NONE" && (
-                <Button
-                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
-                  onClick={() => openRegistrationDialog("create")}
-                >
-                  التسجيل
-                </Button>
-              )}
-              {registrationStatus === "PENDING_APPROVAL" && (
-                <Button
-                  variant="outline"
-                  disabled
-                  className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
-                >
-                  تم التسجيل مبدئيًا
-                </Button>
-              )}
-              {registrationStatus === "REJECTED" && (
-                <Button
-                  variant="outline"
-                  className="w-full rounded-full border-white/60 bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                  onClick={() => openRegistrationDialog("edit")}
-                >
-                  تعديل التسجيل المبدئي
-                </Button>
-              )}
-              {registrationStatus === "APPROVED" && (
-                <Button
-                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                  onClick={() => setIsPaymentDialogOpen(true)}
-                >
-                  تأكيد الدفع
-                </Button>
-              )}
-              {registrationStatus === "PAYMENT_PENDING" && (
-                <Button
-                  variant="outline"
-                  disabled
-                  className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
-                >
-                  تم إرسال الدفع
-                </Button>
-              )}
-              {registrationStatus === "PAYMENT_REJECTED" && (
-                <Button
-                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                  onClick={() => setIsPaymentDialogOpen(true)}
-                >
-                  تعديل سند الدفع
-                </Button>
-              )}
-              {registrationStatus === "ENROLLED" && (
-                <Button
-                  className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                  onClick={() => {
-                    saveEnrollment()
-                    router.push(`/student/courses/${courseId}`)
-                  }}
-                >
-                  الانتقال إلى الدورة
-                </Button>
-              )}
+                {registrationStatus === "NONE" && (
+                  <Button
+                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
+                    onClick={() => openRegistrationDialog("create")}
+                  >
+                    التسجيل
+                  </Button>
+                )}
+                {registrationStatus === "PENDING_APPROVAL" && (
+                  <Button
+                    variant="outline"
+                    disabled
+                    className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                  >
+                    تم التسجيل مبدئيًا
+                  </Button>
+                )}
+                {registrationStatus === "REJECTED" && (
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-full border-white/60 bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                    onClick={() => openRegistrationDialog("edit")}
+                  >
+                    تعديل التسجيل المبدئي
+                  </Button>
+                )}
+                {registrationStatus === "APPROVED" && (
+                  <Button
+                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                    onClick={() => setIsPaymentDialogOpen(true)}
+                  >
+                    تأكيد الدفع
+                  </Button>
+                )}
+                {registrationStatus === "PAYMENT_PENDING" && (
+                  <Button
+                    variant="outline"
+                    disabled
+                    className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                  >
+                    تم إرسال الدفع
+                  </Button>
+                )}
+                {registrationStatus === "PAYMENT_REJECTED" && (
+                  <Button
+                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                    onClick={() => setIsPaymentDialogOpen(true)}
+                  >
+                    تعديل سند الدفع
+                  </Button>
+                )}
+                {registrationStatus === "ENROLLED" && (
+                  <Button
+                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                    onClick={() => {
+                      saveEnrollment()
+                      router.push(`/student/courses/${courseId}`)
+                    }}
+                  >
+                    الانتقال إلى الدورة
+                  </Button>
+                )}
                 <DialogContent
                   dir="rtl"
                   className="[&>button[data-dialog-close='default']]:hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4"
@@ -1248,64 +918,64 @@ export default function CourseDetailsPage() {
                       </div>
                     </div>
                   ) : (
-                  <div className="space-y-4 py-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">الاسم الكامل</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="اكتب اسمك"
-                      />
-                      {formErrors.name && (
-                        <p className="text-xs text-red-500 text-right">{formErrors.name}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">البريد الإلكتروني</Label>
-                      <Input
-                        id="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="name@email.com"
-                      />
-                      {formErrors.email && (
-                        <p className="text-xs text-red-500 text-right">{formErrors.email}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">رقم الهاتف</Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="05xxxxxxxx"
-                      />
-                      {formErrors.phone && (
-                        <p className="text-xs text-red-500 text-right">{formErrors.phone}</p>
-                      )}
-                    </div>
-                    {shouldShowSurvey && (
+                    <div className="space-y-4 py-2">
                       <div className="space-y-2">
-                        <Label>الاستبيان (اختياري)</Label>
-                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3">
-                          <p className="text-sm text-slate-600">
-                          الاستبيان اختياري، لكنه يساعدنا في تحسين تجربتك التعليمية.
-                          </p>
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="h-9 rounded-full px-4"
-                          >
-                            <a href={course.surveyLink} target="_blank" rel="noopener noreferrer">
-                              فتح الاستبيان
-                            </a>
-                          </Button>
-                        </div>
+                        <Label htmlFor="name">الاسم الكامل</Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="اكتب اسمك"
+                        />
+                        {formErrors.name && (
+                          <p className="text-xs text-red-500 text-right">{formErrors.name}</p>
+                        )}
                       </div>
-                    )}
-                  </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">البريد الإلكتروني</Label>
+                        <Input
+                          id="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="name@email.com"
+                        />
+                        {formErrors.email && (
+                          <p className="text-xs text-red-500 text-right">{formErrors.email}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">رقم الهاتف</Label>
+                        <Input
+                          id="phone"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="05xxxxxxxx"
+                        />
+                        {formErrors.phone && (
+                          <p className="text-xs text-red-500 text-right">{formErrors.phone}</p>
+                        )}
+                      </div>
+                      {shouldShowSurvey && (
+                        <div className="space-y-2">
+                          <Label>الاستبيان (اختياري)</Label>
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3">
+                            <p className="text-sm text-slate-600">
+                              الاستبيان اختياري، لكنه يساعدنا في تحسين تجربتك التعليمية.
+                            </p>
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              className="h-9 rounded-full px-4"
+                            >
+                              <a href="#" target="_blank" rel="noopener noreferrer">
+                                فتح الاستبيان
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                   <DialogFooter>
                     <Button
@@ -1352,11 +1022,10 @@ export default function CourseDetailsPage() {
                 <div
                   key={registrationStatus}
                   dir="rtl"
-                  className={`mt-4 rounded-2xl border p-4 text-right text-sm backdrop-blur animate-stepper-reveal ${
-                    registrationStatus === "PENDING_APPROVAL"
-                      ? "border-white/10 bg-white/5 text-white/70 shadow-none opacity-75"
-                      : "border-white/15 bg-white/10 text-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
-                  }`}
+                  className={`mt-4 rounded-2xl border p-4 text-right text-sm backdrop-blur animate-stepper-reveal ${registrationStatus === "PENDING_APPROVAL"
+                    ? "border-white/10 bg-white/5 text-white/70 shadow-none opacity-75"
+                    : "border-white/15 bg-white/10 text-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
+                    }`}
                 >
                   <div className="relative flex flex-nowrap items-start gap-0 overflow-x-auto pb-1">
                     {steps.map((step, index) => {
@@ -1375,9 +1044,8 @@ export default function CourseDetailsPage() {
                         <Fragment key={step.id}>
                           <div className="relative z-10 flex min-w-[88px] flex-col items-center text-center">
                             <div
-                              className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all duration-300 ease-in-out ${circleClass} ${
-                                state === "active" ? "animate-stepper-pop" : ""
-                              }`}
+                              className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all duration-300 ease-in-out ${circleClass} ${state === "active" ? "animate-stepper-pop" : ""
+                                }`}
                             >
                               {state === "completed" && <Check className="h-4 w-4" />}
                               {state === "rejected" && <X className="h-4 w-4" />}
@@ -1410,22 +1078,21 @@ export default function CourseDetailsPage() {
                 onClick={toggleFavorite}
                 aria-label="إضافة إلى المفضلة"
                 aria-pressed={isFavorite}
-                className={`absolute left-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 text-slate-200 backdrop-blur transition-all duration-200 hover:scale-105 hover:text-white ${
-                  isFavorite ? "text-red-500 hover:text-red-500" : ""
-                }`}
+                className={`absolute left-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 text-slate-200 backdrop-blur transition-all duration-200 hover:scale-105 hover:text-white ${isFavorite ? "text-red-500 hover:text-red-500" : ""
+                  }`}
               >
                 <Heart
-                  className={`h-5 w-5 transition-all duration-200 ${
-                    isFavorite ? "fill-current scale-110" : ""
-                  }`}
+                  className={`h-5 w-5 transition-all duration-200 ${isFavorite ? "fill-current scale-110" : ""
+                    }`}
                 />
               </button>
               <Image
-                src={course.image}
+                src={resolveImage(course.image)}
                 alt={course.title}
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 360px, 420px"
+                unoptimized={true}
               />
             </div>
           </div>
@@ -1447,98 +1114,107 @@ export default function CourseDetailsPage() {
             <div className="flex items-start gap-4">
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200">
                 <Image
-                  src={course.instructor.avatar}
+                  src={resolveImage(course.instructor.avatar)}
                   alt={course.instructor.name}
                   fill
                   className="object-cover"
+                  unoptimized={true}
                 />
               </div>
               <div className="space-y-1">
                 <h4 className="text-lg font-bold text-slate-900">
                   {course.instructor.name}
                 </h4>
-                <p className="text-sm text-slate-600">{course.instructor.title}</p>
-                <p className="text-sm text-slate-500 line-clamp-2 max-w-[560px]">
-                  {course.instructor.bio}
-                </p>
+                {course.instructor.bio && (
+                  <p className="text-sm text-slate-500 line-clamp-2 max-w-[560px]">
+                    {course.instructor.bio}
+                  </p>
+                )}
               </div>
             </div>
           </div>
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
-            <Card
-              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
-              data-reveal
-              style={{ "--reveal-delay": "0ms" } as CSSProperties}
-            >
-              <CardHeader>
-                <CardTitle>عن الدورة</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm leading-7 text-slate-700">
-                {course.description}
-              </CardContent>
-            </Card>
+          <Card
+            className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+            data-reveal
+            style={{ "--reveal-delay": "0ms" } as CSSProperties}
+          >
+            <CardHeader>
+              <CardTitle>عن الدورة</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm leading-7 text-slate-700">
+              {course.description}
+            </CardContent>
+          </Card>
 
-            <Card
-              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
-              data-reveal
-              style={{ "--reveal-delay": "100ms" } as CSSProperties}
-            >
-              <CardHeader>
-                <CardTitle>أهداف الدورة</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 text-sm">
-                {course.objectives.map((item) => (
-                  <div key={item} className="flex items-start gap-2">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-blue-600" />
-                    <span className="text-slate-700">{item}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+          <Card
+            className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+            data-reveal
+            style={{ "--reveal-delay": "100ms" } as CSSProperties}
+          >
+            <CardHeader>
+              <CardTitle>أهداف الدورة</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 text-sm">
+              {(course.objectives ?? []).map((item) => (
+                <div key={item} className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-blue-600" />
+                  <span className="text-slate-700">{item}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-            <Card
-              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
-              data-reveal
-              style={{ "--reveal-delay": "200ms" } as CSSProperties}
-            >
-              <CardHeader>
-                <CardTitle>المتطلبات</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {course.prerequisites.map((item) => (
-                  <div key={item} className="flex items-start gap-2">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
-                    <span className="text-slate-700">{item}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+          <Card
+            className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+            data-reveal
+            style={{ "--reveal-delay": "200ms" } as CSSProperties}
+          >
+            <CardHeader>
+              <CardTitle>المتطلبات</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {(course.prerequisites ?? []).map((item) => (
+                <div key={item} className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+                  <span className="text-slate-700">{item}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-            <Card
-              className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
-              data-reveal
-              style={{ "--reveal-delay": "300ms" } as CSSProperties}
-            >
-              <CardHeader>
-                <CardTitle>الجدول الزمني</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {course.schedule.map((item, index) => (
-                  <div key={`${item.date}-${index}`} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Calendar className="h-4 w-4 text-blue-600" />
-                      <span>{formatDate(item.date)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Clock className="h-4 w-4" />
-                      <span>{item.startTime} - {item.endTime}</span>
-                    </div>
+          <Card
+            className="h-full transition-shadow duration-200 hover:shadow-md reveal-card"
+            data-reveal
+            style={{ "--reveal-delay": "300ms" } as CSSProperties}
+          >
+            <CardHeader>
+              <CardTitle>الجدول الزمني</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(course.sessions ?? []).map((item, index) => (
+                <div key={`${item.id}-${index}`} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <span>{formatDate(item.startTime)}</span>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {new Date(item.startTime).toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}
+                      {" - "}
+                      {new Date(item.endTime).toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  {item.topic && (
+                    <div className="text-slate-500">{item.topic}</div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
 
       </div>
@@ -1580,9 +1256,8 @@ export default function CourseDetailsPage() {
                     handleReceiptFile(file)
                   }}
                   onClick={() => paymentFileRef.current?.click()}
-                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${
-                    isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
-                  }`}
+                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
+                    }`}
                 >
                   <UploadCloud className="h-6 w-6 text-blue-600" />
                   <span className="font-medium text-slate-700">اسحب الملف هنا</span>
@@ -1674,9 +1349,8 @@ export default function CourseDetailsPage() {
                             {bank.bankName}
                           </span>
                           <ChevronDown
-                            className={`h-4 w-4 text-slate-400 transition-transform ${
-                              isOpen ? "rotate-180" : ""
-                            }`}
+                            className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""
+                              }`}
                           />
                         </button>
                         {isOpen && (
@@ -1766,17 +1440,17 @@ export default function CourseDetailsPage() {
           animation: image-reveal 320ms ease-out 1;
         }
 
-        .reveal-card {
-          opacity: 0;
-          transform: translateY(12px);
-          transition: opacity 260ms ease, transform 260ms ease, box-shadow 200ms ease;
-          transition-delay: var(--reveal-delay, 0ms);
+        @keyframes reveal {
+          0% { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
 
-        .reveal-card.is-revealed {
-          opacity: 1;
-          transform: translateY(0);
+        .reveal-card {
+          animation: reveal 400ms ease forwards;
+          animation-delay: var(--reveal-delay, 0ms);
+          opacity: 0; /* starts hidden, animation makes it visible */
         }
+
 
         @keyframes stepper-reveal {
           0% {
@@ -1806,8 +1480,7 @@ export default function CourseDetailsPage() {
         @media (prefers-reduced-motion: reduce) {
           .reveal-card {
             opacity: 1;
-            transform: none;
-            transition: none;
+            animation: none;
           }
           .animate-cta-pop,
           .animate-image-reveal {
@@ -1815,6 +1488,6 @@ export default function CourseDetailsPage() {
           }
         }
       `}</style>
-    </div>
+    </div >
   )
 }

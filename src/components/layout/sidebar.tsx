@@ -74,6 +74,7 @@ const instituteAdminMenuItems = [
 
 const platformAdminMenuItems = [
   { href: "/admin/dashboard", label: "لوحة التحكم", icon: Home },
+  { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield },
   { href: "/admin/institutes", label: "إدارة المعاهد", icon: Building },
   { href: "/admin/trainers", label: "إدارة المدربين", icon: UserCheck },
   { href: "/admin/students", label: "إدارة الطلاب", icon: Users },
@@ -87,10 +88,10 @@ export function Sidebar({ role, className }: SidebarProps) {
 
   const getMenuItems = () => {
     switch (role) {
-      case 'student': return studentMenuItems
-      case 'trainer': return trainerMenuItems
-      case 'institute_admin': return instituteAdminMenuItems
-      case 'platform_admin': return platformAdminMenuItems
+      case 'STUDENT': return studentMenuItems
+      case 'TRAINER': return trainerMenuItems
+      case 'INSTITUTE_ADMIN': return instituteAdminMenuItems
+      case 'PLATFORM_ADMIN': return platformAdminMenuItems
       default: return []
     }
   }

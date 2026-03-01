@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,214 +10,164 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, CheckCircle, XCircle, UserCheck, BookOpen, Trash2, Edit, AlertTriangle, Users } from "lucide-react"
-import { User } from "@/types"
-import { formatDate } from "@/lib/utils"
+import { Eye, CheckCircle, XCircle, UserCheck, BookOpen, Trash2, Edit, AlertTriangle, Users, FileText } from "lucide-react"
+import { formatDate, getFileUrl } from "@/lib/utils"
 import { AdminPageHeader } from "@/components/admin/page-header"
+import { adminService } from "@/lib/admin-service"
 
-// Mock data
-const mockTrainers: User[] = [
-  {
-    id: "trainer1",
-    name: "فاطمة علي",
-    email: "fatima@example.com",
-    phone: "0501234567",
-    role: "trainer",
-    status: "approved",
-    avatar: "/avatars/fatima.jpg",
-    createdAt: new Date("2023-01-15"),
-    trainerProfile: {
-      id: "tp1",
-      userId: "trainer1",
-      bio: "مدربة متخصصة في تطوير الويب",
-      specialties: ["React", "Node.js", "TypeScript"],
-      rating: 4.5
-    }
-  },
-  {
-    id: "trainer2",
-    name: "محمد أحمد",
-    email: "mohamed@example.com",
-    phone: "0507654321",
-    role: "trainer",
-    status: "pending",
-    avatar: "/avatars/mohamed.jpg",
-    createdAt: new Date("2023-03-20"),
-    trainerProfile: {
-      id: "tp2",
-      userId: "trainer2",
-      bio: "خبير في الذكاء الاصطناعي",
-      specialties: ["Python", "Machine Learning", "AI"],
-      rating: 4.8
-    }
-  },
-  {
-    id: "trainer3",
-    name: "سارة خالد",
-    email: "sara@example.com",
-    phone: "0509876543",
-    role: "trainer",
-    status: "suspended",
-    avatar: "/avatars/sara.jpg",
-    createdAt: new Date("2023-06-10"),
-    trainerProfile: {
-      id: "tp3",
-      userId: "trainer3",
-      bio: "مدربة تصميم جرافيك",
-      specialties: ["Photoshop", "Illustrator", "UI/UX"],
-      rating: 4.2
-    }
-  },
-  {
-    id: "trainer4",
-    name: "أحمد حسن",
-    email: "ahmed.h@example.com",
-    phone: "0501122334",
-    role: "trainer",
-    status: "rejected",
-    avatar: "/avatars/ahmed.jpg",
-    createdAt: new Date("2023-09-05"),
-    trainerProfile: {
-      id: "tp4",
-      userId: "trainer4",
-      bio: "خبير أمن سيبراني",
-      specialties: ["Cyber Security", "Network Security"],
-      rating: 4.6
-    }
+interface TrainerData {
+  id: string
+  userId: string
+  bio: string | null
+  cvUrl: string | null
+  specialties: string[]
+  certificatesUrls: string[]
+  verificationStatus: string
+  status: string
+  name: string
+  email: string
+  phone: string | null
+  createdAt: string
+  user: {
+    id: string
+    name: string
+    email: string
+    phone: string | null
+    createdAt: string
   }
-]
+}
 
-const mockTrainerStats = [
-  { id: "trainer1", coursesCount: 3, studentsCount: 45, averageRating: 4.5 },
-  { id: "trainer2", coursesCount: 2, studentsCount: 32, averageRating: 4.8 },
-  { id: "trainer3", coursesCount: 1, studentsCount: 18, averageRating: 4.2 },
-  { id: "trainer4", coursesCount: 4, studentsCount: 67, averageRating: 4.6 }
-]
+import { useSearchParams } from "next/navigation"
 
 export default function AdminTrainers() {
-  const [trainers, setTrainers] = useState<User[]>(mockTrainers)
-  const [selectedTrainer, setSelectedTrainer] = useState<User | null>(null)
-  const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'view' | 'suspend' | 'activate' | 'delete' | 'edit' | 'approve' | 'reject' | null }>({
+  const searchParams = useSearchParams()
+  const viewId = searchParams.get('view')
+
+  const [trainers, setTrainers] = useState<TrainerData[]>([])
+  const [selectedTrainer, setSelectedTrainer] = useState<TrainerData | null>(null)
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; type: 'view' | 'approve' | 'reject' | 'edit' | null }>({
     open: false,
     type: null
   })
-  const [deleteReason, setDeleteReason] = useState("")
   const [actionReason, setActionReason] = useState("")
-  const [editForm, setEditForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    bio: "",
-    specialties: "",
-    status: "active",
-    avatar: "",
-    password: ""
-  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+
+  const [editForm, setEditForm] = useState<any>(null)
+
+  useEffect(() => {
+    loadTrainers()
+  }, [])
+
+  useEffect(() => {
+    if (!loading && viewId && trainers.length > 0) {
+      const trainer = trainers.find(t => t.id === viewId)
+      if (trainer) {
+        handleViewTrainer(trainer)
+      }
+    }
+  }, [loading, trainers, viewId])
+
+  const loadTrainers = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const data = await adminService.getAllTrainers()
+      setTrainers(data)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل تحميل البيانات")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Handlers
-  const handleViewTrainer = (trainer: User) => {
+  const handleViewTrainer = (trainer: TrainerData) => {
     setSelectedTrainer(trainer)
     setActionDialog({ open: true, type: 'view' })
   }
 
-  const handleSuspendTrainer = (trainer: User) => {
+  const handleEditTrainer = (trainer: TrainerData) => {
     setSelectedTrainer(trainer)
-    setActionReason("")
-    setActionDialog({ open: true, type: 'suspend' })
+    setEditForm({
+      name: trainer.name || trainer.user.name || "",
+      email: trainer.email || trainer.user.email || "",
+      phone: trainer.phone || trainer.user.phone || "",
+      bio: trainer.bio || "",
+      status: trainer.status || ""
+    })
+    setActionDialog({ open: true, type: 'edit' })
   }
 
-  const handleActivateTrainer = (trainer: User) => {
-    setSelectedTrainer(trainer)
-    setActionDialog({ open: true, type: 'activate' })
-  }
-
-  const handleApproveTrainer = (trainer: User) => {
+  const handleApproveTrainer = (trainer: TrainerData) => {
     setSelectedTrainer(trainer)
     setActionDialog({ open: true, type: 'approve' })
   }
 
-  const handleRejectTrainer = (trainer: User) => {
+  const handleRejectTrainer = (trainer: TrainerData) => {
     setSelectedTrainer(trainer)
     setActionReason("")
     setActionDialog({ open: true, type: 'reject' })
   }
 
-  const handleDeleteTrainer = (trainer: User) => {
-    setSelectedTrainer(trainer)
-    setDeleteReason("")
-    setActionDialog({ open: true, type: 'delete' })
-  }
-
-  const handleEditTrainer = (trainer: User) => {
-    setSelectedTrainer(trainer)
-    setEditForm({
-      name: trainer.name,
-      email: trainer.email,
-      phone: trainer.phone || "",
-      bio: trainer.trainerProfile?.bio || "",
-      specialties: trainer.trainerProfile?.specialties.join(", ") || "",
-      status: trainer.status || "active",
-      avatar: trainer.avatar || "",
-      password: ""
-    })
-    setActionDialog({ open: true, type: 'edit' })
-  }
-
-  const executeAction = () => {
+  const executeAction = async () => {
     if (!selectedTrainer) return
 
-    if (actionDialog.type === 'delete') {
-      console.log(`Deleting trainer ${selectedTrainer.id} with reason: ${deleteReason}`)
-      setTrainers(trainers.filter(t => t.id !== selectedTrainer.id))
-    } else if (actionDialog.type === 'edit') {
-      setTrainers(trainers.map(t => {
-        if (t.id === selectedTrainer.id) {
-          return {
-            ...t,
-            name: editForm.name,
-            email: editForm.email,
-            phone: editForm.phone,
-            status: editForm.status as any,
-            avatar: editForm.avatar,
-            trainerProfile: t.trainerProfile ? {
-              ...t.trainerProfile,
-              bio: editForm.bio,
-              specialties: editForm.specialties.split(",").map(s => s.trim()).filter(Boolean)
-            } : undefined
-          }
+    try {
+      setError("")
+      setSuccess("")
+
+      if (actionDialog.type === 'approve') {
+        await adminService.approveTrainer(selectedTrainer.id)
+        setSuccess("تم قبول المدرب بنجاح")
+        loadTrainers()
+      } else if (actionDialog.type === 'reject') {
+        if (!actionReason || actionReason.trim() === "") {
+          setError("يجب إدخال سبب الرفض")
+          return
         }
-        return t
-      }))
-    } else if (actionDialog.type === 'suspend') {
-      console.log(`Suspending trainer ${selectedTrainer.id} with reason: ${actionReason}`)
-      setTrainers(trainers.map(t => t.id === selectedTrainer.id ? { ...t, status: 'suspended' } : t))
-    } else if (actionDialog.type === 'activate' || actionDialog.type === 'approve') {
-      setTrainers(trainers.map(t => t.id === selectedTrainer.id ? { ...t, status: 'approved' } : t))
-    } else if (actionDialog.type === 'reject') {
-      console.log(`Rejecting trainer ${selectedTrainer.id} with reason: ${actionReason}`)
-      setTrainers(trainers.map(t => t.id === selectedTrainer.id ? { ...t, status: 'rejected' } : t))
-    }
+        await adminService.rejectTrainer(selectedTrainer.id, actionReason)
+        setSuccess("تم رفض المدرب")
+        loadTrainers()
+      } else if (actionDialog.type === 'edit') {
+        await adminService.updateTrainer(selectedTrainer.id, editForm)
+        setSuccess("تم تحديث بيانات المدرب بنجاح")
+        loadTrainers()
+      }
 
-    setActionDialog({ open: false, type: null })
-    setSelectedTrainer(null)
-  }
-
-  const getTrainerStats = (trainerId: string) => {
-    return mockTrainerStats.find(stat => stat.id === trainerId) || {
-      coursesCount: 0,
-      studentsCount: 0,
-      averageRating: 0
+      setActionDialog({ open: false, type: null })
+      setSelectedTrainer(null)
+      setActionReason("")
+      setEditForm(null)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "فشل تنفيذ العملية")
     }
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved': return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">معتمد</Badge>
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">قيد المراجعة</Badge>
-      case 'rejected': return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">مرفوض</Badge>
-      case 'suspended': return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">معلق</Badge>
+      case 'approved': return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">معتمد</Badge>
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">قيد المراجعة</Badge>
+      case 'rejected': return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">مرفوض</Badge>
+      case 'suspended': return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-200">معلق</Badge>
       default: return <Badge variant="secondary">{status}</Badge>
     }
+  }
+
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="إدارة المدربين"
+          description="مراجعة واعتماد طلبات المدربين الجدد وإدارة الحسابات الحالية"
+        />
+        <div className="flex items-center justify-center p-12">
+          <p className="text-lg">جاري التحميل...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -227,16 +177,45 @@ export default function AdminTrainers() {
         description="مراجعة واعتماد طلبات المدربين الجدد وإدارة الحسابات الحالية"
       />
 
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-red-800">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {success && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <p className="text-green-800">{success}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المدربين</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{trainers.length}</div>
             <p className="text-xs text-muted-foreground">مدرب مسجل</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">المدربين النشطين</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {trainers.filter(t => t.verificationStatus === 'approved').length}
+            </div>
+            <p className="text-xs text-muted-foreground">حساب معتمد</p>
           </CardContent>
         </Card>
 
@@ -247,22 +226,9 @@ export default function AdminTrainers() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {trainers.filter(t => t.status === 'pending').length}
+              {trainers.filter(t => t.verificationStatus === 'pending').length}
             </div>
             <p className="text-xs text-muted-foreground">في انتظار الاعتماد</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الدورات</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {mockTrainerStats.reduce((sum, stat) => sum + stat.coursesCount, 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">دورة تدريبية</p>
           </CardContent>
         </Card>
       </div>
@@ -273,54 +239,38 @@ export default function AdminTrainers() {
           <CardTitle>قائمة المدربين</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>المدرب</TableHead>
-                <TableHead>الدورات</TableHead>
-                <TableHead>الطلاب</TableHead>
-                <TableHead>تاريخ الانضمام</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {trainers.map((trainer) => {
-                const stats = getTrainerStats(trainer.id)
-                return (
+          {trainers.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              لا يوجد مدربين مسجلين
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>المدرب</TableHead>
+                  <TableHead>رقم الهاتف</TableHead>
+                  <TableHead>تاريخ التسجيل</TableHead>
+                  <TableHead>الحالة</TableHead>
+                  <TableHead>الإجراءات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {trainers.map((trainer) => (
                   <TableRow key={trainer.id}>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        {trainer.avatar && (
-                          <img
-                            src={trainer.avatar}
-                            alt={trainer.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        )}
-                        <div>
-                          <div className="font-medium">{trainer.name}</div>
-                          <div className="text-sm text-gray-500">{trainer.email}</div>
-                        </div>
+                      <div>
+                        <div className="font-medium">{trainer.name || trainer.user?.name}</div>
+                        <div className="text-sm text-gray-500">{trainer.email || trainer.user?.email}</div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="h-4 w-4" />
-                        {stats.coursesCount}
-                      </div>
+                      {trainer.phone || trainer.user?.phone || '-'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {stats.studentsCount}
-                      </div>
+                      {formatDate(new Date(trainer.createdAt || trainer.user?.createdAt))}
                     </TableCell>
                     <TableCell>
-                      {formatDate(trainer.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(trainer.status)}
+                      {getStatusBadge(trainer.verificationStatus)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -330,9 +280,8 @@ export default function AdminTrainers() {
                         <Button variant="outline" size="sm" onClick={() => handleEditTrainer(trainer)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        
-                        {/* Verification Workflow Actions */}
-                        {trainer.status === 'pending' && (
+
+                        {trainer.verificationStatus === 'pending' && (
                           <>
                             <Button
                               size="sm"
@@ -353,46 +302,13 @@ export default function AdminTrainers() {
                             </Button>
                           </>
                         )}
-                        
-                        {trainer.status === 'approved' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSuspendTrainer(trainer)}
-                            className="border-orange-300 text-orange-600 hover:bg-orange-50 h-8"
-                          >
-                            <AlertTriangle className="h-4 w-4 mr-1" />
-                            تعليق
-                          </Button>
-                        )}
-
-                        {trainer.status === 'suspended' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleActivateTrainer(trainer)}
-                            className="border-green-300 text-green-600 hover:bg-green-50 h-8"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            تفعيل
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteTrainer(trainer)}
-                          className="border-red-300 text-red-600 hover:bg-red-50 h-8"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -405,57 +321,75 @@ export default function AdminTrainers() {
           {selectedTrainer && (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                  {selectedTrainer.avatar ? (
-                    <img src={selectedTrainer.avatar} alt={selectedTrainer.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <UserCheck className="h-8 w-8 text-gray-600" />
-                  )}
+                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                  <UserCheck className="h-8 w-8 text-gray-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold">{selectedTrainer.name}</h3>
-                  <p className="text-gray-600">{selectedTrainer.email}</p>
+                  <h3 className="text-lg font-semibold">{selectedTrainer.name || selectedTrainer.user.name}</h3>
+                  <p className="text-gray-600">{selectedTrainer.email || selectedTrainer.user.email}</p>
                   <p className="text-sm text-gray-500">
-                    انضم في {formatDate(selectedTrainer.createdAt)}
+                    {selectedTrainer.phone || selectedTrainer.user.phone || 'لا يوجد رقم هاتف'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    انضم في {formatDate(new Date(selectedTrainer.createdAt || selectedTrainer.user.createdAt))}
                   </p>
                   <div className="flex gap-2 mt-2">
-                    {getStatusBadge(selectedTrainer.status)}
+                    {getStatusBadge(selectedTrainer.verificationStatus)}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {getTrainerStats(selectedTrainer.id).coursesCount}
-                      </div>
-                      <div className="text-sm text-gray-600">دورة تدريبية</div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {getTrainerStats(selectedTrainer.id).studentsCount}
-                      </div>
-                      <div className="text-sm text-gray-600">طالب</div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-600">
-                        {getTrainerStats(selectedTrainer.id).averageRating}
-                      </div>
-                      <div className="text-sm text-gray-600">متوسط التقييم</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {selectedTrainer.bio && (
+                <div>
+                  <h4 className="font-semibold mb-2">النبذة:</h4>
+                  <p className="text-gray-700">{selectedTrainer.bio}</p>
+                </div>
+              )}
+
+              {selectedTrainer.specialties && selectedTrainer.specialties.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">التخصصات:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTrainer.specialties.map((specialty, index) => (
+                      <Badge key={index} variant="secondary">{specialty}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedTrainer.cvUrl && (
+                <div>
+                  <h4 className="font-semibold mb-2">السيرة الذاتية:</h4>
+                  <a
+                    href={getFileUrl(selectedTrainer.cvUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-primary hover:underline"
+                  >
+                    <FileText className="h-4 w-4" />
+                    عرض السيرة الذاتية
+                  </a>
+                </div>
+              )}
+
+              {selectedTrainer.certificatesUrls && selectedTrainer.certificatesUrls.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">الشهادات ({selectedTrainer.certificatesUrls.length}):</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTrainer.certificatesUrls.map((url, index) => (
+                      <a
+                        key={index}
+                        href={getFileUrl(url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-sm"
+                      >
+                        شهادة {index + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button onClick={() => setActionDialog({ open: false, type: null })} className="flex-1">
@@ -466,41 +400,77 @@ export default function AdminTrainers() {
           )}
         </DialogContent>
       </Dialog>
-      
-      {/* Suspend Dialog */}
-      <Dialog open={actionDialog.open && actionDialog.type === 'suspend'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
+
+      {/* Edit Trainer Dialog */}
+      <Dialog open={actionDialog.open && actionDialog.type === 'edit'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>تعليق المدرب</DialogTitle>
+            <DialogTitle>تعديل بيانات المدرب</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {selectedTrainer && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p>هل أنت متأكد من تعليق حساب المدرب <strong>{selectedTrainer.name}</strong>؟</p>
-                <p className="text-sm text-gray-600 mt-2">سيتم إيقاف جميع دوراته ومنع الوصول إلى النظام.</p>
+          {editForm && (
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">الاسم</Label>
+                <Input
+                  id="name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
               </div>
-            )}
-            <div>
-              <Label htmlFor="suspend-reason">سبب التعليق</Label>
-              <Textarea
-                id="suspend-reason"
-                placeholder="اكتب سبب تعليق الحساب..."
-                value={actionReason}
-                onChange={(e) => setActionReason(e.target.value)}
-              />
+              <div className="grid gap-2">
+                <Label htmlFor="email">البريد الإلكتروني</Label>
+                <Input
+                  id="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">رقم الهاتف</Label>
+                <Input
+                  id="phone"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">الحالة</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر الحالة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">قيد المراجعة</SelectItem>
+                    <SelectItem value="approved">معتمد</SelectItem>
+                    <SelectItem value="suspended">معلق</SelectItem>
+                    <SelectItem value="rejected">مرفوض</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="bio">النبذة</Label>
+                <Textarea
+                  id="bio"
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                />
+              </div>
             </div>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setActionDialog({ open: false, type: null })}
-              >
-                إلغاء
-              </Button>
-              <Button onClick={executeAction} className="bg-red-600 hover:bg-red-700">
-                تعليق الحساب
-              </Button>
-            </DialogFooter>
-          </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setActionDialog({ open: false, type: null })}
+            >
+              إلغاء
+            </Button>
+            <Button onClick={executeAction} className="bg-blue-600 hover:bg-blue-700">
+              حفظ التغييرات
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -511,9 +481,9 @@ export default function AdminTrainers() {
             <DialogTitle>اعتماد المدرب</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-             {selectedTrainer && (
+            {selectedTrainer && (
               <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-green-800">هل ترغب في اعتماد حساب المدرب <strong>{selectedTrainer.name}</strong>؟</p>
+                <p className="text-green-800">هل ترغب في اعتماد حساب المدرب <strong>{selectedTrainer.name || selectedTrainer.user.name}</strong>؟</p>
                 <p className="text-sm text-green-600 mt-2">سيتم تفعيل الحساب وتمكينه من إضافة الدورات.</p>
               </div>
             )}
@@ -532,19 +502,19 @@ export default function AdminTrainers() {
         </DialogContent>
       </Dialog>
 
-       {/* Reject Dialog */}
-       <Dialog open={actionDialog.open && actionDialog.type === 'reject'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
+      {/* Reject Dialog */}
+      <Dialog open={actionDialog.open && actionDialog.type === 'reject'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>رفض المدرب</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-             {selectedTrainer && (
+            {selectedTrainer && (
               <div className="p-4 bg-red-50 rounded-lg">
-                <p className="text-red-800">هل أنت متأكد من رفض طلب انضمام المدرب <strong>{selectedTrainer.name}</strong>؟</p>
+                <p className="text-red-800">هل أنت متأكد من رفض طلب انضمام المدرب <strong>{selectedTrainer.name || selectedTrainer.user.name}</strong>؟</p>
               </div>
             )}
-             <div>
+            <div>
               <Label htmlFor="reject-reason">سبب الرفض</Label>
               <Textarea
                 id="reject-reason"
@@ -562,150 +532,6 @@ export default function AdminTrainers() {
               </Button>
               <Button onClick={executeAction} variant="destructive">
                 تأكيد الرفض
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-
-      {/* Delete Dialog */}
-      <Dialog open={actionDialog.open && actionDialog.type === 'delete'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>حذف المدرب</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selectedTrainer && (
-              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                <div>
-                   <p className="text-red-600 font-medium">هل أنت متأكد من حذف حساب المدرب <strong>{selectedTrainer.name}</strong>؟</p>
-                   <p className="text-sm text-gray-600 mt-1">لا يمكن التراجع عن هذا الإجراء.</p>
-                </div>
-                
-                 <div className="space-y-2">
-                    <Label htmlFor="delete-reason" className="text-sm">سبب الحذف <span className="text-red-500">*</span></Label>
-                    <Textarea 
-                        id="delete-reason" 
-                        placeholder="يرجى كتابة سبب الحذف..." 
-                        value={deleteReason}
-                        onChange={(e) => setDeleteReason(e.target.value)}
-                        className="bg-white"
-                    />
-                </div>
-              </div>
-            )}
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setActionDialog({ open: false, type: null })}
-              >
-                إلغاء
-              </Button>
-              <Button 
-                onClick={executeAction} 
-                variant="destructive"
-                disabled={deleteReason.length < 5}
-              >
-                حذف
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={actionDialog.open && actionDialog.type === 'edit'} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null })}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>تعديل بيانات المدرب</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">الاسم</Label>
-              <Input
-                id="edit-name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-email">البريد الإلكتروني</Label>
-              <Input
-                id="edit-email"
-                value={editForm.email}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-phone">رقم الهاتف</Label>
-              <Input
-                id="edit-phone"
-                value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-avatar">رابط الصورة الشخصية</Label>
-              <Input
-                id="edit-avatar"
-                value={editForm.avatar}
-                onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
-                placeholder="https://example.com/avatar.jpg"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-password">كلمة المرور الجديدة</Label>
-              <Input
-                id="edit-password"
-                type="password"
-                value={editForm.password}
-                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                placeholder="اتركها فارغة إذا لم ترد التغيير"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-bio">النبذة التعريفية</Label>
-              <Textarea
-                id="edit-bio"
-                value={editForm.bio}
-                onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-specialties">التخصصات (مفصولة بفاصلة)</Label>
-              <Input
-                id="edit-specialties"
-                value={editForm.specialties}
-                onChange={(e) => setEditForm({ ...editForm, specialties: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-status">الحالة</Label>
-              <Select
-                value={editForm.status}
-                onValueChange={(value) => setEditForm({ ...editForm, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر الحالة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">نشط</SelectItem>
-                  <SelectItem value="approved">معتمد</SelectItem>
-                  <SelectItem value="suspended">معلق</SelectItem>
-                  <SelectItem value="pending">قيد المراجعة</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setActionDialog({ open: false, type: null })}
-              >
-                إلغاء
-              </Button>
-              <Button onClick={executeAction}>
-                حفظ التغييرات
               </Button>
             </DialogFooter>
           </div>

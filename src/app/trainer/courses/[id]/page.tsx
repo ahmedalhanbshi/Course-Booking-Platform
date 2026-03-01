@@ -8,156 +8,120 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, Upload, X, Eye } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import { Save, Send, Trash2, ArrowLeft, X, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { trainerService } from "@/lib/trainer-service"
 
-// Mock user data
-const mockUser = {
-    id: "2",
-    name: "فاطمة علي",
-    email: "fatima@example.com",
-    role: 'trainer' as const,
-}
-
-// Mock course data for editing
-const mockCourseData = {
-    id: "1",
-    title: "تعلم React من الصفر",
-    category: "تطوير الويب",
-    shortDescription: "دورة شاملة في تعلم React.js مع مشاريع عملية",
-    description: "دورة شاملة في تعلم React.js مع مشاريع عملية. ستتعلم أساسيات React، إدارة الحالة، التوجيه، والعديد من المفاهيم المتقدمة من خلال بناء تطبيقات حقيقية.",
-    deliveryType: "online",
-    price: "29900",
-    maxStudents: "50",
-    startDate: "2025-02-01",
-    endDate: "2025-03-15",
-    instituteId: "",
-    prerequisites: "معرفة أساسية في HTML و CSS و JavaScript",
-    objectives: [
-        "فهم أساسيات React ومكوناته",
-        "إدارة حالة التطبيق باستخدام Hooks",
-        "بناء تطبيقات تفاعلية مع React Router",
-        "التعامل مع APIs والحصول على البيانات",
-        "نشر التطبيقات على الإنترنت"
-    ],
-    tags: ["React", "JavaScript", "Frontend"],
-    status: "active"
-}
-
-const categories = [
-    "تطوير الويب",
-    "التصميم",
-    "إدارة الأعمال",
-    "تطوير البرمجيات",
-    "التسويق",
-    "قواعد البيانات",
-    "الذكاء الاصطناعي",
-    "الأمن السيبراني"
-]
-
-const deliveryTypes = [
-    { value: "online", label: "أونلاين" },
-    { value: "in_person", label: "حضوري" },
-    { value: "hybrid", label: "حضور وأونلاين" }
-]
-
-export default function EditCoursePage() {
+export default function EditTrainerCoursePage() {
     const router = useRouter()
     const params = useParams()
-    const { user } = useAuth() // Get actual user from context
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const courseId = params.id as string
 
-    // Redirect if not authorized
-    useEffect(() => {
-        // In a real app, we would check if the course belongs to the user
-        // For this mock, we'll assume course with ID '1' belongs to user with ID '2' (Fatima)
-        // Adjust this logic as needed for your mock data setup
-        if (user && user.role === 'trainer' && user.id !== '2') {
-            // If user is a trainer but NOT Fatima (id: 2), they shouldn't edit this specific mock course
-            // In a real scenario: if (course.instructorId !== user.id) router.push('/trainer/dashboard')
-            alert("عذراً، لا يمكنك تعديل دورة لا تملكها")
-            router.push('/trainer/dashboard')
-        }
-    }, [user, router])
+    const [loading, setLoading] = useState(true)
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
-    // In a real app, we would fetch data here based on params.id
-    const [courseData, setCourseData] = useState(mockCourseData)
-
+    const [courseData, setCourseData] = useState<any>(null)
     const [currentObjective, setCurrentObjective] = useState("")
+    const [currentPrerequisite, setCurrentPrerequisite] = useState("")
     const [currentTag, setCurrentTag] = useState("")
 
-    const handleSubmit = async (action: 'draft' | 'submit') => {
-        setIsSubmitting(true)
+    useEffect(() => {
+        const fetchCourse = async () => {
+            try {
+                setLoading(true)
+                const data = await trainerService.getTrainerCourseById(courseId)
+                // Normalize dates for <input type="date">
+                setCourseData({
+                    ...data,
+                    startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
+                    endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
+                })
+            } catch (err: any) {
+                toast.error(err?.response?.data?.message || "فشل في تحميل بيانات الدورة")
+                router.push('/trainer/courses')
+            } finally {
+                setLoading(false)
+            }
+        }
+        if (courseId) fetchCourse()
+    }, [courseId, router])
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        setIsSubmitting(false)
-
-        if (action === 'submit') {
-            // Redirect to courses list
+    const handleSubmit = async () => {
+        if (!courseData) return
+        try {
+            setIsSubmitting(true)
+            await trainerService.updateTrainerCourse(courseId, {
+                title: courseData.title,
+                shortDescription: courseData.shortDescription,
+                description: courseData.description,
+                price: courseData.price,
+                duration: courseData.duration,
+                maxStudents: courseData.maxStudents,
+                startDate: courseData.startDate,
+                endDate: courseData.endDate,
+                categoryId: courseData.categoryId,
+                objectives: courseData.objectives,
+                prerequisites: courseData.prerequisites,
+                tags: courseData.tags,
+            })
+            toast.success("تم تحديث الدورة بنجاح")
             router.push('/trainer/courses')
-        } else {
-            // Show success message and stay on page
-            alert('تم حفظ التغييرات')
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "فشل في تحديث الدورة")
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
-    const handleDelete = () => {
-        // In real app, this would delete the course
-        console.log('Deleting course...')
-        setShowDeleteDialog(false)
-        router.push('/trainer/courses')
-    }
-
+    // ---- List helpers ----
     const addObjective = () => {
         if (currentObjective.trim()) {
-            setCourseData(prev => ({
-                ...prev,
-                objectives: [...prev.objectives, currentObjective.trim()]
-            }))
+            setCourseData((prev: any) => ({ ...prev, objectives: [...prev.objectives, currentObjective.trim()] }))
             setCurrentObjective("")
         }
     }
+    const removeObjective = (i: number) =>
+        setCourseData((prev: any) => ({ ...prev, objectives: prev.objectives.filter((_: any, idx: number) => idx !== i) }))
 
-    const removeObjective = (index: number) => {
-        setCourseData(prev => ({
-            ...prev,
-            objectives: prev.objectives.filter((_, i) => i !== index)
-        }))
+    const addPrerequisite = () => {
+        if (currentPrerequisite.trim()) {
+            setCourseData((prev: any) => ({ ...prev, prerequisites: [...prev.prerequisites, currentPrerequisite.trim()] }))
+            setCurrentPrerequisite("")
+        }
     }
+    const removePrerequisite = (i: number) =>
+        setCourseData((prev: any) => ({ ...prev, prerequisites: prev.prerequisites.filter((_: any, idx: number) => idx !== i) }))
 
     const addTag = () => {
         if (currentTag.trim() && !courseData.tags.includes(currentTag.trim())) {
-            setCourseData(prev => ({
-                ...prev,
-                tags: [...prev.tags, currentTag.trim()]
-            }))
+            setCourseData((prev: any) => ({ ...prev, tags: [...prev.tags, currentTag.trim()] }))
             setCurrentTag("")
         }
     }
+    const removeTag = (tag: string) =>
+        setCourseData((prev: any) => ({ ...prev, tags: prev.tags.filter((t: string) => t !== tag) }))
 
-    const removeTag = (tagToRemove: string) => {
-        setCourseData(prev => ({
-            ...prev,
-            tags: prev.tags.filter(tag => tag !== tagToRemove)
-        }))
+    if (loading) {
+        return (
+            <div className="flex h-96 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
     }
 
-    const isFormValid = () => {
-        return courseData.title &&
-            courseData.category &&
-            courseData.shortDescription &&
-            courseData.description &&
-            courseData.deliveryType &&
-            courseData.price &&
-            courseData.startDate &&
-            courseData.endDate
+    if (!courseData) return null
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'active': return 'نشط'
+            case 'draft': return 'مسودة'
+            case 'completed': return 'مكتمل'
+            case 'cancelled': return 'ملغي'
+            default: return status
+        }
     }
 
     return (
@@ -171,23 +135,14 @@ export default function EditCoursePage() {
                             العودة إلى القائمة
                         </Link>
                     </Button>
-
-                    <Button variant="ghost" asChild>
-                        <Link href={`/courses/${params.id}`} target="_blank">
-                            <Eye className="mr-2 h-4 w-4" />
-                            معاينة الدورة
-                        </Link>
-                    </Button>
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                     تعديل الدورة: {courseData.title}
                 </h1>
-                <p className="text-gray-600">
-                    تعديل تفاصيل الدورة ومحتواها
-                </p>
+                <p className="text-gray-600">تعديل تفاصيل الدورة ومحتواها</p>
             </div>
 
-            {/* Course Status */}
+            {/* Course Status Badge */}
             <Card className="mb-8">
                 <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
@@ -199,17 +154,16 @@ export default function EditCoursePage() {
                                         'الدورة قيد المراجعة'}
                             </p>
                         </div>
-                        <Badge variant={courseData.status === 'active' ? 'default' : 'secondary'} className={courseData.status === 'active' ? 'bg-green-600' : ''}>
-                            {courseData.status === 'active' ? 'نشط' :
-                                courseData.status === 'draft' ? 'مسودة' :
-                                    'قيد المراجعة'}
+                        <Badge variant={courseData.status === 'active' ? 'default' : 'secondary'}
+                            className={courseData.status === 'active' ? 'bg-green-600' : ''}>
+                            {getStatusLabel(courseData.status)}
                         </Badge>
                     </div>
                 </CardContent>
             </Card>
 
-            <form className="space-y-8">
-                {/* Basic Information */}
+            <div className="space-y-8">
+                {/* Basic Info */}
                 <Card>
                     <CardHeader>
                         <CardTitle>المعلومات الأساسية</CardTitle>
@@ -220,118 +174,84 @@ export default function EditCoursePage() {
                             <Label htmlFor="title">عنوان الدورة *</Label>
                             <Input
                                 id="title"
-                                placeholder="مثال: تعلم React من الصفر"
                                 value={courseData.title}
-                                onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
+                                onChange={e => setCourseData((prev: any) => ({ ...prev, title: e.target.value }))}
                             />
                         </div>
-
                         <div className="space-y-2">
-                            <Label htmlFor="category">الفئة *</Label>
-                            <Select value={courseData.category} onValueChange={(value) => setCourseData(prev => ({ ...prev, category: value }))}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="اختر فئة الدورة" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {categories.map(category => (
-                                        <SelectItem key={category} value={category}>
-                                            {category}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="shortDescription">وصف مختصر *</Label>
+                            <Label htmlFor="shortDescription">وصف مختصر</Label>
                             <Textarea
                                 id="shortDescription"
-                                placeholder="وصف قصير للدورة (سيظهر في قائمة الدورات)"
                                 value={courseData.shortDescription}
-                                onChange={(e) => setCourseData(prev => ({ ...prev, shortDescription: e.target.value }))}
+                                onChange={e => setCourseData((prev: any) => ({ ...prev, shortDescription: e.target.value }))}
                                 rows={2}
                             />
                         </div>
-
                         <div className="space-y-2">
-                            <Label htmlFor="description">الوصف التفصيلي *</Label>
+                            <Label htmlFor="description">الوصف التفصيلي</Label>
                             <Textarea
                                 id="description"
-                                placeholder="وصف مفصل للدورة وما ستتعلمه الطلاب"
                                 value={courseData.description}
-                                onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
+                                onChange={e => setCourseData((prev: any) => ({ ...prev, description: e.target.value }))}
                                 rows={4}
                             />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>طريقة التقديم *</Label>
-                            <RadioGroup
-                                value={courseData.deliveryType}
-                                onValueChange={(value) => setCourseData(prev => ({ ...prev, deliveryType: value }))}
-                            >
-                                <div className="flex gap-6">
-                                    {deliveryTypes.map(type => (
-                                        <div key={type.value} className="flex items-center space-x-2 space-x-reverse">
-                                            <RadioGroupItem value={type.value} id={type.value} />
-                                            <Label htmlFor={type.value}>{type.label}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </RadioGroup>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Pricing and Dates */}
+                {/* Pricing & Dates */}
                 <Card>
                     <CardHeader>
                         <CardTitle>التسعير والتواريخ</CardTitle>
                         <CardDescription>حدد سعر الدورة ومواعيدها</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="price">السعر (ريال يمني) *</Label>
+                                <Label htmlFor="price">السعر (ر.ي) *</Label>
                                 <Input
                                     id="price"
                                     type="number"
-                                    placeholder="299"
                                     value={courseData.price}
-                                    onChange={(e) => setCourseData(prev => ({ ...prev, price: e.target.value }))}
+                                    onChange={e => setCourseData((prev: any) => ({ ...prev, price: e.target.value }))}
                                 />
                             </div>
-
                             <div className="space-y-2">
-                                <Label htmlFor="maxStudents">الحد الأقصى للطلاب (اختياري)</Label>
+                                <Label htmlFor="duration">المدة (ساعة)</Label>
+                                <Input
+                                    id="duration"
+                                    type="number"
+                                    value={courseData.duration}
+                                    onChange={e => setCourseData((prev: any) => ({ ...prev, duration: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="maxStudents">الحد الأقصى للطلاب</Label>
                                 <Input
                                     id="maxStudents"
                                     type="number"
-                                    placeholder="50"
                                     value={courseData.maxStudents}
-                                    onChange={(e) => setCourseData(prev => ({ ...prev, maxStudents: e.target.value }))}
+                                    onChange={e => setCourseData((prev: any) => ({ ...prev, maxStudents: e.target.value }))}
                                 />
                             </div>
                         </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="startDate">تاريخ البداية *</Label>
+                                <Label htmlFor="startDate">تاريخ البداية</Label>
                                 <Input
                                     id="startDate"
                                     type="date"
                                     value={courseData.startDate}
-                                    onChange={(e) => setCourseData(prev => ({ ...prev, startDate: e.target.value }))}
+                                    onChange={e => setCourseData((prev: any) => ({ ...prev, startDate: e.target.value }))}
                                 />
                             </div>
-
                             <div className="space-y-2">
-                                <Label htmlFor="endDate">تاريخ النهاية *</Label>
+                                <Label htmlFor="endDate">تاريخ النهاية</Label>
                                 <Input
                                     id="endDate"
                                     type="date"
                                     value={courseData.endDate}
-                                    onChange={(e) => setCourseData(prev => ({ ...prev, endDate: e.target.value }))}
+                                    onChange={e => setCourseData((prev: any) => ({ ...prev, endDate: e.target.value }))}
                                 />
                             </div>
                         </div>
@@ -342,32 +262,24 @@ export default function EditCoursePage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>أهداف الدورة</CardTitle>
-                        <CardDescription>ما سيحصل عليه الطلاب بعد إكمال الدورة</CardDescription>
+                        <CardDescription>ما سيتعلمه الطلاب من هذه الدورة</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex gap-2">
                             <Input
                                 placeholder="أدخل هدف الدورة"
                                 value={currentObjective}
-                                onChange={(e) => setCurrentObjective(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addObjective())}
+                                onChange={e => setCurrentObjective(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addObjective())}
                             />
-                            <Button type="button" onClick={addObjective}>
-                                إضافة
-                            </Button>
+                            <Button type="button" onClick={addObjective}>إضافة</Button>
                         </div>
-
-                        {courseData.objectives.length > 0 && (
+                        {courseData.objectives?.length > 0 && (
                             <div className="space-y-2">
-                                {courseData.objectives.map((objective, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                        <span>{objective}</span>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeObjective(index)}
-                                        >
+                                {courseData.objectives.map((obj: string, i: number) => (
+                                    <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                        <span>{obj}</span>
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => removeObjective(i)}>
                                             <X className="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -383,13 +295,28 @@ export default function EditCoursePage() {
                         <CardTitle>المتطلبات المسبقة</CardTitle>
                         <CardDescription>ما يحتاجه الطلاب قبل التسجيل في الدورة</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Textarea
-                            placeholder="مثال: معرفة أساسية في HTML و CSS"
-                            value={courseData.prerequisites}
-                            onChange={(e) => setCourseData(prev => ({ ...prev, prerequisites: e.target.value }))}
-                            rows={3}
-                        />
+                    <CardContent className="space-y-4">
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="مثال: معرفة أساسية في HTML و CSS"
+                                value={currentPrerequisite}
+                                onChange={e => setCurrentPrerequisite(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addPrerequisite())}
+                            />
+                            <Button type="button" onClick={addPrerequisite}>إضافة</Button>
+                        </div>
+                        {courseData.prerequisites?.length > 0 && (
+                            <div className="space-y-2">
+                                {courseData.prerequisites.map((p: string, i: number) => (
+                                    <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                        <span>{p}</span>
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => removePrerequisite(i)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -404,28 +331,19 @@ export default function EditCoursePage() {
                             <Input
                                 placeholder="أدخل كلمة مفتاحية"
                                 value={currentTag}
-                                onChange={(e) => setCurrentTag(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                                onChange={e => setCurrentTag(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
                             />
-                            <Button type="button" onClick={addTag}>
-                                إضافة
-                            </Button>
+                            <Button type="button" onClick={addTag}>إضافة</Button>
                         </div>
-
-                        {courseData.tags.length > 0 && (
+                        {courseData.tags?.length > 0 && (
                             <div className="flex flex-wrap gap-2">
-                                {courseData.tags.map((tag) => (
+                                {courseData.tags.map((tag: string) => (
                                     <Badge key={tag} variant="secondary" className="flex items-center gap-1">
                                         {tag}
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-4 w-4 p-0 hover:bg-transparent"
-                                            onClick={() => removeTag(tag)}
-                                        >
+                                        <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-red-500">
                                             <X className="h-3 w-3" />
-                                        </Button>
+                                        </button>
                                     </Badge>
                                 ))}
                             </div>
@@ -433,28 +351,8 @@ export default function EditCoursePage() {
                     </CardContent>
                 </Card>
 
-                {/* Course Image */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>صورة الدورة</CardTitle>
-                        <CardDescription>أضف صورة تعبيرية للدورة</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-600 mb-2">اسحب وأفلت الصورة هنا، أو</p>
-                            <Button variant="outline">
-                                اختر صورة
-                            </Button>
-                            <p className="text-sm text-gray-500 mt-2">
-                                PNG, JPG حتى 2MB
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-
                 {/* Action Buttons */}
-                <div className="flex gap-4 justify-end">
+                <div className="flex gap-4 justify-end pb-8">
                     <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                         <DialogTrigger asChild>
                             <Button variant="destructive" type="button">
@@ -470,36 +368,23 @@ export default function EditCoursePage() {
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="flex gap-2 justify-end">
-                                <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                                    إلغاء
-                                </Button>
-                                <Button variant="destructive" onClick={handleDelete}>
-                                    حذف
-                                </Button>
+                                <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>إلغاء</Button>
+                                <Button variant="destructive" onClick={() => { setShowDeleteDialog(false); router.push('/trainer/courses') }}>حذف</Button>
                             </div>
                         </DialogContent>
                     </Dialog>
 
-                    <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => handleSubmit('draft')}
-                        disabled={isSubmitting}
-                    >
+                    <Button variant="outline" type="button" onClick={handleSubmit} disabled={isSubmitting}>
                         <Save className="mr-2 h-4 w-4" />
-                        حفظ التغييرات
+                        {isSubmitting ? 'جاري الحفظ...' : 'حفظ التغييرات'}
                     </Button>
 
-                    <Button
-                        type="button"
-                        onClick={() => handleSubmit('submit')}
-                        disabled={!isFormValid() || isSubmitting}
-                    >
+                    <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
                         <Send className="mr-2 h-4 w-4" />
-                        {isSubmitting ? 'جاري الإرسال...' : 'تحديث الدورة'}
+                        {isSubmitting ? 'جاري التحديث...' : 'تحديث الدورة'}
                     </Button>
                 </div>
-            </form>
+            </div>
         </div>
     )
 }
