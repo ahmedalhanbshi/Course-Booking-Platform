@@ -8,25 +8,16 @@ import { Badge } from "@/components/ui/badge"
 import { BookOpen, Users, Calendar, MapPin, Plus, Clock, CheckCircle, Loader2, AlertCircle } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { trainerService, TrainerDashboardData } from "@/lib/trainer-service"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function TrainerDashboard() {
   const [data, setData] = useState<TrainerDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [trainerName, setTrainerName] = useState<string>("")
+  const { user } = useAuth()
+  const trainerName = user?.name || ""
 
   useEffect(() => {
-    // Read the trainer's name from the stored auth state (same pattern as other pages)
-    try {
-      const raw = localStorage.getItem("user")
-      if (raw) {
-        const user = JSON.parse(raw)
-        setTrainerName(user.name || "")
-      }
-    } catch {
-      // ignore
-    }
-
     trainerService
       .getDashboard()
       .then(setData)

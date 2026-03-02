@@ -38,9 +38,19 @@ class InstituteController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const payload = { ...req.body };
-            if (req.file) {
+
+            if (req.files) {
+                const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+                if (files['avatar'] && files['avatar'][0]) {
+                    payload.avatar = `/uploads/${files['avatar'][0].filename}`;
+                }
+                if (files['logo'] && files['logo'][0]) {
+                    payload.logo = `/uploads/${files['logo'][0].filename}`;
+                }
+            } else if (req.file) {
                 payload.avatar = `/uploads/${req.file.filename}`;
             }
+
             const data = await instituteService.updateInstituteProfile(req.user.userId, payload);
             return sendSuccess(res, 'تم تحديث الملف الشخصي بنجاح', data);
         } catch (error: any) {

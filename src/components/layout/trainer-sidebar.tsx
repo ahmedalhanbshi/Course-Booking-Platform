@@ -22,11 +22,11 @@ export function TrainerSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-72 bg-white dark:bg-slate-900 border-l border-gray-100 dark:border-slate-800 h-screen flex flex-col shadow-sm">
+    <aside className="w-[280px] bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-l-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)] h-screen flex flex-col">
       {/* App Logo/Header Area */}
       <div className="p-6 h-16 flex items-center gap-3 border-b border-gray-100 dark:border-slate-800">
         <div className="relative w-10 h-10">
-           <Image src="/images/logo.png" alt="منصة د" fill className="object-contain" />
+          <Image src="/images/logo.png" alt="منصة د" fill className="object-contain" />
         </div>
         <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
           منصة د
@@ -39,13 +39,13 @@ export function TrainerSidebar() {
           // Precise active logic
           let isActive = false
           if (link.href === "/trainer/dashboard") {
-              isActive = pathname === link.href
+            isActive = pathname === link.href
           } else if (link.href === "/trainer/explore") {
-              isActive = pathname.startsWith("/trainer/explore")
+            isActive = pathname.startsWith("/trainer/explore")
           } else {
-              isActive = pathname.startsWith(link.href)
+            isActive = pathname.startsWith(link.href)
           }
-          
+
           const Icon = link.icon
           return (
             <Link
@@ -58,13 +58,13 @@ export function TrainerSidebar() {
                   : "text-gray-600 hover:bg-gray-50 hover:text-blue-600"
               )}
             >
-              <div className="flex items-center gap-3 w-full"> 
-                   {/* Icon Right, Text Left due to RTL global dir, but flex-row is standard. 
+              <div className="flex items-center gap-3 w-full">
+                {/* Icon Right, Text Left due to RTL global dir, but flex-row is standard. 
                       Let's rely on standard flow. In RTL:
                       Item 1 (Icon) is Right. Item 2 (Text) is Left. 
                    */}
-                   <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-gray-400 group-hover:text-blue-600")} />
-                   <span className="flex-1 text-right">{link.label}</span> 
+                <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-gray-400 group-hover:text-blue-600")} />
+                <span className="flex-1 text-right">{link.label}</span>
               </div>
             </Link>
           )

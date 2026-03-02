@@ -89,7 +89,25 @@ export interface CourseDetail {
     };
 }
 
+export interface Session {
+    id: string;
+    title: string;
+    courseTitle: string;
+    startTime: string;
+    endTime: string;
+    type: 'online' | 'in_person' | 'hybrid';
+    status: 'scheduled' | 'completed' | 'cancelled' | 'postponed';
+    meetingLink: string | null;
+    location: string;
+    enrolledStudents: number;
+}
+
 class TrainerService {
+    async getSchedule(): Promise<Session[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Session[] }>('/api/trainer/schedule');
+        return response.data.data;
+    }
+
     async getPublicCourseById(courseId: string): Promise<CourseDetail> {
         const response = await apiClient.get<{ success: boolean; message: string; data: CourseDetail }>(`/api/trainer/explore/${courseId}`);
         return response.data.data;
@@ -102,6 +120,16 @@ class TrainerService {
 
     async getDashboard(): Promise<TrainerDashboardData> {
         const response = await apiClient.get<{ success: boolean; message: string; data: TrainerDashboardData }>('/api/trainer/dashboard');
+        return response.data.data;
+    }
+
+    async getCategories(): Promise<any[]> {
+        const response = await apiClient.get('/api/trainer/categories');
+        return response.data.data;
+    }
+
+    async createCategory(name: string): Promise<any> {
+        const response = await apiClient.post('/api/trainer/categories', { name });
         return response.data.data;
     }
 
@@ -118,8 +146,9 @@ class TrainerService {
         return response.data.data;
     }
 
-    async getHallAvailability(hallId: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/trainer/halls/${hallId}/availability`);
+    async getHallAvailability(hallId: string, date?: string): Promise<any> {
+        const url = `/api/trainer/halls/${hallId}/availability${date ? `?date=${date}` : ''}`;
+        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(url);
         return response.data.data;
     }
 
@@ -131,6 +160,10 @@ class TrainerService {
     async getCourses(): Promise<any[]> {
         const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/courses');
         return response.data.data;
+    }
+
+    async deleteCourse(id: string): Promise<void> {
+        await apiClient.delete(`/api/trainer/courses/${id}`);
     }
 
     async getTrainerCourseById(courseId: string): Promise<any> {
@@ -206,6 +239,17 @@ class TrainerService {
 
     async getRoomBookings(): Promise<any[]> {
         const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/bookings');
+        return response.data.data;
+    }
+
+    async resubmitBookingPayment(courseId: string, bookingId: string, file: File): Promise<any> {
+        const formData = new FormData();
+        formData.append('paymentReceipt', file);
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>(
+            `/api/trainer/courses/${courseId}/bookings/${bookingId}/resubmit`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
         return response.data.data;
     }
 

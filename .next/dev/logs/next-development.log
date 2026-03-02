@@ -1,0 +1,104 @@
+[00:00:04.216] Server  LOG      ✓ Ready in 2.3s
+[00:00:07.452] Server  LOG      ○ Compiling /trainer/halls/[id] ...
+[00:00:20.004] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:20.851] Browser LOG     Browsing Topics API removed from http://localhost:3000/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b which is main frame
+[00:00:20.851] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:00:20.851] Browser LOG     API Request: GET http://localhost:5000/api/auth/me
+[00:00:20.851] Browser WARN    Image with src "/images/logo.png" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[00:00:20.960] Browser ERROR   Failed to fetch hall details {"code":"ERR_BAD_REQUEST","config":{"adapter":["xhr","http","fetch"],"allowAbsoluteUrls":true,"data":"{}","env":{},"headers":{"Accept":"application/json, text/plain, */*","Content-Type":"application/json"},"maxBodyLength":-1,"maxContentLength":-1,"method":"post","timeout":0,"transformRequest":[null],"transformResponse":[null],"transitional":{"clarifyTimeoutError":false,"forcedJSONParsing":true,"legacyInterceptorReqResOrdering":true,"silentJSONParsing":true},"url":"http://localhost:5000/api/auth/refresh","withCredentials":true,"xsrfCookieName":"XSRF-TOKEN","xsrfHeaderName":"X-XSRF-TOKEN"},"message":"Request failed with status code 400","name":"AxiosError","stack":"AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:1940:16)\n    at XMLHttpRequest.onloadend (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:2458:174)\n    at Axios.request (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:3264:49)\n    at async http://localhost:3000/_next/static/chunks/src_a601fad7._.js:108:26\n    at async Axios.request (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:3260:20)\n    at async TrainerService.getHallById (http://localhost:3000/_next/static/chunks/src_3a68f9aa._.js:467:26)\n    at async HallDetailsPage.useEffect.fetchHall (http://localhost:3000/_next/static/chunks/src_3a68f9aa._.js:794:38)","status":400}
+[00:00:22.606] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:23.172] Browser LOG     API Request: GET http://localhost:5000/api/auth/me
+[00:00:23.172] Browser WARN    Image with src "/images/logo.png" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[00:00:23.274] Browser LOG     Browsing Topics API removed from http://localhost:3000/auth/login which is main frame
+[00:00:29.325] Browser LOG     Login form submitted {"email":"khaled.trainer@test.com"}
+[00:00:29.325] Browser LOG     Calling login function...
+[00:00:29.325] Browser LOG     API Request: POST http://localhost:5000/api/auth/login
+[00:00:29.542] Browser LOG     Login successful
+[00:00:30.913] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:00:30.913] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:00:34.325] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:00:34.325] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:00:37.169] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:00:37.169] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:01:24.396] Server  LOG      ✓ Compiled in 543ms
+[00:03:27.828] Server  LOG      ✓ Compiled in 574ms
+[00:04:14.877] Browser WARN    Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+[00:04:14.877] Browser WARN    Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+[00:04:48.932] Server  LOG      ✓ Compiled in 649ms
+[00:05:13.127] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:13.127] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:15.605] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/70d1a3e4-0432-4d93-9ec9-5cd11c53440a
+[00:05:15.605] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/70d1a3e4-0432-4d93-9ec9-5cd11c53440a
+[00:05:23.346] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:23.346] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:27.756] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/b4782216-d1d9-454f-a24a-6fd625f8719a
+[00:05:27.756] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/b4782216-d1d9-454f-a24a-6fd625f8719a
+[00:05:32.152] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:32.152] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:34.771] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/416bab06-39ed-4cc5-baa3-a1bc305f22a7
+[00:05:34.771] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/416bab06-39ed-4cc5-baa3-a1bc305f22a7
+[00:05:39.486] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:39.486] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:05:41.349] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/1086e1d5-4bfe-468d-bb81-4db718de5101
+[00:05:41.349] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/1086e1d5-4bfe-468d-bb81-4db718de5101
+[00:06:10.931] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:06:10.931] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:06:15.588] Server  LOG      ✓ Compiled in 1042ms
+[00:06:17.010] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:06:17.010] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:07:03.593] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:07:03.593] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:07:05.782] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:07:05.782] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:07:09.427] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:07:09.427] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:07:20.504] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses/083683b6-1f56-4af6-96da-f653f14ba875
+[00:07:20.504] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses/083683b6-1f56-4af6-96da-f653f14ba875
+[00:07:33.266] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses/083683b6-1f56-4af6-96da-f653f14ba875/students
+[00:07:33.266] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses/083683b6-1f56-4af6-96da-f653f14ba875/students
+[00:07:38.322] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses/083683b6-1f56-4af6-96da-f653f14ba875
+[00:07:38.322] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses/083683b6-1f56-4af6-96da-f653f14ba875
+[00:09:05.298] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:09:05.298] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:09:59.509] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:09:59.509] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:11:01.745] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:11:01.745] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:11:05.760] Browser LOG     API Request: GET http://localhost:5000/api/trainer/categories
+[00:11:05.760] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:11:05.760] Browser LOG     API Request: GET http://localhost:5000/api/trainer/categories
+[00:11:05.760] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:11:06.145] Browser LOG     HLS DATA FETCHED: [{"availability":[{"day":"SUNDAY","endTime":"16:00","startTime":"08:00"},{"day":"MONDAY","endTime":"16:00","startTime":"08:00"}],"capacity":20,"description":null,"facilities":["20 Computers","Projector","AC","WiFi","Software Licenses","computers","wifi","projector"],"id":"70d1a3e4-0432-4d93-9ec9-5cd11c53440a","image":"/uploads/tank-1772105206463-243888397.png","institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":"lefljlgjrg","locationUrl":null,"name":"Computer Lab 1","pricePerHour":"75","type":"قاعة اجتماعات"},{"availability":null,"capacity":50,"description":null,"facilities":["Projector","Sound System","AC","WiFi","Video Conferencing"],"id":"1086e1d5-4bfe-468d-bb81-4db718de5101","image":null,"institute":{"id":"4f72a2c3-eeb1-45c3-91a3-626f60a80d70","name":"Business Skills Institute"},"instituteId":"4f72a2c3-eeb1-45c3-91a3-626f60a80d70","isActive":true,"location":null,"locationUrl":null,"name":"Conference Hall","pricePerHour":"100","type":"قاعة محاضرات"},{"availability":[{"day":"SUNDAY","endTime":"16:00","startTime":"08:00"},{"day":"MONDAY","endTime":"16:00","startTime":"08:00"},{"day":"TUESDAY","endTime":"13:00","startTime":"08:00"},{"day":"WEDNESDAY","endTime":"18:00","startTime":"10:00"},{"day":"SATURDAY","endTime":"13:00","startTime":"08:00"}],"capacity":50,"description":"klhii","facilities":["wifi","projector"],"id":"cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b","image":"/uploads/sky-1772204625076-478061467.png","institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":"jgugug","locationUrl":null,"name":"hammam","pricePerHour":"600","type":"قاعة محاضرات"},{"availability":null,"capacity":30,"description":null,"facilities":["Projector","Whiteboard","AC","WiFi"],"id":"416bab06-39ed-4cc5-baa3-a1bc305f22a7","image":null,"institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":null,"locationUrl":null,"name":"Main Training Hall A","pricePerHour":"50","type":"قاعة محاضرات"},{"availability":null,"capacity":15,"description":null,"facilities":["Projector","Whiteboard","AC"],"id":"b4782216-d1d9-454f-a24a-6fd625f8719a","image":null,"institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":null,"locationUrl":null,"name":"Seminar Room B","pricePerHour":"40","type":"قاعة محاضرات"}]
+[00:11:06.145] Browser LOG     HLS DATA FETCHED: [{"availability":[{"day":"SUNDAY","endTime":"16:00","startTime":"08:00"},{"day":"MONDAY","endTime":"16:00","startTime":"08:00"}],"capacity":20,"description":null,"facilities":["20 Computers","Projector","AC","WiFi","Software Licenses","computers","wifi","projector"],"id":"70d1a3e4-0432-4d93-9ec9-5cd11c53440a","image":"/uploads/tank-1772105206463-243888397.png","institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":"lefljlgjrg","locationUrl":null,"name":"Computer Lab 1","pricePerHour":"75","type":"قاعة اجتماعات"},{"availability":null,"capacity":50,"description":null,"facilities":["Projector","Sound System","AC","WiFi","Video Conferencing"],"id":"1086e1d5-4bfe-468d-bb81-4db718de5101","image":null,"institute":{"id":"4f72a2c3-eeb1-45c3-91a3-626f60a80d70","name":"Business Skills Institute"},"instituteId":"4f72a2c3-eeb1-45c3-91a3-626f60a80d70","isActive":true,"location":null,"locationUrl":null,"name":"Conference Hall","pricePerHour":"100","type":"قاعة محاضرات"},{"availability":[{"day":"SUNDAY","endTime":"16:00","startTime":"08:00"},{"day":"MONDAY","endTime":"16:00","startTime":"08:00"},{"day":"TUESDAY","endTime":"13:00","startTime":"08:00"},{"day":"WEDNESDAY","endTime":"18:00","startTime":"10:00"},{"day":"SATURDAY","endTime":"13:00","startTime":"08:00"}],"capacity":50,"description":"klhii","facilities":["wifi","projector"],"id":"cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b","image":"/uploads/sky-1772204625076-478061467.png","institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":"jgugug","locationUrl":null,"name":"hammam","pricePerHour":"600","type":"قاعة محاضرات"},{"availability":null,"capacity":30,"description":null,"facilities":["Projector","Whiteboard","AC","WiFi"],"id":"416bab06-39ed-4cc5-baa3-a1bc305f22a7","image":null,"institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":null,"locationUrl":null,"name":"Main Training Hall A","pricePerHour":"50","type":"قاعة محاضرات"},{"availability":null,"capacity":15,"description":null,"facilities":["Projector","Whiteboard","AC"],"id":"b4782216-d1d9-454f-a24a-6fd625f8719a","image":null,"institute":{"id":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","name":"Tech Academy Yemen"},"instituteId":"95b671d4-2743-4dbb-a5f8-991ee5c01ec8","isActive":true,"location":null,"locationUrl":null,"name":"Seminar Room B","pricePerHour":"40","type":"قاعة محاضرات"}]
+[00:11:08.054] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:11:08.054] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:11:50.234] Server  LOG      ✓ Compiled in 1151ms
+[00:13:00.866] Server  LOG      ✓ Compiled in 830ms
+[00:13:03.592] Browser LOG     API Request: GET http://localhost:5000/api/trainer/schedule
+[00:14:39.483] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:14:39.483] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:14:41.295] Browser LOG     API Request: GET http://localhost:5000/api/trainer/schedule
+[00:14:41.295] Browser LOG     API Request: GET http://localhost:5000/api/trainer/schedule
+[00:15:45.629] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:15:45.629] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:15:46.111] Browser ERROR   Failed to fetch halls {"code":"ERR_BAD_REQUEST","config":{"adapter":["xhr","http","fetch"],"allowAbsoluteUrls":true,"data":"{}","env":{},"headers":{"Accept":"application/json, text/plain, */*","Content-Type":"application/json"},"maxBodyLength":-1,"maxContentLength":-1,"method":"post","timeout":0,"transformRequest":[null],"transformResponse":[null],"transitional":{"clarifyTimeoutError":false,"forcedJSONParsing":true,"legacyInterceptorReqResOrdering":true,"silentJSONParsing":true},"url":"http://localhost:5000/api/auth/refresh","withCredentials":true,"xsrfCookieName":"XSRF-TOKEN","xsrfHeaderName":"X-XSRF-TOKEN"},"message":"Request failed with status code 400","name":"AxiosError","stack":"AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:1940:16)\n    at XMLHttpRequest.onloadend (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:2458:174)\n    at Axios.request (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:3264:49)\n    at async http://localhost:3000/_next/static/chunks/src_a601fad7._.js:108:26\n    at async Axios.request (http://localhost:3000/_next/static/chunks/node_modules_axios_lib_99e19c7d._.js:3260:20)\n    at async TrainerService.getHalls (http://localhost:3000/_next/static/chunks/src_3a68f9aa._.js?id=%255Bproject%255D%252Fsrc%252Flib%252Ftrainer-service.ts+%255Bapp-client%255D+%2528ecmascript%2529:40:26)\n    at async TrainerHallsPage.useEffect.fetchHalls (http://localhost:3000/_next/static/chunks/src_bc9ec509._.js:606:46)","status":400}
+[00:15:47.386] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:15:48.097] Browser LOG     API Request: GET http://localhost:5000/api/auth/me
+[00:15:48.097] Browser WARN    Image with src "/images/logo.png" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[00:15:48.392] Browser LOG     Browsing Topics API removed from http://localhost:3000/auth/login which is main frame
+[00:15:53.173] Browser LOG     Login form submitted {"email":"khaled.trainer@test.com"}
+[00:15:53.173] Browser LOG     Calling login function...
+[00:15:53.173] Browser LOG     API Request: POST http://localhost:5000/api/auth/login
+[00:15:53.697] Browser LOG     Login successful
+[00:15:54.104] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:15:54.104] Browser LOG     API Request: GET http://localhost:5000/api/trainer/dashboard
+[00:15:55.741] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:15:55.741] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:15:58.834] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:15:58.834] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:16:00.818] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:16:00.818] Browser LOG     API Request: GET http://localhost:5000/api/trainer/courses
+[00:16:03.113] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:16:03.113] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls
+[00:16:05.818] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b
+[00:16:05.818] Browser LOG     API Request: GET http://localhost:5000/api/trainer/halls/cf153a7f-81cc-4cd7-8fbb-80e42ffdf69b

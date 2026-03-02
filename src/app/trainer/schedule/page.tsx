@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle, Loader2 } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -13,63 +13,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
-
-// Mock sessions data for trainer
-const mockSessions = [
-    {
-        id: "1",
-        title: "المكونات في React (Components)",
-        courseTitle: "تعلم React من الصفر",
-        startTime: new Date("2025-01-20T10:00:00"),
-        endTime: new Date("2025-01-20T12:00:00"),
-        type: "online",
-        link: "https://meet.google.com/abc-defg-hij",
-        status: "upcoming"
-    },
-    {
-        id: "2",
-        title: "مبادئ التصميم الأساسية",
-        courseTitle: "تصميم واجهات المستخدم",
-        startTime: new Date("2025-01-20T14:00:00"),
-        endTime: new Date("2025-01-20T16:00:00"),
-        type: "in_person",
-        location: "قاعة المحاضرات الأولى",
-        status: "upcoming"
-    },
-    {
-        id: "3",
-        title: "إدارة الحالة (State Management)",
-        courseTitle: "تعلم React من الصفر",
-        startTime: new Date("2025-01-21T10:00:00"),
-        endTime: new Date("2025-01-21T12:00:00"),
-        type: "online",
-        link: "https://meet.google.com/xyz-uvw-123",
-        status: "upcoming"
-    },
-    {
-        id: "4",
-        title: "الألوان والخطوط",
-        courseTitle: "تصميم واجهات المستخدم",
-        startTime: new Date("2025-01-25T14:00:00"),
-        endTime: new Date("2025-01-25T16:00:00"),
-        type: "in_person",
-        location: "قاعة المحاضرات الثانية",
-        status: "upcoming"
-    },
-    {
-        id: "5",
-        title: "مقدمة في البرمجة",
-        courseTitle: "أساسيات البرمجة",
-        startTime: new Date("2025-01-18T09:00:00"),
-        endTime: new Date("2025-01-18T11:00:00"),
-        type: "in_person",
-        location: "معمل الحاسوب 1",
-        status: "completed"
-    }
-]
+import { trainerService, Session } from "@/lib/trainer-service"
 
 export default function TrainerSchedulePage() {
-    const [selectedSession, setSelectedSession] = useState<typeof mockSessions[0] | null>(null)
+    const [sessions, setSessions] = useState<Session[]>([])
+    const [loading, setLoading] = useState(true)
+    const [selectedSession, setSelectedSession] = useState<Session | null>(null)
     const [isManageModalOpen, setIsManageModalOpen] = useState(false)
 
     // Manage Modal State
@@ -79,19 +28,37 @@ export default function TrainerSchedulePage() {
     const [newEndTime, setNewEndTime] = useState("")
     const [reason, setReason] = useState("")
 
-    const handleOpenManageModal = (session: typeof mockSessions[0]) => {
+    useEffect(() => {
+        const fetchSessions = async () => {
+            try {
+                const data = await trainerService.getSchedule()
+                setSessions(data)
+            } catch (err: any) {
+                console.error("Failed to fetch sessions:", err)
+                toast.error("حدث خطأ أثناء جلب الجدولة")
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchSessions()
+    }, [])
+
+    const handleOpenManageModal = (session: Session) => {
         setSelectedSession(session)
         // Initialize fields with current session data
-        const dateStr = session.startTime.toISOString().split('T')[0]
-        const startTimeStr = session.startTime.toTimeString().slice(0, 5)
-        const endTimeStr = session.endTime.toTimeString().slice(0, 5)
-        
+        const startTimeObj = new Date(session.startTime)
+        const endTimeObj = new Date(session.endTime)
+
+        const dateStr = session.startTime.split('T')[0]
+        const startTimeStr = startTimeObj.toTimeString().slice(0, 5)
+        const endTimeStr = endTimeObj.toTimeString().slice(0, 5)
+
         setNewDate(dateStr)
         setNewStartTime(startTimeStr)
         setNewEndTime(endTimeStr)
         setActionType('reschedule')
         setReason("")
-        
+
         setIsManageModalOpen(true)
     }
 
@@ -110,26 +77,39 @@ export default function TrainerSchedulePage() {
     }
 
     // Group sessions by date
-    const sessionsByDate = mockSessions.reduce((acc, session) => {
-        const dateKey = session.startTime.toISOString().split('T')[0]
+    const sessionsByDate = sessions.reduce((acc, session) => {
+        const dateKey = session.startTime.split('T')[0]
         if (!acc[dateKey]) {
             acc[dateKey] = []
         }
         acc[dateKey].push(session)
         return acc
-    }, {} as Record<string, typeof mockSessions>)
+    }, {} as Record<string, Session[]>)
 
     const sortedDates = Object.keys(sessionsByDate).sort()
 
     const getStatusConfig = (status: string) => {
-        switch (status) {
-            case 'upcoming':
+        switch (status.toLowerCase()) {
+            case 'scheduled':
                 return { label: 'قادم', className: 'bg-blue-100 text-blue-700' }
             case 'completed':
-                return { label: 'مكتمل', className: 'bg-gray-100 text-gray-700' }
+                return { label: 'مكتمل', className: 'bg-green-100 text-green-700' }
+            case 'cancelled':
+                return { label: 'ملغي', className: 'bg-red-100 text-red-700' }
+            case 'postponed':
+                return { label: 'مؤجل', className: 'bg-amber-100 text-amber-700' }
             default:
                 return { label: status, className: 'bg-gray-100 text-gray-700' }
         }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <p className="text-gray-500">جاري جلب جدولك...</p>
+            </div>
+        )
     }
 
     return (
@@ -141,97 +121,113 @@ export default function TrainerSchedulePage() {
                 </div>
             </div>
 
-            <div className="space-y-8">
-                {sortedDates.map((dateStr) => (
-                    <div key={dateStr}>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-600" />
-                            {formatDate(new Date(dateStr), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                        </h3>
+            {sessions.length === 0 ? (
+                <Card className="bg-gray-50 border-dashed border-2">
+                    <CardContent className="p-12 text-center">
+                        <CalendarIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">لا يوجد دروس مجدولة</h3>
+                        <p className="text-gray-500">لم تقم بإضافة أي دروس بعد أو ليس لديك دروس قادمة.</p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-8">
+                    {sortedDates.map((dateStr) => (
+                        <div key={dateStr}>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-blue-600" />
+                                {formatDate(new Date(dateStr), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </h3>
 
-                        <div className="grid gap-4">
-                            {sessionsByDate[dateStr].map((session) => (
-                                <Card key={session.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-6">
-                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                            <div className="flex gap-4">
-                                                <div className={`flex-shrink-0 w-16 h-16 rounded-lg flex flex-col items-center justify-center border ${session.status === 'completed' ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-blue-50 border-blue-100 text-blue-600'}`}>
-                                                    <span className="text-sm font-bold">{formatTime(session.startTime)}</span>
-                                                    <span className={`text-xs ${session.status === 'completed' ? 'text-gray-400' : 'text-blue-400'}`}>إلى</span>
-                                                    <span className="text-sm font-bold">{formatTime(session.endTime)}</span>
+                            <div className="grid gap-4">
+                                {sessionsByDate[dateStr].map((session) => (
+                                    <Card key={session.id} className="hover:shadow-md transition-shadow">
+                                        <CardContent className="p-6">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div className="flex gap-4">
+                                                    <div className={`flex-shrink-0 w-16 h-16 rounded-lg flex flex-col items-center justify-center border ${session.status === 'completed' ? 'bg-green-50 border-green-100 text-green-600' : session.status === 'cancelled' ? 'bg-red-50 border-red-100 text-red-600' : 'bg-blue-50 border-blue-100 text-blue-600'}`}>
+                                                        <span className="text-sm font-bold">{formatTime(new Date(session.startTime))}</span>
+                                                        <span className="text-xs opacity-60">إلى</span>
+                                                        <span className="text-sm font-bold">{formatTime(new Date(session.endTime))}</span>
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <h4 className="text-lg font-bold text-gray-900">{session.title}</h4>
+                                                            <Badge variant="secondary" className={getStatusConfig(session.status).className}>
+                                                                {getStatusConfig(session.status).label}
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 mb-2">{session.courseTitle}</p>
+
+                                                        <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+                                                            <div className="flex items-center gap-1">
+                                                                {session.type === 'online' ? (
+                                                                    <Video className="h-4 w-4" />
+                                                                ) : (
+                                                                    <MapPin className="h-4 w-4" />
+                                                                )}
+                                                                <span className="truncate max-w-[200px]">
+                                                                    {session.location}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <Clock className="h-4 w-4" />
+                                                                <span>{session.enrolledStudents} طالب مسجل</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
-                                                <div>
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="text-lg font-bold text-gray-900">{session.title}</h4>
-                                                        <Badge variant="secondary" className={getStatusConfig(session.status).className}>
-                                                            {getStatusConfig(session.status).label}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-sm text-gray-600 mb-2">{session.courseTitle}</p>
-
-                                                    <div className="flex flex-wrap gap-3 text-sm text-gray-500">
-                                                        <div className="flex items-center gap-1">
-                                                            {session.type === 'online' ? (
-                                                                <Video className="h-4 w-4" />
+                                                <div className="flex flex-col gap-2 min-w-[140px]">
+                                                    {['scheduled', 'postponed'].includes(session.status) && (
+                                                        <>
+                                                            {session.type === 'online' && session.meetingLink ? (
+                                                                <Button asChild className="w-full">
+                                                                    <a href={session.meetingLink} target="_blank" rel="noopener noreferrer">
+                                                                        بدء الدرس
+                                                                    </a>
+                                                                </Button>
                                                             ) : (
-                                                                <MapPin className="h-4 w-4" />
+                                                                <div className="flex items-center gap-2 text-gray-500 bg-gray-50 px-3 py-2 rounded-md justify-center border text-sm mb-1">
+                                                                    <MapPin className="h-4 w-4" />
+                                                                    <span className="truncate max-w-[120px]">{session.location}</span>
+                                                                </div>
                                                             )}
-                                                            <span>
-                                                                {session.type === 'online' ? 'أونلاين' : session.location}
-                                                            </span>
+
+                                                            <Button
+                                                                variant="outline"
+                                                                className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800"
+                                                                onClick={() => handleOpenManageModal(session)}
+                                                            >
+                                                                <Settings className="w-4 h-4 ml-2" />
+                                                                إدارة الجلسة
+                                                            </Button>
+                                                        </>
+                                                    )}
+
+                                                    {session.status === 'completed' && (
+                                                        <div className="flex items-center gap-2 text-green-600 justify-center font-medium">
+                                                            <CheckCircle className="h-5 w-5" />
+                                                            <span className="text-sm">تم الانتهاء</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <Clock className="h-4 w-4" />
-                                                            <span>ساعتان</span>
+                                                    )}
+
+                                                    {session.status === 'cancelled' && (
+                                                        <div className="flex items-center gap-2 text-red-600 justify-center font-medium">
+                                                            <AlertTriangle className="h-5 w-5" />
+                                                            <span className="text-sm">ملغي</span>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            <div className="flex flex-col gap-2 min-w-[140px]">
-                                                {session.status !== 'completed' && (
-                                                    <>
-                                                        {session.type === 'online' ? (
-                                                            <Button asChild className="w-full">
-                                                                <a href={session.link} target="_blank" rel="noopener noreferrer">
-                                                                    بدء الدرس
-                                                                </a>
-                                                            </Button>
-                                                        ) : (
-                                                             <div className="flex items-center gap-2 text-gray-500 bg-gray-50 px-3 py-2 rounded-md justify-center border text-sm mb-1">
-                                                                <MapPin className="h-4 w-4" />
-                                                                <span>{session.location}</span>
-                                                             </div>
-                                                        )}
-                                                        
-                                                        {/* Manage Session Button */}
-                                                        <Button 
-                                                            variant="outline" 
-                                                            className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800"
-                                                            onClick={() => handleOpenManageModal(session)}
-                                                        >
-                                                            <Settings className="w-4 h-4 ml-2" />
-                                                            إدارة الجلسة
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                
-                                                {session.status === 'completed' && (
-                                                     <div className="flex items-center gap-2 text-gray-500 justify-center">
-                                                        <CheckCircle className="h-5 w-5 text-green-500" />
-                                                        <span className="text-sm">تم الانتهاء</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {/* Manage Session Modal */}
             <Dialog open={isManageModalOpen} onOpenChange={setIsManageModalOpen}>
@@ -242,12 +238,12 @@ export default function TrainerSchedulePage() {
                             {selectedSession?.title} - {selectedSession?.courseTitle}
                         </DialogDescription>
                     </DialogHeader>
-                    
+
                     <div className="grid gap-6 py-4">
                         {/* Action Type Selection */}
-                        <RadioGroup 
-                            defaultValue="reschedule" 
-                            value={actionType} 
+                        <RadioGroup
+                            defaultValue="reschedule"
+                            value={actionType}
                             onValueChange={(val) => setActionType(val as 'reschedule' | 'cancel')}
                             className="grid grid-cols-2 gap-4"
                         >
@@ -278,31 +274,31 @@ export default function TrainerSchedulePage() {
                             <div className="space-y-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
                                 <div className="grid gap-2">
                                     <Label htmlFor="date">التاريخ الجديد</Label>
-                                    <Input 
-                                        id="date" 
-                                        type="date" 
-                                        value={newDate} 
-                                        onChange={(e) => setNewDate(e.target.value)} 
+                                    <Input
+                                        id="date"
+                                        type="date"
+                                        value={newDate}
+                                        onChange={(e) => setNewDate(e.target.value)}
                                         className="bg-white"
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="start-time">وقت البدء</Label>
-                                        <Input 
-                                            id="start-time" 
-                                            type="time" 
-                                            value={newStartTime} 
+                                        <Input
+                                            id="start-time"
+                                            type="time"
+                                            value={newStartTime}
                                             onChange={(e) => setNewStartTime(e.target.value)}
                                             className="bg-white"
                                         />
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="end-time">وقت النهاية</Label>
-                                        <Input 
-                                            id="end-time" 
-                                            type="time" 
-                                            value={newEndTime} 
+                                        <Input
+                                            id="end-time"
+                                            type="time"
+                                            value={newEndTime}
                                             onChange={(e) => setNewEndTime(e.target.value)}
                                             className="bg-white"
                                         />
@@ -324,20 +320,20 @@ export default function TrainerSchedulePage() {
                         {/* Reason Field */}
                         <div className="grid gap-2">
                             <Label htmlFor="reason">سبب التغيير/الإلغاء (إجباري)</Label>
-                            <Textarea 
-                                id="reason" 
-                                placeholder="مثلاً: ظروف صحية طارئة، تأجيل بطلب من الطلاب..." 
+                            <Textarea
+                                id="reason"
+                                placeholder="مثلاً: ظروف صحية طارئة، تأجيل بطلب من الطلاب..."
                                 value={reason}
                                 onChange={(e) => setReason(e.target.value)}
                                 className={!reason && isManageModalOpen ? "border-red-200 focus-visible:ring-red-500" : ""}
                             />
-                            <p className="text-xs text-muted-foreground">سيظهر هذا النص في الإشعار المرسل للطلاب.</p>
+                            <p className="text-xs text-muted-foreground">سيظهر هذا نص في الإشعار المرسل للطلاب.</p>
                         </div>
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>إلغاء</Button>
-                        <Button 
+                        <Button
                             className={actionType === 'reschedule' ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"}
                             onClick={handleConfirmAction}
                         >

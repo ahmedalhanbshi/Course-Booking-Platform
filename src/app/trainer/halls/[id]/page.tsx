@@ -125,6 +125,15 @@ interface Hall {
   locationUrl?: string
   capacity: number
   gallery?: string[]
+  institute?: {
+    name: string
+    description: string
+    logo: string
+    phone: string
+    email: string
+    address: string
+    website: string
+  }
 }
 
 export default function HallDetailsPage() {
@@ -147,7 +156,16 @@ export default function HallDetailsPage() {
           image: getFileUrl(data.image),
           features: data.facilities || [],
           location: data.location || "غير محدد",
-          type: data.type || "قاعة محاضرات"
+          type: data.type || "قاعة محاضرات",
+          institute: {
+            name: data.institute?.name || "معهد غير مسمى",
+            description: data.instituteDescription || data.institute?.description || "لا يوجد وصف متاح لهذا المعهد حالياً.",
+            logo: getFileUrl(data.instituteLogo) || "/images/logo.png",
+            phone: data.institute?.phone || "",
+            email: data.institute?.email || "",
+            address: data.institute?.address || "",
+            website: data.institute?.website || "",
+          }
         }
         setHall(mappedHall)
       } catch (err: any) {
@@ -1029,55 +1047,68 @@ export default function HallDetailsPage() {
                 <div className="flex items-center justify-start md:justify-end">
                   <div className="relative h-28 w-28 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
                     <Image
-                      src="/images/logo.png"
-                      alt="شعار المعهد"
+                      src={hall.institute?.logo || "/images/logo.png"}
+                      alt={`شعار ${hall.institute?.name || "المعهد"}`}
                       fill
-                      className="object-contain p-4"
+                      unoptimized
+                      className="object-cover"
                       sizes="112px"
                     />
                   </div>
                 </div>
 
                 <div className="flex-1 text-right">
-                  <h2 className="text-lg font-bold text-slate-900">معهد منصة د</h2>
+                  <h2 className="text-lg font-bold text-slate-900">{hall.institute?.name || "المعهد غير متاح"}</h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    معهد تدريبي متخصص في القاعات التعليمية والدورات الاحترافية.
+                    {hall.institute?.description || "معهد تدريبي متخصص في القاعات التعليمية والدورات الاحترافية."}
                   </p>
 
                   <div className="mt-4 space-y-2 text-sm">
-                    <a href="tel:+456123777967" className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
-                      <Phone className="h-4 w-4" />
-                      <span className="text-slate-500">رقم التواصل:</span>
-                      <span className="font-semibold">+456 123 777 967</span>
-                    </a>
-                    <a href="mailto:institute@manasa.edu" className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
-                      <Mail className="h-4 w-4" />
-                      <span className="text-slate-500">البريد الإلكتروني:</span>
-                      <span className="font-semibold">institute@manasa.edu</span>
-                    </a>
+                    {hall.institute?.phone && (
+                      <a href={`tel:${hall.institute.phone}`} className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
+                        <Phone className="h-4 w-4" />
+                        <span className="text-slate-500">رقم التواصل:</span>
+                        <span className="font-semibold">{hall.institute.phone}</span>
+                      </a>
+                    )}
+                    {hall.institute?.email && (
+                      <a href={`mailto:${hall.institute.email}`} className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
+                        <Mail className="h-4 w-4" />
+                        <span className="text-slate-500">البريد الإلكتروني:</span>
+                        <span className="font-semibold">{hall.institute.email}</span>
+                      </a>
+                    )}
                   </div>
 
                   <div className="mt-4 flex items-center gap-2">
-                    {locationUrl ? (
-                      <a
-                        href={locationUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700"
-                        aria-label="الموقع على الخريطة"
-                      >
+                    {hall.institute?.address ? (
+                      <span className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 px-3 text-sm text-slate-600 w-auto gap-2">
                         <MapPin className="h-4 w-4" />
-                      </a>
-                    ) : (
-                      <span
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-300 cursor-not-allowed"
-                        aria-label="الموقع غير متوفر"
-                      >
-                        <MapPin className="h-4 w-4" />
+                        {hall.institute.address}
                       </span>
-                    )}
+                    ) : (
+                      hall.locationUrl ? (
+                        <a
+                          href={hall.locationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 px-3 gap-2"
+                          aria-label="الموقع على الخريطة"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          عرض على الخريطة
+                        </a>
+                      ) : (
+                        <span
+                          className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 text-slate-300 cursor-not-allowed px-3 gap-2"
+                          aria-label="الموقع غير متوفر"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          الموقع غير متوفر
+                        </span>
+                      ))}
                     <a
-                      href="https://www.instagram.com/"
+                      href="#"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-pink-200 hover:text-pink-600"
@@ -1086,7 +1117,7 @@ export default function HallDetailsPage() {
                       <Instagram className="h-4 w-4" />
                     </a>
                     <a
-                      href="https://www.facebook.com/"
+                      href="#"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700"
@@ -1094,15 +1125,17 @@ export default function HallDetailsPage() {
                     >
                       <Facebook className="h-4 w-4" />
                     </a>
-                    <a
-                      href="https://example.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700"
-                      aria-label="الموقع الإلكتروني"
-                    >
-                      <Globe className="h-4 w-4" />
-                    </a>
+                    {hall.institute?.website && (
+                      <a
+                        href={hall.institute.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700"
+                        aria-label="الموقع الإلكتروني"
+                      >
+                        <Globe className="h-4 w-4" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

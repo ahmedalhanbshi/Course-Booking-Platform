@@ -12,6 +12,13 @@ router.use(authenticate);
 // Dashboard
 router.get('/dashboard', trainerController.getDashboard);
 
+// Schedule
+router.get('/schedule', trainerController.getSchedule);
+
+// Categories
+router.get('/categories', trainerController.getCategories);
+router.post('/categories', trainerController.createCategory);
+
 // Explore (public course catalog)
 router.get('/explore', trainerController.getExploreCourses);
 router.get('/explore/:courseId', trainerController.getPublicCourseById);
@@ -26,6 +33,7 @@ router.get('/halls/:hallId/availability', trainerController.getHallAvailability)
 router.get('/courses', trainerController.getCourses);
 router.get('/courses/:courseId', trainerController.getTrainerCourseById);
 router.put('/courses/:courseId', trainerController.updateTrainerCourse);
+router.delete('/courses/:courseId', trainerController.deleteCourse);
 router.get('/courses/:courseId/students', trainerController.getCourseStudents);
 router.patch('/courses/:courseId/students/:enrollmentId/unenroll', trainerController.unenrollStudent);
 
@@ -76,5 +84,18 @@ router.patch('/enrollments/:enrollmentId/status', trainerController.updateEnroll
 
 // Room Bookings
 router.get('/bookings', trainerController.getRoomBookings);
+router.post(
+    '/courses/:courseId/bookings/:bookingId/resubmit',
+    (req: Request, res: Response, next: NextFunction): void => {
+        upload.fields([{ name: 'paymentReceipt', maxCount: 1 }])(req, res, (err) => {
+            if (err) {
+                res.status(400).json({ success: false, message: err.message });
+                return;
+            }
+            next();
+        });
+    },
+    trainerController.resubmitBookingPayment
+);
 
 export default router;

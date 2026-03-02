@@ -37,7 +37,9 @@ export default function InstituteProfilePage() {
     const [showPassword, setShowPassword] = useState(false)
     const [activeTab, setActiveTab] = useState("personal")
     const [avatarFile, setAvatarFile] = useState<File | null>(null)
+    const [logoFile, setLogoFile] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const logoFileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -72,6 +74,15 @@ export default function InstituteProfilePage() {
         }
     }
 
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]
+            setLogoFile(file)
+            setUser({ ...user, instituteLogo: URL.createObjectURL(file) })
+            setIsEditing(true) // auto-enable editing mode so they can save
+        }
+    }
+
     const handleSave = async () => {
         try {
             setIsSaving(true)
@@ -84,6 +95,9 @@ export default function InstituteProfilePage() {
             formData.append("instituteDescription", user.instituteDescription)
             if (avatarFile) {
                 formData.append("avatar", avatarFile)
+            }
+            if (logoFile) {
+                formData.append("logo", logoFile)
             }
 
             const data = await instituteService.updateProfile(formData)
@@ -98,6 +112,7 @@ export default function InstituteProfilePage() {
             toast.success("تم تحديث البيانات بنجاح")
             setIsEditing(false)
             setAvatarFile(null)
+            setLogoFile(null)
         } catch (error) {
             console.error(error)
             toast.error("حدث خطأ أثناء حفظ البيانات")
@@ -230,6 +245,34 @@ export default function InstituteProfilePage() {
                 <CardDescription>إدارة المعلومات العامة للمعهد</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {/* Institute Logo */}
+                <div className="flex items-center gap-4">
+                    <Avatar className="h-24 w-24 border-2 border-slate-100">
+                        {user.instituteLogo ? (
+                            <AvatarImage src={getFileUrl(user.instituteLogo)} alt={user.instituteName} className="object-cover" />
+                        ) : (
+                            <AvatarFallback className="text-xl bg-slate-50 text-slate-400">
+                                {user.instituteName?.charAt(0) || <Building className="h-8 w-8 text-slate-300" />}
+                            </AvatarFallback>
+                        )}
+                    </Avatar>
+                    <div>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            ref={logoFileInputRef}
+                            onChange={handleLogoChange}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => logoFileInputRef.current?.click()}>
+                            تغيير شعار المعهد
+                        </Button>
+                        <p className="text-sm text-gray-500 mt-1">
+                            JPG, PNG أو GIF. الحد الأقصى 2MB
+                        </p>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="instituteName">اسم المعهد</Label>

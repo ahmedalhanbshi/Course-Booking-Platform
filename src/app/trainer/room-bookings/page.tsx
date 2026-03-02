@@ -144,7 +144,7 @@ export default function TrainerRoomBookingsPage() {
     setShowCancelDialog(false)
     setSelectedBooking(null)
   }
-  
+
   const handleConfirmPayment = (booking: RoomBooking) => {
     setBookings(bookings.map(current =>
       current.id === booking.id

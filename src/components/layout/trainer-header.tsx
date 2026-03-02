@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Bell, User, Menu, LogOut, Sun, Moon, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,10 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 
 interface TrainerHeaderProps {
+  isSidebarOpen: boolean
   onMenuClick: () => void
 }
 
-export function TrainerHeader({ onMenuClick }: TrainerHeaderProps) {
+export function TrainerHeader({ isSidebarOpen, onMenuClick }: TrainerHeaderProps) {
   const { user, logout } = useAuth()
 
   const avatarSrc = user?.avatar
@@ -26,10 +28,16 @@ export function TrainerHeader({ onMenuClick }: TrainerHeaderProps) {
     : ""
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-white/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-6 shadow-sm transition-all duration-300">
       {/* Menu Toggle */}
-      <Button variant="ghost" size="icon" onClick={onMenuClick} className="text-gray-500 hover:text-gray-900 lg:hidden">
-        <Menu className="h-5 w-5" />
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onMenuClick}
+        className="text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 dark:hover:bg-slate-800"
+        title={isSidebarOpen ? "إخفاء القائمة الجانبية" : "إظهار القائمة الجانبية"}
+      >
+        <Menu className={cn("h-5 w-5 transition-transform duration-300", isSidebarOpen ? "rotate-90" : "rotate-0")} />
         <span className="sr-only">القائمة</span>
       </Button>
 

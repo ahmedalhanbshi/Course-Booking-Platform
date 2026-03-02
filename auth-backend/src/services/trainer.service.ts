@@ -148,6 +148,28 @@ class TrainerService {
     }
 
     /**
+     * Get all categories
+     */
+    async getCategories() {
+        return prisma.courseCategory.findMany({
+            orderBy: { name: 'asc' },
+            select: { id: true, name: true }
+        });
+    }
+
+    /**
+     * Create a new category
+     */
+    async createCategory(name: string) {
+        // Generate a simple slug from the name
+        const slug = name.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-').replace(/(^-|-$)/g, '');
+        return prisma.courseCategory.create({
+            data: { name, slug: slug || `category-${Date.now()}` },
+            select: { id: true, name: true }
+        });
+    }
+
+    /**
      * Get all courses created by this trainer
      */
     async getCourses(userId: string) {
@@ -157,7 +179,7 @@ class TrainerService {
                 category: { select: { name: true } },
                 _count: { select: { enrollments: true } },
                 roomBookings: {
-                    select: { status: true },
+                    select: { status: true, rejectionReason: true },
                     orderBy: { createdAt: 'desc' },
                     take: 1,
                 },
@@ -184,6 +206,7 @@ class TrainerService {
                 minStudents: c.minStudents,
                 enrolledStudents: c._count.enrollments,
                 status: displayStatus,
+                rejectionReason: latestBooking?.rejectionReason ?? null,
                 category: c.category?.name ?? '—',
                 createdAt: c.createdAt,
                 prerequisites: c.prerequisites ? c.prerequisites.split('\n') : [],
@@ -202,6 +225,11 @@ class TrainerService {
             include: {
                 category: { select: { id: true, name: true } },
                 _count: { select: { enrollments: true } },
+                roomBookings: {
+                    include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
+                    orderBy: { createdAt: 'desc' },
+                    take: 1
+                }
             },
         });
 
@@ -226,6 +254,18 @@ class TrainerService {
             prerequisites: course.prerequisites ? course.prerequisites.split('\n').filter(Boolean) : [],
             objectives: course.objectives ?? [],
             tags: course.tags ?? [],
+            roomBooking: course.roomBookings[0] ? {
+                id: course.roomBookings[0].id,
+                status: course.roomBookings[0].status.toLowerCase(),
+                rejectionReason: course.roomBookings[0].rejectionReason,
+                totalPrice: Number(course.roomBookings[0].totalPrice),
+                payment: course.roomBookings[0].payments[0] ? {
+                    id: course.roomBookings[0].payments[0].id,
+                    status: course.roomBookings[0].payments[0].status.toLowerCase(),
+                    amount: Number(course.roomBookings[0].payments[0].amount),
+                    receipt: course.roomBookings[0].payments[0].depositSlipImage
+                } : null
+            } : null,
             createdAt: course.createdAt,
         };
     }
@@ -255,6 +295,27 @@ class TrainerService {
                 prerequisites: data.prerequisites?.length ? data.prerequisites.join('\n') : null,
                 tags: data.tags ?? [],
             },
+        });
+    }
+
+    /**
+     * Delete a course that belongs to this trainer
+     */
+    async deleteCourse(userId: string, courseId: string) {
+        const course = await prisma.course.findFirst({
+            where: { id: courseId, trainerId: userId },
+        });
+        if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
+
+        // Delete associated sessions, room bookings, etc. (cascading handled by Prisma or manual)
+        // Note: In this schema, we might want to check for enrollments first.
+        const enrollmentCount = await prisma.enrollment.count({ where: { courseId } });
+        if (enrollmentCount > 0) {
+            throw new Error('لا يمكن حذف دورة بها طلاب مسجلون. يرجى إلغاء تسجيل الطلاب أولاً.');
+        }
+
+        return prisma.course.delete({
+            where: { id: courseId },
         });
     }
 
@@ -403,21 +464,25 @@ class TrainerService {
         });
     }
 
-    /**
-     * Get a single hall by ID
-     */
     async getHallById(hallId: string) {
         const room = await prisma.room.findFirst({
             where: { id: hallId, isActive: true },
             include: {
                 institute: {
-                    select: { id: true, name: true, phone: true, email: true, website: true, address: true }
+                    include: {
+                        user: { select: { avatar: true } }
+                    }
                 }
             }
         });
 
         if (!room) throw new Error("القاعة غير موجودة أو غير نشطة");
-        return room;
+
+        return {
+            ...room,
+            instituteDescription: room.institute?.description,
+            instituteLogo: room.institute?.logo || room.institute?.user?.avatar,
+        };
     }
 
     /**
@@ -802,6 +867,46 @@ class TrainerService {
     }
 
     /**
+     * Resubmit a rejected hall booking payment
+     */
+    async resubmitBookingPayment(userId: string, courseId: string, bookingId: string, paymentReceiptPath: string) {
+        // 1. Validate Ownership and rejection status
+        const booking = await prisma.roomBooking.findFirst({
+            where: {
+                id: bookingId,
+                courseId: courseId,
+                requestedById: userId,
+                status: 'REJECTED'
+            }
+        });
+
+        if (!booking) throw new Error("لم يتم العثور على طلب الحجز المرفوض");
+
+        // 2. Update Booking Status back to PENDING_APPROVAL
+        const updatedBooking = await prisma.roomBooking.update({
+            where: { id: bookingId },
+            data: {
+                status: 'PENDING_APPROVAL',
+                rejectionReason: null // Clear previous reason
+            }
+        });
+
+        // 3. Create a NEW payment request
+        await prisma.payment.create({
+            data: {
+                amount: booking.totalPrice,
+                currency: "YER",
+                depositSlipImage: paymentReceiptPath,
+                notes: `إعادة إرسال إيصال الدفع بعد الرفض لطلب الحجز (${bookingId})`,
+                status: "PENDING_REVIEW",
+                roomBookingId: bookingId
+            }
+        });
+
+        return updatedBooking;
+    }
+
+    /**
      * Get enrollments for courses owned by this trainer
      */
     async getEnrollments(trainerId: string) {
@@ -919,6 +1024,53 @@ class TrainerService {
             },
             orderBy: { createdAt: 'desc' }
         });
+    }
+    /**
+     * Get all sessions for all courses owned by this trainer
+     */
+    async getSchedule(userId: string) {
+        // First get all courses belonging to this trainer
+        const courses = await prisma.course.findMany({
+            where: { trainerId: userId },
+            select: { id: true, title: true }
+        });
+
+        const courseIds = courses.map(c => c.id);
+
+        if (courseIds.length === 0) return [];
+
+        // Get all sessions for these courses
+        const sessions = await prisma.session.findMany({
+            where: {
+                courseId: { in: courseIds }
+            },
+            include: {
+                room: { select: { name: true } },
+                course: {
+                    select: {
+                        title: true,
+                        enrollments: {
+                            where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
+                            select: { id: true }
+                        }
+                    }
+                }
+            },
+            orderBy: { startTime: 'asc' }
+        });
+
+        return sessions.map(s => ({
+            id: s.id,
+            title: s.topic || 'جلسة تدريبية',
+            courseTitle: s.course.title,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            type: s.type.toLowerCase(),
+            status: s.status.toLowerCase(),
+            meetingLink: s.meetingLink,
+            location: s.room?.name || s.location || (s.type === 'ONLINE' ? 'أونلاين' : 'غير محدد'),
+            enrolledStudents: s.course.enrollments.length
+        }));
     }
 }
 

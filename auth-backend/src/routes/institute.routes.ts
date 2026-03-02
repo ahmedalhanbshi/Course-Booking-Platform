@@ -13,7 +13,7 @@ router.get('/dashboard', instituteController.getDashboard);
 
 // Profile
 router.get('/profile', instituteController.getProfile);
-router.put('/profile', upload.single('avatar'), instituteController.updateProfile);
+router.put('/profile', upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), instituteController.updateProfile);
 
 // Course management
 router.get('/courses', instituteController.getCourses);

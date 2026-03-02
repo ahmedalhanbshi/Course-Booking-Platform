@@ -32,11 +32,11 @@ class InstituteService {
         ] = await Promise.all([
             // Active courses count
             prisma.course.count({
-                where: { instituteId: institute.id, status: "ACTIVE" },
+                where: { instituteId: institute.id, status: "ACTIVE", trainerId: null },
             }),
             // Total courses count
             prisma.course.count({
-                where: { instituteId: institute.id },
+                where: { instituteId: institute.id, trainerId: null },
             }),
             // Rooms count
             prisma.room.count({
@@ -95,6 +95,7 @@ class InstituteService {
                     instituteId: institute.id,
                     status: { in: ["ACTIVE", "DRAFT"] },
                     startDate: { gte: new Date() },
+                    trainerId: null,
                 },
                 include: {
                     trainer: { select: { name: true } },
@@ -170,6 +171,7 @@ class InstituteService {
             avatar: institute.user.avatar,
             role: "institute_admin",
             instituteName: institute.name,
+            instituteLogo: institute.logo,
             instituteAddress: institute.address,
             instituteWebsite: institute.website,
             instituteDescription: institute.description,
@@ -190,6 +192,7 @@ class InstituteService {
             instituteWebsite?: string;
             instituteDescription?: string;
             avatar?: string;
+            logo?: string;
         }
     ) {
         const institute = await prisma.institute.findUnique({
@@ -218,6 +221,7 @@ class InstituteService {
                 address: data.instituteAddress !== undefined ? data.instituteAddress : undefined,
                 website: data.instituteWebsite !== undefined ? data.instituteWebsite : undefined,
                 description: data.instituteDescription !== undefined ? data.instituteDescription : undefined,
+                logo: data.logo !== undefined ? data.logo : undefined,
             },
         });
 
@@ -229,6 +233,7 @@ class InstituteService {
             avatar: updatedUser.avatar,
             role: "institute_admin",
             instituteName: updatedInstitute.name,
+            instituteLogo: updatedInstitute.logo,
             instituteAddress: updatedInstitute.address,
             instituteWebsite: updatedInstitute.website,
             instituteDescription: updatedInstitute.description,
@@ -334,7 +339,10 @@ class InstituteService {
         }
 
         const courses = await prisma.course.findMany({
-            where: { instituteId: institute.id },
+            where: {
+                instituteId: institute.id,
+                trainerId: null
+            },
             include: {
                 trainer: {
                     select: { id: true, name: true, email: true },
@@ -391,7 +399,7 @@ class InstituteService {
         }
 
         const course = await prisma.course.findFirst({
-            where: { id: courseId, instituteId: institute.id },
+            where: { id: courseId, instituteId: institute.id, trainerId: null },
         });
 
         if (!course) {
@@ -418,7 +426,7 @@ class InstituteService {
         }
 
         const course = await prisma.course.findFirst({
-            where: { id: courseId, instituteId: institute.id },
+            where: { id: courseId, instituteId: institute.id, trainerId: null },
         });
 
         if (!course) {
@@ -626,10 +634,15 @@ class InstituteService {
         const institute = await prisma.institute.findUnique({ where: { userId } });
         if (!institute) throw new Error("لم يتم العثور على المعهد");
 
-        return prisma.room.findMany({
+        const halls = await prisma.room.findMany({
             where: { instituteId: institute.id, isActive: true },
             orderBy: { name: "asc" },
         });
+
+        return halls.map(hall => ({
+            ...hall,
+            institute: { name: institute.name }
+        }));
     }
 
     /**
@@ -958,7 +971,7 @@ class InstituteService {
         }
 
         const course = await prisma.course.findFirst({
-            where: { id: courseId, instituteId: institute.id },
+            where: { id: courseId, instituteId: institute.id, trainerId: null },
             include: {
                 trainer: {
                     select: { id: true, name: true, email: true },
@@ -1068,7 +1081,7 @@ class InstituteService {
         }
 
         const course = await prisma.course.findFirst({
-            where: { id: courseId, instituteId: institute.id },
+            where: { id: courseId, instituteId: institute.id, trainerId: null },
             include: {
                 trainer: {
                     select: { id: true, name: true, email: true },
@@ -1116,7 +1129,7 @@ class InstituteService {
         }
 
         const course = await prisma.course.findFirst({
-            where: { id: courseId, instituteId: institute.id },
+            where: { id: courseId, instituteId: institute.id, trainerId: null },
         });
 
         if (!course) {

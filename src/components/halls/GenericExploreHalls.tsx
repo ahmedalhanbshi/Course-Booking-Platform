@@ -61,7 +61,8 @@ export default function GenericExploreHalls({
                     hourlyRate: Number(h.pricePerHour || 0),
                     image: getFileUrl(h.image),
                     features: h.facilities || [],
-                    description: h.description || ""
+                    description: h.description || "",
+                    owner: h.institute?.name || "معهد غير معروف"
                 }))
                 setDbHalls(mapped)
             } catch (e) {
@@ -195,12 +196,20 @@ export default function GenericExploreHalls({
                             {/* Content */}
                             <div className="p-5 flex flex-col flex-1">
                                 <div className="mb-4">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                                        {hall.name}
-                                    </h3>
-                                    <div className="flex items-center text-gray-500 text-sm gap-1.5 font-medium">
-                                        <MapPin className="h-4 w-4 shrink-0" />
-                                        <span className="truncate">{hall.location}</span>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="text-xl font-bold text-gray-900 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                                            {hall.name}
+                                        </h3>
+                                    </div>
+                                    <div className="flex flex-col gap-2 text-gray-500 text-sm font-medium">
+                                        <div className="flex items-start gap-1.5">
+                                            <Building2 className="h-4 w-4 shrink-0 mt-0.5" />
+                                            <span className="line-clamp-2 leading-tight">{hall.owner}</span>
+                                        </div>
+                                        <div className="flex items-start gap-1.5">
+                                            <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                                            <span className="line-clamp-2 leading-tight">{hall.location}</span>
+                                        </div>
                                     </div>
                                 </div>
 

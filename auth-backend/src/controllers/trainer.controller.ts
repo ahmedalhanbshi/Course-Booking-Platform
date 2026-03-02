@@ -46,6 +46,34 @@ class TrainerController {
     }
 
     /**
+     * Get all categories
+     */
+    async getCategories(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            const categories = await trainerService.getCategories();
+            return sendSuccess(res, 'تم جلب التصنيفات بنجاح', categories);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
+     * Create a new category
+     */
+    async createCategory(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { name } = req.body;
+            if (!name) return sendError(res, 'يرجى إدخال اسم التصنيف', 400);
+
+            const category = await trainerService.createCategory(name);
+            return sendSuccess(res, 'تم إضافة التصنيف بنجاح', category);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
      * Get all active halls for the trainer (or any user) to browse
      */
     async getHalls(req: AuthRequest, res: Response, _next: NextFunction) {
@@ -124,6 +152,20 @@ class TrainerController {
             const { courseId } = req.params;
             const updated = await trainerService.updateTrainerCourse(req.user.userId, courseId, req.body);
             return sendSuccess(res, 'تم تحديث الدورة بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
+     * Delete a course belonging to this trainer
+     */
+    async deleteCourse(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { courseId } = req.params;
+            await trainerService.deleteCourse(req.user.userId, courseId);
+            return sendSuccess(res, 'تم حذف الدورة بنجاح');
         } catch (error: any) {
             return sendError(res, error.message, 400);
         }
@@ -338,6 +380,46 @@ class TrainerController {
             return sendSuccess(res, 'تم جلب طلبات الحجز بنجاح', bookings);
         } catch (error: any) {
             return sendError(res, error.message, 404);
+        }
+    }
+
+    /**
+     * Resubmit a rejected hall booking payment
+     */
+    async resubmitBookingPayment(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { courseId, bookingId } = req.params;
+
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+            if (!files?.paymentReceipt?.[0]) {
+                return sendError(res, 'يرجى إرفاق إيصال الدفع الجديد', 400);
+            }
+
+            const paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
+
+            const updated = await trainerService.resubmitBookingPayment(
+                req.user.userId,
+                courseId,
+                bookingId,
+                paymentReceiptPath
+            );
+
+            return sendSuccess(res, 'تم إعادة إرسال طلب الحجز للمراجعة بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+    /**
+     * Get all sessions for the authenticated trainer
+     */
+    async getSchedule(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await trainerService.getSchedule(req.user.userId);
+            return sendSuccess(res, 'تم جلب الجدول بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
         }
     }
 }

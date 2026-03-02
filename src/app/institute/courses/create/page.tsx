@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { instituteService } from "@/lib/institute-service"
+import { HallImage } from "@/components/halls/HallImage"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -138,6 +139,7 @@ export default function CreateCoursePage() {
                 setCategories(cats)
                 setTrainers(trns)
                 setHalls(hls)
+                console.log("HLS DATA FETCHED:", hls)
             } catch (err) {
                 toast.error("فشل في تحميل البيانات الأساسية")
                 console.error(err)
@@ -152,13 +154,14 @@ export default function CreateCoursePage() {
     const mappedHalls = halls.map(h => ({
         id: h.id,
         name: h.name,
-        type: "قاعة تدريب", // Default since backend doesn't store type explicitly yet or assumes 'Room'
-        location: "مقر المعهد", // Placeholder
+        type: h.type || "قاعة تدريب",
+        location: h.location || "مقر المعهد",
         capacity: h.capacity,
         hourlyRate: Number(h.pricePerHour),
         image: h.image || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000",
-        features: ["wifi", "projector", "screen"], // Placeholder
-        description: `${h.facilities.join(' • ')}`
+        features: h.facilities && h.facilities.length > 0 ? h.facilities : ["مجهزة بالكامل"],
+        description: h.description || `${h.facilities?.join(' • ') || 'لا يوجد وصف'}`,
+        owner: h.institute?.name || "المعهد"
     }))
 
     const selectedHall = mappedHalls.find(h => h.id === courseData.hallId)
@@ -615,16 +618,30 @@ export default function CreateCoursePage() {
                             <Card>
                                 <CardHeader><CardTitle>اختيار القاعة</CardTitle></CardHeader>
                                 <CardContent>
-                                    <Button variant="outline" className="w-full justify-between h-12" onClick={() => setIsHallDialogOpen(true)}>
-                                        <span className="flex items-center gap-2"><MapPin className="h-4 w-4" /> {selectedHall ? selectedHall.name : "اختر القاعة"}</span>
-                                    </Button>
-                                    {selectedHall && (
-                                        <div className="mt-4 p-4 border rounded-xl flex gap-4 items-center">
-                                            <div className="relative h-16 w-16 rounded-lg overflow-hidden"><Image src={selectedHall.image} fill alt="" className="object-cover" /></div>
-                                            <div>
-                                                <h4 className="font-bold">{selectedHall.name}</h4>
-                                                <p className="text-sm text-gray-500">السعة: {selectedHall.capacity} | السعر: {selectedHall.hourlyRate} ر.ي/ساعة</p>
+                                    {!selectedHall ? (
+                                        <Button variant="outline" className="w-full justify-between h-14 border-dashed border-2 hover:bg-gray-50 hover:border-blue-500 text-gray-600" onClick={() => setIsHallDialogOpen(true)}>
+                                            <span className="flex items-center gap-2"><MapPin className="h-4 w-4" /> اختر قاعة التدريب لعرض المواعيد المتاحة</span>
+                                            <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-md text-sm font-medium">الاستعراض والقائمة</span>
+                                        </Button>
+                                    ) : (
+                                        <div className="mt-2 p-5 border-2 border-blue-100 bg-blue-50/40 rounded-xl flex flex-col md:flex-row gap-5 items-start md:items-center cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setIsHallDialogOpen(true)}>
+                                            <div className="relative h-24 w-full md:w-36 rounded-lg overflow-hidden shadow-sm shrink-0 border border-gray-100">
+                                                <HallImage src={selectedHall.image} alt={selectedHall.name} className="object-cover" />
                                             </div>
+                                            <div className="flex-1 space-y-2 w-full">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="font-bold text-lg text-gray-900">{selectedHall.name}</h4>
+                                                    <Badge variant="outline" className="bg-white hidden md:inline-flex">قاعة مختارة <CheckCircle className="mr-1 h-3 w-3 text-green-500 inline" /></Badge>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-3 text-sm mt-1">
+                                                    <span className="flex items-center gap-1.5 bg-white text-gray-700 px-2 py-1.5 rounded-md border shadow-sm"><Building className="h-4 w-4 text-purple-500" /> معهد: <strong>{selectedHall.owner}</strong> </span>
+                                                    <span className="flex items-center gap-1.5 bg-white text-gray-700 px-2 py-1.5 rounded-md border shadow-sm"><Users className="h-4 w-4 text-blue-500" /> السعة: <strong>{selectedHall.capacity}</strong> </span>
+                                                    <span className="flex items-center gap-1.5 bg-white text-gray-700 px-2 py-1.5 rounded-md border shadow-sm"><Banknote className="h-4 w-4 text-green-500" /> التكلفة: <strong>{selectedHall.hourlyRate} ر.ي/ساعة</strong></span>
+                                                </div>
+                                            </div>
+                                            <Button variant="ghost" size="sm" className="text-gray-500 hover:text-blue-600 hover:bg-white border w-full md:w-auto mt-2 md:mt-0" onClick={(e) => { e.stopPropagation(); setIsHallDialogOpen(true); }}>
+                                                تغيير القاعة
+                                            </Button>
                                         </div>
                                     )}
 
@@ -633,19 +650,59 @@ export default function CreateCoursePage() {
                                             <DialogHeader className="sr-only">
                                                 <DialogTitle>اختيار القاعة</DialogTitle>
                                                 <DialogDescription>اختر قاعة من القائمة</DialogDescription>
+                                                {halls.length > 0 && <div className="text-xs text-red-500 bg-red-50 p-2 mb-4 whitespace-normal break-words overflow-hidden" dir="ltr">{JSON.stringify(halls[0])}</div>}
                                             </DialogHeader>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
                                                 {mappedHalls.map((hall) => (
-                                                    <div key={hall.id} className="border rounded-xl overflow-hidden hover:border-blue-500 transition-colors cursor-pointer" onClick={() => { setCourseData(p => ({ ...p, hallId: hall.id })); setIsHallDialogOpen(false); }}>
-                                                        <div className="relative h-32 bg-slate-100">
-                                                            {hall.image ? <Image src={hall.image} fill alt="" className="object-cover" /> : <div className="h-full flex items-center justify-center text-slate-400">لا توجد صورة</div>}
+                                                    <div key={hall.id} className="border rounded-xl overflow-hidden hover:border-blue-500 transition-colors group flex flex-col bg-white">
+                                                        <div className="relative h-40 bg-slate-100 group-hover:opacity-90 transition-opacity">
+                                                            <HallImage src={hall.image} alt={hall.name} className="object-cover" />
+                                                            <div className="absolute top-2 right-2 flex flex-col gap-1">
+                                                                <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm shadow-sm">{hall.type}</Badge>
+                                                                <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm shadow-sm flex items-center gap-1">
+                                                                    <MapPin className="h-3 w-3" /> {hall.location}
+                                                                </Badge>
+                                                            </div>
                                                         </div>
-                                                        <div className="p-4">
-                                                            <h4 className="font-bold whitespace-nowrap overflow-hidden text-ellipsis">{hall.name}</h4>
-                                                            <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+                                                        <div className="p-4 flex-1 flex flex-col">
+                                                            <h4 className="font-bold whitespace-nowrap overflow-hidden text-ellipsis mb-1">{hall.name}</h4>
+                                                            <div className="flex items-start gap-1.5 text-xs text-gray-500 mb-3">
+                                                                <Building className="h-3 w-3 shrink-0 mt-0.5" /> <span className="line-clamp-2 leading-tight">{hall.owner}</span>
+                                                            </div>
+                                                            {hall.description && (
+                                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                                                                    {hall.description}
+                                                                </p>
+                                                            )}
+                                                            {hall.features && hall.features.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mb-3">
+                                                                    {hall.features.slice(0, 3).map((feature: string, idx: number) => (
+                                                                        <span key={idx} className="bg-gray-100 text-gray-600 text-[10px] px-1.5 py-0.5 rounded border border-gray-200">
+                                                                            {feature}
+                                                                        </span>
+                                                                    ))}
+                                                                    {hall.features.length > 3 && (
+                                                                        <span className="bg-gray-100 text-gray-600 text-[10px] px-1.5 py-0.5 rounded border border-gray-200">
+                                                                            +{hall.features.length - 3}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex justify-between items-center mb-4 text-sm text-gray-500 border-t pt-3 mt-auto">
                                                                 <span>السعة: {hall.capacity}</span>
                                                                 <span className="text-blue-600 font-medium">{hall.hourlyRate} ر.ي/ساعة</span>
                                                             </div>
+                                                            <Button
+                                                                variant="outline"
+                                                                className="w-full hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setCourseData(p => ({ ...p, hallId: hall.id }));
+                                                                    setIsHallDialogOpen(false);
+                                                                }}
+                                                            >
+                                                                اختيار القاعة
+                                                            </Button>
                                                         </div>
                                                     </div>
                                                 ))}
