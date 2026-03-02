@@ -32,7 +32,7 @@ router.get('/halls/:hallId/availability', trainerController.getHallAvailability)
 // Courses
 router.get('/courses', trainerController.getCourses);
 router.get('/courses/:courseId', trainerController.getTrainerCourseById);
-router.put('/courses/:courseId', trainerController.updateTrainerCourse);
+router.put('/courses/:courseId', upload.single('image'), trainerController.updateTrainerCourse);
 router.delete('/courses/:courseId', trainerController.deleteCourse);
 router.get('/courses/:courseId/students', trainerController.getCourseStudents);
 router.patch('/courses/:courseId/students/:enrollmentId/unenroll', trainerController.unenrollStudent);

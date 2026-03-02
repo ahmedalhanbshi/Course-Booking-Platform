@@ -150,7 +150,25 @@ class TrainerController {
         try {
             if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
             const { courseId } = req.params;
-            const updated = await trainerService.updateTrainerCourse(req.user.userId, courseId, req.body);
+            const payload = { ...req.body };
+
+            // Parse JSON fields from formData if they arrive as strings
+            if (typeof payload.objectives === 'string') {
+                try { payload.objectives = JSON.parse(payload.objectives); } catch (e) { /* ignore */ }
+            }
+            if (typeof payload.prerequisites === 'string') {
+                try { payload.prerequisites = JSON.parse(payload.prerequisites); } catch (e) { /* ignore */ }
+            }
+            if (typeof payload.tags === 'string') {
+                try { payload.tags = JSON.parse(payload.tags); } catch (e) { /* ignore */ }
+            }
+
+            // Handle file upload
+            if (req.file) {
+                payload.image = `/uploads/${req.file.filename}`;
+            }
+
+            const updated = await trainerService.updateTrainerCourse(req.user.userId, courseId, payload);
             return sendSuccess(res, 'تم تحديث الدورة بنجاح', updated);
         } catch (error: any) {
             return sendError(res, error.message, 400);

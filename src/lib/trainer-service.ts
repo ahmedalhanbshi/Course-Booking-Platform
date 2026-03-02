@@ -171,8 +171,12 @@ class TrainerService {
         return response.data.data;
     }
 
-    async updateTrainerCourse(courseId: string, data: any): Promise<any> {
-        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/trainer/courses/${courseId}`, data);
+    async updateTrainerCourse(courseId: string, data: any | FormData): Promise<any> {
+        let headers = {};
+        if (data instanceof FormData) {
+            headers = { 'Content-Type': 'multipart/form-data' };
+        }
+        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/trainer/courses/${courseId}`, data, { headers });
         return response.data.data;
     }
 

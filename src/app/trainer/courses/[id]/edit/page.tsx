@@ -10,9 +10,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, X, Loader2, AlertCircle, UploadCloud, Banknote } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, Loader2, AlertCircle, UploadCloud, Banknote, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { trainerService } from "@/lib/trainer-service"
+import { getFileUrl } from "@/lib/utils"
+import Image from "next/image"
+import { useRef } from "react"
 
 export default function EditTrainerCoursePage() {
     const router = useRouter()
@@ -31,6 +34,10 @@ export default function EditTrainerCoursePage() {
     const [resubmitFile, setResubmitFile] = useState<File | null>(null)
     const [resubmitPreview, setResubmitPreview] = useState<string>("")
     const [isResubmitting, setIsResubmitting] = useState(false)
+
+    const [imageFile, setImageFile] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string>("")
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleResubmit = async () => {
         if (!resubmitFile || !courseData.roomBooking?.id) return
@@ -65,6 +72,9 @@ export default function EditTrainerCoursePage() {
                     startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
                     endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
                 })
+                if (data.image) {
+                    setImagePreview(getFileUrl(data.image))
+                }
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || "فشل في تحميل بيانات الدورة")
                 router.push('/trainer/courses')
@@ -79,26 +89,40 @@ export default function EditTrainerCoursePage() {
         if (!courseData) return
         try {
             setIsSubmitting(true)
-            await trainerService.updateTrainerCourse(courseId, {
-                title: courseData.title,
-                shortDescription: courseData.shortDescription,
-                description: courseData.description,
-                price: courseData.price,
-                duration: courseData.duration,
-                maxStudents: courseData.maxStudents,
-                startDate: courseData.startDate,
-                endDate: courseData.endDate,
-                categoryId: courseData.categoryId,
-                objectives: courseData.objectives,
-                prerequisites: courseData.prerequisites,
-                tags: courseData.tags,
-            })
+
+            const formData = new FormData()
+            formData.append('title', courseData.title)
+            formData.append('shortDescription', courseData.shortDescription || '')
+            formData.append('description', courseData.description || '')
+            formData.append('price', courseData.price.toString())
+            formData.append('duration', courseData.duration.toString())
+            formData.append('maxStudents', courseData.maxStudents.toString())
+            formData.append('startDate', courseData.startDate)
+            formData.append('endDate', courseData.endDate)
+            formData.append('categoryId', courseData.categoryId || '')
+            formData.append('objectives', JSON.stringify(courseData.objectives))
+            formData.append('prerequisites', JSON.stringify(courseData.prerequisites))
+            formData.append('tags', JSON.stringify(courseData.tags))
+
+            if (imageFile) {
+                formData.append('image', imageFile)
+            }
+
+            await trainerService.updateTrainerCourse(courseId, formData)
             toast.success("تم تحديث الدورة بنجاح")
             router.push('/trainer/courses')
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "فشل في تحديث الدورة")
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            setImageFile(file)
+            setImagePreview(URL.createObjectURL(file))
         }
     }
 
@@ -290,6 +314,55 @@ export default function EditTrainerCoursePage() {
                                 onChange={e => setCourseData((prev: any) => ({ ...prev, shortDescription: e.target.value }))}
                                 rows={2}
                             />
+                        </div>
+                        <div className="space-y-4">
+                            <Label>صورة الدورة</Label>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <div
+                                    className="relative h-32 w-48 rounded-lg border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    {imagePreview ? (
+                                        <Image src={imagePreview} alt="Course Preview" fill className="object-cover" unoptimized />
+                                    ) : (
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <Plus className="h-8 w-8 mb-2" />
+                                            <span className="text-xs">إضافة صورة</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                    <p className="text-sm text-gray-500">
+                                        تغيير صورة الدورة التدريبية. يفضل أن تكون صورتك بصيغة JPG أو PNG وبجودة عالية.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                        />
+                                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                            تغيير الصورة
+                                        </Button>
+                                        {imageFile && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                onClick={() => {
+                                                    setImageFile(null)
+                                                    setImagePreview(courseData.image ? getFileUrl(courseData.image) : "")
+                                                }}
+                                            >
+                                                إلغاء التغيير
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="description">الوصف التفصيلي</Label>

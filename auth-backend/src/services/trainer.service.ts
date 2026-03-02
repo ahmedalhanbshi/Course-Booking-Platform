@@ -285,6 +285,7 @@ class TrainerService {
                 title: data.title,
                 description: data.description,
                 shortDescription: data.shortDescription,
+                image: data.image,
                 price: Number(data.price),
                 duration: Number(data.duration),
                 maxStudents: Number(data.maxStudents),
