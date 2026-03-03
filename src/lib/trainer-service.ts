@@ -257,6 +257,13 @@ class TrainerService {
         return response.data.data;
     }
 
+    async cancelBooking(courseId: string, bookingId: string): Promise<any> {
+        const response = await apiClient.delete<{ success: boolean; message: string; data: any }>(
+            `/api/trainer/courses/${courseId}/bookings/${bookingId}`
+        );
+        return response.data.data;
+    }
+
 }
 
 export const trainerService = new TrainerService();

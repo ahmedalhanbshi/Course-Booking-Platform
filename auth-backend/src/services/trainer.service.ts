@@ -1021,6 +1021,18 @@ class TrainerService {
                         id: true,
                         title: true
                     }
+                },
+                sessions: {
+                    select: {
+                        id: true,
+                        topic: true,
+                        startTime: true,
+                        endTime: true
+                    },
+                    orderBy: { startTime: 'asc' }
+                },
+                payments: {
+                    orderBy: { createdAt: 'desc' }
                 }
             },
             orderBy: { createdAt: 'desc' }
