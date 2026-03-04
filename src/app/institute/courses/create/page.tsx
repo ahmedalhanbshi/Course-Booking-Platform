@@ -86,12 +86,24 @@ export default function CreateCoursePage() {
     const [isSlotsLoading, setIsSlotsLoading] = useState(false)
     const [isHallDialogOpen, setIsHallDialogOpen] = useState(false)
     const [onlineSchedule, setOnlineSchedule] = useState({
-        startDate: "",
-        startTime: "",
-        duration: "",
         platform: "",
         meetingLink: ""
     })
+
+    type OnlineSession = { date: string; startTime: string; duration: string; topic: string }
+    const [onlineSessions, setOnlineSessions] = useState<OnlineSession[]>([
+        { date: "", startTime: "", duration: "60", topic: "" }
+    ])
+
+    const addOnlineSession = () => {
+        setOnlineSessions(prev => [...prev, { date: "", startTime: "", duration: "60", topic: "" }])
+    }
+    const removeOnlineSession = (idx: number) => {
+        setOnlineSessions(prev => prev.filter((_, i) => i !== idx))
+    }
+    const updateOnlineSession = (idx: number, field: keyof OnlineSession, value: string) => {
+        setOnlineSessions(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
+    }
 
     const [currentObjective, setCurrentObjective] = useState("")
     const [currentPrerequisite, setCurrentPrerequisite] = useState("")
@@ -296,24 +308,24 @@ export default function CreateCoursePage() {
                 }));
 
             } else if (courseData.deliveryType === 'online') {
-                if (!onlineSchedule.startDate) throw new Error("يجب تحديد تاريخ البدء");
-                startDate = onlineSchedule.startDate;
-                // Assume single session or Calculate end date based on logic/duration
-                // For simplicity, end date = start date (single session course)
-                endDate = onlineSchedule.startDate;
+                const validSessions = onlineSessions.filter(s => s.date && s.startTime)
+                if (validSessions.length === 0) throw new Error("يجب إضافة جلسة واحدة على الأقل مع تحديد التاريخ والوقت");
+                const sortedDates = [...validSessions].sort((a, b) => a.date.localeCompare(b.date));
+                startDate = sortedDates[0].date;
+                endDate = sortedDates[sortedDates.length - 1].date;
 
-                // Calculate end time
-                const start = new Date(`${onlineSchedule.startDate}T${onlineSchedule.startTime}`);
-                const end = new Date(start.getTime() + Number(onlineSchedule.duration) * 60000);
-                const endTime = end.toTimeString().substring(0, 5);
-
-                sessionsPayload = [{
-                    date: onlineSchedule.startDate,
-                    startTime: onlineSchedule.startTime,
-                    endTime: endTime,
-                    location: 'Online',
-                    topic: 'جلسة أونلاين'
-                }];
+                sessionsPayload = validSessions.map(s => {
+                    const start = new Date(`${s.date}T${s.startTime}`);
+                    const end = new Date(start.getTime() + Number(s.duration || 60) * 60000);
+                    return {
+                        date: s.date,
+                        startTime: s.startTime,
+                        endTime: end.toTimeString().substring(0, 5),
+                        location: onlineSchedule.platform || 'Online',
+                        meetingLink: onlineSchedule.meetingLink || undefined,
+                        topic: s.topic || 'جلسة أونلاين'
+                    };
+                });
             } else {
                 // Capacity based or other
                 startDate = new Date().toISOString().split('T')[0]; // Placeholder
@@ -339,7 +351,7 @@ export default function CreateCoursePage() {
             formData.append('status', status === 'ACTIVE' ? 'DRAFT' : 'DRAFT')
             formData.append('startDate', startDate)
             formData.append('endDate', endDate)
-            formData.append('duration', (courseData.deliveryType === 'in_person' ? selectedSessions.length : (Number(onlineSchedule.duration) / 60)).toString())
+            formData.append('duration', (courseData.deliveryType === 'in_person' ? selectedSessions.length : (onlineSessions.reduce((sum, s) => sum + Number(s.duration || 60), 0) / 60)).toString())
             formData.append('sessions', JSON.stringify(sessionsPayload))
 
             if (imageFile) {
@@ -388,7 +400,7 @@ export default function CreateCoursePage() {
     const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && courseData.trainerId;
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
-        if (courseData.deliveryType === 'online') return !!onlineSchedule.startDate && !!onlineSchedule.startTime;
+        if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
         return true; // capacity_based doesn't need location yet
     }
 
@@ -798,19 +810,85 @@ export default function CreateCoursePage() {
 
                     {/* Online Flow */}
                     {courseData.deliveryType === 'online' && (
-                        <Card>
-                            <CardHeader><CardTitle>بيانات الجلسة</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>تاريخ البدء</Label><Input type="date" value={onlineSchedule.startDate} onChange={e => setOnlineSchedule({ ...onlineSchedule, startDate: e.target.value })} /></div>
-                                <div className="space-y-2"><Label>وقت البدء</Label><Input type="time" value={onlineSchedule.startTime} onChange={e => setOnlineSchedule({ ...onlineSchedule, startTime: e.target.value })} /></div>
-                                <div className="space-y-2"><Label>المدة (دقيقة)</Label>
-                                    <Select value={onlineSchedule.duration} onValueChange={v => setOnlineSchedule({ ...onlineSchedule, duration: v })}>
-                                        <SelectTrigger><SelectValue placeholder="المدة" /></SelectTrigger>
-                                        <SelectContent><SelectItem value="60">60</SelectItem><SelectItem value="90">90</SelectItem><SelectItem value="120">120</SelectItem></SelectContent>
-                                    </Select>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <div className="space-y-6">
+                            {/* Platform & Meeting Link */}
+                            <Card>
+                                <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-blue-600" />منصة البث والرابط</CardTitle></CardHeader>
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>منصة البث</Label>
+                                        <Select value={onlineSchedule.platform} onValueChange={v => setOnlineSchedule({ ...onlineSchedule, platform: v })}>
+                                            <SelectTrigger><SelectValue placeholder="اختر المنصة" /></SelectTrigger>
+                                            <SelectContent>
+                                                {platforms.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>رابط الاجتماع (Meeting Link)</Label>
+                                        <Input
+                                            placeholder="https://zoom.us/j/... أو meet.google.com/..."
+                                            value={onlineSchedule.meetingLink}
+                                            onChange={e => setOnlineSchedule({ ...onlineSchedule, meetingLink: e.target.value })}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Sessions List */}
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex justify-between items-center">
+                                        <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-blue-600" />الجلسات ({onlineSessions.length})</CardTitle>
+                                        <Button type="button" size="sm" variant="outline" onClick={addOnlineSession}>
+                                            <Plus className="h-4 w-4 mr-1" /> إضافة جلسة
+                                        </Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {onlineSessions.map((session, idx) => (
+                                        <div key={idx} className="border rounded-xl p-4 space-y-3 bg-blue-50/40 relative">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-semibold text-sm text-blue-800">جلسة {idx + 1}</span>
+                                                {onlineSessions.length > 1 && (
+                                                    <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => removeOnlineSession(idx)}>
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">التاريخ</Label>
+                                                    <Input type="date" value={session.date} onChange={e => updateOnlineSession(idx, 'date', e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">وقت البدء</Label>
+                                                    <Input type="time" value={session.startTime} onChange={e => updateOnlineSession(idx, 'startTime', e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">المدة (دقيقة)</Label>
+                                                    <Select value={session.duration} onValueChange={v => updateOnlineSession(idx, 'duration', v)}>
+                                                        <SelectTrigger><SelectValue placeholder="المدة" /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="30">30 دقيقة</SelectItem>
+                                                            <SelectItem value="45">45 دقيقة</SelectItem>
+                                                            <SelectItem value="60">60 دقيقة</SelectItem>
+                                                            <SelectItem value="90">90 دقيقة</SelectItem>
+                                                            <SelectItem value="120">120 دقيقة</SelectItem>
+                                                            <SelectItem value="180">180 دقيقة</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">عنوان الجلسة (اختياري)</Label>
+                                                <Input placeholder="مثال: المقدمة والتعريف بالمنهج" value={session.topic} onChange={e => updateOnlineSession(idx, 'topic', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </div>
                     )}
 
                     <div className="flex justify-between pt-6 border-t mt-8">

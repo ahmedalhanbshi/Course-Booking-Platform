@@ -105,6 +105,8 @@ export default function InstituteRoomBookings() {
         return <Badge className="bg-yellow-100 text-yellow-800">قيد المراجعة</Badge>
       case "PENDING_PAYMENT":
         return <Badge className="bg-blue-100 text-blue-800">في انتظار الدفع</Badge>
+      case "CANCELLED":
+        return <Badge className="bg-gray-100 text-gray-800">ملغى</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -316,43 +318,52 @@ export default function InstituteRoomBookings() {
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
             {paymentDialog.booking && paymentDialog.booking.payments && paymentDialog.booking.payments.length > 0 ? (
-              paymentDialog.booking.payments.map((payment: any) => (
-                <div key={payment.id} className="p-4 bg-gray-50 rounded-lg space-y-2 text-sm border">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-gray-700">المبلغ:</span>
-                    <span className="font-bold text-lg">{payment.amount} {payment.currency}</span>
+              [...paymentDialog.booking.payments]
+                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((payment: any, index: number) => (
+                  <div key={payment.id} className={`p-4 rounded-lg space-y-2 text-sm border ${index === 0 ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-gray-50'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-700">المبلغ:</span>
+                        {index === 0 ? (
+                          <Badge variant="default" className="bg-blue-600 text-[10px] px-1.5 h-5">الأحدث</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] px-1.5 h-5">سابق</Badge>
+                        )}
+                      </div>
+                      <span className="font-bold text-lg">{payment.amount} {payment.currency}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-700">الحالة:</span>
+                      <Badge variant={payment.status === 'APPROVED' ? 'default' : payment.status === 'REJECTED' ? 'destructive' : 'secondary'}>
+                        {payment.status === 'APPROVED' ? 'مقبول' : payment.status === 'REJECTED' ? 'مرفوض' : 'قيد المراجعة'}
+                      </Badge>
+                    </div>
+                    {payment.notes && (
+                      <div className="mt-2 pt-2 border-t text-gray-600">
+                        <span className="font-medium text-gray-700 block mb-1">الملاحظات:</span>
+                        {payment.notes}
+                      </div>
+                    )}
+                    {payment.depositSlipImage && (
+                      <div className="mt-2 pt-2 border-t">
+                        <span className="font-medium text-gray-700 block mb-2">صورة الإيصال:</span>
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${payment.depositSlipImage}`}
+                          alt="Deposit Slip"
+                          className="max-w-full h-auto rounded-md border"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      </div>
+                    )}
+                    {payment.rejectionReason && (
+                      <div className="mt-2 pt-2 border-t text-red-600 bg-red-50 p-2 rounded">
+                        <span className="font-medium block mb-1">سبب الرفض:</span>
+                        {payment.rejectionReason}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-700">الحالة:</span>
-                    <Badge variant={payment.status === 'APPROVED' ? 'default' : payment.status === 'REJECTED' ? 'destructive' : 'secondary'}>
-                      {payment.status === 'APPROVED' ? 'مقبول' : payment.status === 'REJECTED' ? 'مرفوض' : 'قيد المراجعة'}
-                    </Badge>
-                  </div>
-                  {payment.notes && (
-                    <div className="mt-2 pt-2 border-t text-gray-600">
-                      <span className="font-medium text-gray-700 block mb-1">الملاحظات:</span>
-                      {payment.notes}
-                    </div>
-                  )}
-                  {payment.depositSlipImage && (
-                    <div className="mt-2 pt-2 border-t">
-                      <span className="font-medium text-gray-700 block mb-2">صورة الإيصال:</span>
-                      <img
-                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${payment.depositSlipImage}`}
-                        alt="Deposit Slip"
-                        className="max-w-full h-auto rounded-md border"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    </div>
-                  )}
-                  {payment.rejectionReason && (
-                    <div className="mt-2 pt-2 border-t text-red-600 bg-red-50 p-2 rounded">
-                      <span className="font-medium block mb-1">سبب الرفض:</span>
-                      {payment.rejectionReason}
-                    </div>
-                  )}
-                </div>
-              ))
+                ))
             ) : (
               <div className="text-center p-4 text-gray-500">لا توجد تفاصيل دفع متاحة</div>
             )}

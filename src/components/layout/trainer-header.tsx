@@ -25,7 +25,7 @@ export function TrainerHeader({ isSidebarOpen, onMenuClick }: TrainerHeaderProps
 
   const avatarSrc = user?.avatar
     ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${user.avatar}?t=${Date.now()}`
-    : ""
+    : undefined
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-white/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-6 shadow-sm transition-all duration-300">

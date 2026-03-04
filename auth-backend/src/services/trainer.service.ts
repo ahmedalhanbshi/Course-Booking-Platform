@@ -1039,6 +1039,49 @@ class TrainerService {
         });
     }
     /**
+     * Cancel a room booking and its associated course and sessions
+     */
+    async cancelBooking(trainerId: string, courseId: string, bookingId: string) {
+        const booking = await prisma.roomBooking.findUnique({
+            where: { id: bookingId },
+            include: { course: true }
+        });
+
+        if (!booking) {
+            throw new Error('طلب الحجز غير موجود');
+        }
+
+        if (booking.requestedById !== trainerId) {
+            throw new Error('غير مصرح لك بإلغاء هذا الحجز');
+        }
+
+        if (booking.courseId !== courseId) {
+            throw new Error('طلب الحجز لا ينتمي لهذه الدورة');
+        }
+
+        return await prisma.$transaction(async (tx) => {
+            const updatedBooking = await tx.roomBooking.update({
+                where: { id: bookingId },
+                data: { status: 'CANCELLED' }
+            });
+
+            if (booking.courseId) {
+                await tx.course.update({
+                    where: { id: booking.courseId },
+                    data: { status: 'CANCELLED' }
+                });
+
+                await tx.session.updateMany({
+                    where: { courseId: booking.courseId },
+                    data: { status: 'CANCELLED' }
+                });
+            }
+
+            return updatedBooking;
+        });
+    }
+
+    /**
      * Get all sessions for all courses owned by this trainer
      */
     async getSchedule(userId: string) {

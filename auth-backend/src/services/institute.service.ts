@@ -923,12 +923,14 @@ class InstituteService {
             },
         });
 
-        // Cascade approval to Payment and Course if APPROVED
+        // Cascade status to the LATEST pending Payment and Course if APPROVED or REJECTED
         if (data.status === "APPROVED") {
             if (updatedBooking.payments && updatedBooking.payments.length > 0) {
-                for (const payment of updatedBooking.payments) {
+                // Only update the latest pending payment
+                const latestPayment = [...updatedBooking.payments].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+                if (latestPayment && latestPayment.status === "PENDING_REVIEW") {
                     await prisma.payment.update({
-                        where: { id: payment.id },
+                        where: { id: latestPayment.id },
                         data: {
                             status: "APPROVED",
                             reviewedBy: data.adminId,
@@ -949,6 +951,22 @@ class InstituteService {
                 where: { roomBookingId: bookingId },
                 data: { status: "SCHEDULED" }
             });
+        } else if (data.status === "REJECTED") {
+            // Also reject the latest pending payment if the booking is rejected
+            if (updatedBooking.payments && updatedBooking.payments.length > 0) {
+                const latestPayment = [...updatedBooking.payments].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+                if (latestPayment && latestPayment.status === "PENDING_REVIEW") {
+                    await prisma.payment.update({
+                        where: { id: latestPayment.id },
+                        data: {
+                            status: "REJECTED",
+                            reviewedBy: data.adminId,
+                            reviewedAt: new Date(),
+                            rejectionReason: data.notes
+                        }
+                    });
+                }
+            }
         }
 
         return updatedBooking;

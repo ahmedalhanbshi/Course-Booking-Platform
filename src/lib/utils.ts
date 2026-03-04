@@ -15,8 +15,8 @@ export function formatDate(date: Date | string | number, options?: Intl.DateTime
   })
 }
 
-export function getFileUrl(path: string | null | undefined): string {
-  if (!path) return ""
+export function getFileUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
   const trimmedPath = path.trim()
   if (trimmedPath.startsWith("http") || trimmedPath.startsWith("blob:")) return trimmedPath
 

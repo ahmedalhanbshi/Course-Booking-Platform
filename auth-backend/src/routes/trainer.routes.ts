@@ -98,4 +98,7 @@ router.post(
     trainerController.resubmitBookingPayment
 );
 
+// Cancel Room Booking (alsos cancels course)
+router.delete('/courses/:courseId/bookings/:bookingId', trainerController.cancelBooking);
+
 export default router;

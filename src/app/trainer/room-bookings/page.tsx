@@ -526,10 +526,17 @@ export default function TrainerRoomBookingsPage() {
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
             {selectedBooking && selectedBooking.payments && selectedBooking.payments.length > 0 ? (
-              selectedBooking.payments.map((payment: any) => (
-                <div key={payment.id} className="p-4 bg-gray-50 rounded-lg space-y-2 text-sm border">
+              selectedBooking.payments.map((payment: any, index: number) => (
+                <div key={payment.id} className={`p-4 rounded-lg space-y-2 text-sm border ${index === 0 ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-gray-50'}`}>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-gray-700">المبلغ:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-700">المبلغ:</span>
+                      {index === 0 ? (
+                        <Badge variant="default" className="bg-blue-600 text-[10px] px-1.5 h-5">الأحدث</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] px-1.5 h-5">سابق</Badge>
+                      )}
+                    </div>
                     <span className="font-bold text-lg">{payment.amount} {payment.currency}</span>
                   </div>
                   <div className="flex justify-between items-center">

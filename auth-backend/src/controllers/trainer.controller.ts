@@ -440,6 +440,22 @@ class TrainerController {
             return sendError(res, error.message, 400);
         }
     }
+
+    /**
+     * Cancel a room booking (Trainer)
+     * As per requirement: This also cancels the associated Course and Sessions.
+     */
+    async cancelBooking(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { courseId, bookingId } = req.params;
+
+            const updated = await trainerService.cancelBooking(req.user.userId, courseId, bookingId);
+            return sendSuccess(res, 'تم إلغاء طلب الحجز والدورة بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
 }
 
 export default new TrainerController();
