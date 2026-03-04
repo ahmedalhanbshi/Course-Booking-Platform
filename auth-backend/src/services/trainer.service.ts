@@ -193,6 +193,11 @@ class TrainerService {
             if (latestBooking?.status === 'PENDING_PAYMENT') displayStatus = 'payment_required';
             else if (latestBooking?.status === 'PENDING_APPROVAL') displayStatus = 'pending_approval';
 
+            // Auto complete if end date passed
+            if (displayStatus === 'active' && c.endDate && new Date(c.endDate) < new Date()) {
+                displayStatus = 'completed';
+            }
+
             return {
                 id: c.id,
                 title: c.title,
@@ -235,6 +240,11 @@ class TrainerService {
 
         if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
 
+        let displayStatus = course.status.toLowerCase();
+        if (displayStatus === 'active' && course.endDate && new Date(course.endDate) < new Date()) {
+            displayStatus = 'completed';
+        }
+
         return {
             id: course.id,
             title: course.title,
@@ -247,7 +257,7 @@ class TrainerService {
             endDate: course.endDate,
             maxStudents: course.maxStudents,
             minStudents: course.minStudents,
-            status: course.status.toLowerCase(),
+            status: displayStatus,
             enrolledStudents: course._count.enrollments,
             category: course.category?.name ?? '',
             categoryId: course.categoryId ?? '',

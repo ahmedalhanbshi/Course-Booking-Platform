@@ -32,7 +32,15 @@ export default function TrainerSchedulePage() {
         const fetchSessions = async () => {
             try {
                 const data = await trainerService.getSchedule()
-                setSessions(data)
+                const now = new Date();
+                const processed = data.map(session => {
+                    const isPast = new Date(session.endTime) < now;
+                    if (isPast && session.status !== 'cancelled') {
+                        return { ...session, status: 'completed' as Session['status'] }
+                    }
+                    return session;
+                });
+                setSessions(processed)
             } catch (err: any) {
                 console.error("Failed to fetch sessions:", err)
                 toast.error("حدث خطأ أثناء جلب الجدولة")

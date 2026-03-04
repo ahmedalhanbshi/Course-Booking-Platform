@@ -364,7 +364,7 @@ export default function CreateCoursePage() {
             formData.append('prerequisites', JSON.stringify(courseData.prerequisites))
             formData.append('tags', JSON.stringify(courseData.tags))
 
-            formData.append('status', status === 'ACTIVE' ? 'DRAFT' : 'DRAFT')
+            formData.append('status', status)
             formData.append('startDate', startDate)
             formData.append('endDate', endDate)
             formData.append('duration', (courseData.deliveryType === 'in_person' ? selectedSessions.length : (onlineSessions.reduce((sum, s) => sum + Number(s.duration || 60), 0) / 60)).toString())
