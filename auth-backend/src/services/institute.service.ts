@@ -360,30 +360,37 @@ class InstituteService {
             orderBy: { createdAt: "desc" },
         });
 
-        return courses.map((c) => ({
-            id: c.id,
-            title: c.title,
-            description: c.description,
-            shortDescription: c.shortDescription,
-            image: c.image,
-            price: Number(c.price),
-            duration: c.duration,
-            startDate: c.startDate,
-            endDate: c.endDate,
-            maxStudents: c.maxStudents,
-            enrolledStudents: c._count.enrollments,
-            status: c.status.toLowerCase(),
-            trainerId: c.staffTrainerId || c.trainerId,
-            trainer: {
-                id: c.staffTrainer?.id || c.trainer?.id,
-                name: c.staffTrainer?.name || c.trainer?.name,
-                email: c.staffTrainer?.email || c.trainer?.email,
-            },
-            category: c.category?.name || "-",
-            categoryId: c.categoryId,
-            createdAt: c.createdAt,
-            prerequisites: c.prerequisites ? c.prerequisites.split('\n') : [],
-        }));
+        return courses.map((c) => {
+            let displayStatus = c.status.toLowerCase();
+            if (displayStatus === 'active' && c.endDate && new Date(c.endDate) < new Date()) {
+                displayStatus = 'completed';
+            }
+
+            return {
+                id: c.id,
+                title: c.title,
+                description: c.description,
+                shortDescription: c.shortDescription,
+                image: c.image,
+                price: Number(c.price),
+                duration: c.duration,
+                startDate: c.startDate,
+                endDate: c.endDate,
+                maxStudents: c.maxStudents,
+                enrolledStudents: c._count.enrollments,
+                status: displayStatus,
+                trainerId: c.staffTrainerId || c.trainerId,
+                trainer: {
+                    id: c.staffTrainer?.id || c.trainer?.id,
+                    name: c.staffTrainer?.name || c.trainer?.name,
+                    email: c.staffTrainer?.email || c.trainer?.email,
+                },
+                category: c.category?.name || "-",
+                categoryId: c.categoryId,
+                createdAt: c.createdAt,
+                prerequisites: c.prerequisites ? c.prerequisites.split('\n') : [],
+            };
+        });
     }
 
     /**
@@ -1120,8 +1127,14 @@ class InstituteService {
             throw new Error("الدورة غير موجودة أو لا تنتمي لهذا المعهد");
         }
 
+        let displayStatus = course.status.toLowerCase();
+        if (displayStatus === 'active' && course.endDate && new Date(course.endDate) < new Date()) {
+            displayStatus = 'completed';
+        }
+
         return {
             ...course,
+            status: displayStatus,
             price: Number(course.price),
             enrolledStudents: course._count.enrollments,
             trainer: {
