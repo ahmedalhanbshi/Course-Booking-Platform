@@ -92,6 +92,8 @@ export default function TrainerCoursesPage() {
       case 'pending':
       case 'pending_approval':
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">بانتظار الموافقة</Badge>
+      case 'pending_review':
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">بانتظار الموافقة على الدفع</Badge>
       case 'rejected':
         return (
           <div className="flex flex-col gap-1 items-start">
@@ -438,6 +440,7 @@ export default function TrainerCoursesPage() {
             <SelectContent className="rounded-2xl">
               <SelectItem value="all">جميع الحالات</SelectItem>
               <SelectItem value="active">مستمر</SelectItem>
+              <SelectItem value="pending_review">بانتظار الموافقة على الدفع</SelectItem>
               <SelectItem value="pending_approval">بانتظار الموافقة</SelectItem>
               <SelectItem value="payment_required">بانتظار الدفع</SelectItem>
               <SelectItem value="processing_payment">التحقق من الدفع</SelectItem>
@@ -491,8 +494,8 @@ export default function TrainerCoursesPage() {
               <div className="relative h-[160px] sm:h-full w-full sm:w-[190px] shrink-0 overflow-hidden rounded-[1.5rem] bg-slate-50 flex items-center justify-center">
                 {course.image && !imageErrors[course.id] ? (
                   <Image
-                    src={getFileUrl(course.image)}
-                    alt={course.title}
+                    src={getFileUrl(course.image) || ""}
+                    alt={course.title || "صورة الدورة"}
                     fill
                     sizes="190px"
                     className="object-cover transition-transform group-hover:scale-105 duration-500"

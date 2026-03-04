@@ -17,7 +17,7 @@ router.put('/profile', upload.fields([{ name: 'avatar', maxCount: 1 }, { name: '
 
 // Course management
 router.get('/courses', instituteController.getCourses);
-router.post('/courses', upload.single('image'), instituteController.createCourse);
+router.post('/courses', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'paymentReceipt', maxCount: 1 }]), instituteController.createCourse);
 router.delete('/courses/:id', instituteController.deleteCourse);
 router.put('/courses/:id/trainer', instituteController.changeTrainer);
 
@@ -43,7 +43,7 @@ router.put('/courses/:id/students/:enrollmentId/unenroll', instituteController.u
 
 // Course Details & Edit
 router.get('/courses/:id', instituteController.getCourseById);
-router.put('/courses/:id', upload.single('image'), instituteController.updateCourse);
+router.put('/courses/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'paymentReceipt', maxCount: 1 }]), instituteController.updateCourse);
 
 // Metadata
 router.get('/categories', instituteController.getCategories);

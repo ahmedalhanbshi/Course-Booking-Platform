@@ -293,7 +293,12 @@ export default function CreateCoursePage() {
             let startDate: string, endDate: string;
             let sessionsPayload: any[] = [];
 
-            if (courseData.deliveryType === 'in_person') {
+            if (status === 'DRAFT') {
+                // Drafts don't need hall/session — save with placeholders
+                startDate = new Date().toISOString().split('T')[0];
+                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                sessionsPayload = [];
+            } else if (courseData.deliveryType === 'in_person') {
                 if (selectedSessions.length === 0) throw new Error("يجب اختيار جلسة واحدة على الأقل");
                 const sortedSessions = [...selectedSessions].sort((a, b) => a.date.localeCompare(b.date));
                 startDate = sortedSessions[0].date;
@@ -328,8 +333,8 @@ export default function CreateCoursePage() {
                 });
             } else {
                 // Capacity based or other
-                startDate = new Date().toISOString().split('T')[0]; // Placeholder
-                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // +30 days
+                startDate = new Date().toISOString().split('T')[0];
+                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             }
 
             const formData = new FormData()
@@ -594,8 +599,17 @@ export default function CreateCoursePage() {
                             </Card>
                         </div>
                     </div>
-                    <div className="flex justify-end pt-6">
-                        <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي</Button>
+                    <div className="flex justify-between items-center pt-6 border-t mt-4">
+                        <Button
+                            variant="ghost"
+                            onClick={() => handleSubmit('DRAFT')}
+                            disabled={isSubmitting || !isInfoValid}
+                            className="text-gray-600 hover:text-gray-900"
+                        >
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            حفظ كمسودة
+                        </Button>
+                        <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي ←</Button>
                     </div>
                 </TabsContent>
 
@@ -894,7 +908,6 @@ export default function CreateCoursePage() {
                     <div className="flex justify-between pt-6 border-t mt-8">
                         <Button variant="outline" onClick={() => setActiveTab("info")}>السابق</Button>
                         <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting}>حفظ كمسودة</Button>
                             <Button onClick={() => handleSubmit('ACTIVE')} disabled={!isLocationValid() || isSubmitting}>
                                 {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                                 نشر الدورة

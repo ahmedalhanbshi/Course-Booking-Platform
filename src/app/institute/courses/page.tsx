@@ -139,6 +139,8 @@ export default function InstituteCourses() {
         return <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">مكتمل</Badge>
       case 'draft':
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">مسودة</Badge>
+      case 'pending_review':
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">بانتظار الموافقة على الدفع</Badge>
       case 'cancelled':
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">ملغي</Badge>
       case 'rejected':
@@ -204,6 +206,7 @@ export default function InstituteCourses() {
             <SelectContent>
               <SelectItem value="all">جميع الحالات</SelectItem>
               <SelectItem value="active">مستمر</SelectItem>
+              <SelectItem value="pending_review">بانتظار الموافقة على الدفع</SelectItem>
               <SelectItem value="draft">مسودة</SelectItem>
               <SelectItem value="completed">مكتمل</SelectItem>
             </SelectContent>
@@ -238,7 +241,7 @@ export default function InstituteCourses() {
               <div className="relative h-[160px] sm:h-[185px] w-full sm:w-[185px] shrink-0 overflow-hidden rounded-2xl bg-slate-100 flex items-center justify-center">
                 {course.image && !imageErrors[course.id] ? (
                   <Image
-                    src={getFileUrl(course.image)}
+                    src={getFileUrl(course.image) || ""}
                     alt={course.title}
                     fill
                     sizes="185px"

@@ -150,27 +150,49 @@ class TrainerController {
         try {
             if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
             const { courseId } = req.params;
-            const payload = { ...req.body };
+            const body = req.body;
 
-            // Parse JSON fields from formData if they arrive as strings
-            if (typeof payload.objectives === 'string') {
-                try { payload.objectives = JSON.parse(payload.objectives); } catch (e) { /* ignore */ }
-            }
-            if (typeof payload.prerequisites === 'string') {
-                try { payload.prerequisites = JSON.parse(payload.prerequisites); } catch (e) { /* ignore */ }
-            }
-            if (typeof payload.tags === 'string') {
-                try { payload.tags = JSON.parse(payload.tags); } catch (e) { /* ignore */ }
-            }
+            const safeParseJSON = (val: any, fallback: any = null) => {
+                if (val === undefined || val === null || val === '') return fallback;
+                if (typeof val !== 'string') return val;
+                try { return JSON.parse(val); } catch { return fallback; }
+            };
 
-            // Handle file upload
-            if (req.file) {
+            const payload: any = {
+                title: body.title,
+                shortDescription: body.shortDescription || '',
+                description: body.description,
+                price: body.price !== undefined && body.price !== '' ? Number(body.price) : undefined,
+                duration: body.duration !== undefined && body.duration !== '' ? Number(body.duration) : undefined,
+                maxStudents: body.maxStudents !== undefined && body.maxStudents !== '' ? Number(body.maxStudents) : undefined,
+                startDate: body.startDate && body.startDate !== '' ? body.startDate : undefined,
+                endDate: body.endDate && body.endDate !== '' ? body.endDate : undefined,
+                categoryId: body.categoryId || undefined,
+                status: body.status || undefined,
+                deliveryType: body.deliveryType || undefined,
+                objectives: safeParseJSON(body.objectives, []),
+                prerequisites: safeParseJSON(body.prerequisites, []),
+                tags: safeParseJSON(body.tags, []),
+                sessions: safeParseJSON(body.sessions, undefined),
+                hallId: body.hallId || undefined,
+            };
+
+            // Handle file uploads (both image and paymentReceipt via upload.fields)
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+            if (files?.image?.[0]) {
+                payload.image = `/uploads/${files.image[0].filename}`;
+            } else if (req.file) {
+                // fallback for single upload
                 payload.image = `/uploads/${req.file.filename}`;
+            }
+            if (files?.paymentReceipt?.[0]) {
+                payload.paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
             }
 
             const updated = await trainerService.updateTrainerCourse(req.user.userId, courseId, payload);
             return sendSuccess(res, 'تم تحديث الدورة بنجاح', updated);
         } catch (error: any) {
+            console.error('[updateTrainerCourse] Error:', error);
             return sendError(res, error.message, 400);
         }
     }

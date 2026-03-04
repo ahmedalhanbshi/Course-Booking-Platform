@@ -32,7 +32,25 @@ router.get('/halls/:hallId/availability', trainerController.getHallAvailability)
 // Courses
 router.get('/courses', trainerController.getCourses);
 router.get('/courses/:courseId', trainerController.getTrainerCourseById);
-router.put('/courses/:courseId', upload.single('image'), trainerController.updateTrainerCourse);
+router.put(
+    '/courses/:courseId',
+    (req: Request, res: Response, next: NextFunction): void => {
+        upload.fields([
+            { name: 'image', maxCount: 1 },
+            { name: 'paymentReceipt', maxCount: 1 },
+        ])(req, res, (err) => {
+            if (err instanceof multer.MulterError) {
+                res.status(400).json({ success: false, message: `خطأ في رفع الملف: ${err.message}` });
+                return;
+            } else if (err) {
+                res.status(400).json({ success: false, message: err.message || 'حدث خطأ أثناء رفع الملف' });
+                return;
+            }
+            next();
+        });
+    },
+    trainerController.updateTrainerCourse
+);
 router.delete('/courses/:courseId', trainerController.deleteCourse);
 router.get('/courses/:courseId/students', trainerController.getCourseStudents);
 router.patch('/courses/:courseId/students/:enrollmentId/unenroll', trainerController.unenrollStudent);

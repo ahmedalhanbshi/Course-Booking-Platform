@@ -75,6 +75,8 @@ export default function TrainerCourseDetailsPage() {
                 return <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">مكتمل</Badge>
             case 'draft':
                 return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">مسودة</Badge>
+            case 'pending_review':
+                return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">بانتظار الموافقة على الدفع</Badge>
             case 'cancelled':
                 return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">ملغي</Badge>
             default:
@@ -143,6 +145,15 @@ export default function TrainerCourseDetailsPage() {
                     </Button>
                 </div>
             </div>
+
+            {course.status === 'PENDING_REVIEW' && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-amber-600 shrink-0" />
+                    <p className="font-medium">
+                        طلبك قيد المراجعة من قِبَل المعهد. سيتم تفعيل الدورة فور التأكد من سند الدفع والموافقة على الحجز.
+                    </p>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Content - Left Column */}

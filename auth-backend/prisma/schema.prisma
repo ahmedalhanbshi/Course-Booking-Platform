@@ -37,6 +37,7 @@ enum VerificationStatus {
 
 enum CourseStatus {
   DRAFT
+  PENDING_REVIEW
   ACTIVE
   COMPLETED
   CANCELLED
