@@ -177,16 +177,16 @@ class TrainerController {
                 hallId: body.hallId || undefined,
             };
 
-            // Handle file uploads (both image and paymentReceipt via upload.fields)
-            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-            if (files?.image?.[0]) {
-                payload.image = `/uploads/${files.image[0].filename}`;
-            } else if (req.file) {
-                // fallback for single upload
+            // Handle file upload
+            if (req.file) {
                 payload.image = `/uploads/${req.file.filename}`;
             }
+
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+            let paymentReceiptPath: string | undefined;
             if (files?.paymentReceipt?.[0]) {
-                payload.paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
+                paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
+                payload.paymentReceiptPath = paymentReceiptPath;
             }
 
             const updated = await trainerService.updateTrainerCourse(req.user.userId, courseId, payload);

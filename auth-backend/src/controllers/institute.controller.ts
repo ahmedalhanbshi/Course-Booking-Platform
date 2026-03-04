@@ -159,49 +159,31 @@ class InstituteController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const body = req.body;
+            const payload = { ...req.body };
 
-            const safeParseJSON = (val: any, fallback: any = null) => {
-                if (val === undefined || val === null || val === '') return fallback;
-                if (typeof val !== 'string') return val;
-                try { return JSON.parse(val); } catch { return fallback; }
-            };
-
-            const payload: any = {
-                title: body.title,
-                shortDescription: body.shortDescription || '',
-                description: body.description,
-                price: body.price !== undefined && body.price !== '' ? Number(body.price) : undefined,
-                duration: body.duration !== undefined && body.duration !== '' ? Number(body.duration) : undefined,
-                maxStudents: body.maxStudents !== undefined && body.maxStudents !== '' ? Number(body.maxStudents) : undefined,
-                startDate: body.startDate && body.startDate !== '' ? body.startDate : undefined,
-                endDate: body.endDate && body.endDate !== '' ? body.endDate : undefined,
-                categoryId: body.categoryId || undefined,
-                status: body.status || undefined,
-                deliveryType: body.deliveryType || undefined,
-                trainerId: body.trainerId || undefined,
-                isFree: body.isFree === 'true' ? true : body.isFree === 'false' ? false : undefined,
-                objectives: safeParseJSON(body.objectives, []),
-                prerequisites: safeParseJSON(body.prerequisites, []),
-                tags: safeParseJSON(body.tags, []),
-                sessions: safeParseJSON(body.sessions, undefined),
-                hallId: body.hallId || undefined,
-            };
-
-            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-            if (files?.image?.[0]) {
-                payload.image = `/uploads/${files.image[0].filename}`;
-            } else if (req.file) {
-                payload.image = `/uploads/${req.file.filename}`;
+            // Parse JSON fields from formData
+            if (typeof payload.sessions === 'string') {
+                try { payload.sessions = JSON.parse(payload.sessions); } catch (e) { }
             }
-            if (files?.paymentReceipt?.[0]) {
-                payload.paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
+            if (typeof payload.objectives === 'string') {
+                try { payload.objectives = JSON.parse(payload.objectives); } catch (e) { }
+            }
+            if (typeof payload.prerequisites === 'string') {
+                try { payload.prerequisites = JSON.parse(payload.prerequisites); } catch (e) { }
+            }
+            if (typeof payload.tags === 'string') {
+                try { payload.tags = JSON.parse(payload.tags); } catch (e) { }
+            }
+            if (payload.isFree === 'true') payload.isFree = true;
+            if (payload.isFree === 'false') payload.isFree = false;
+
+            if (req.file) {
+                payload.image = `/uploads/${req.file.filename}`;
             }
 
             const updatedCourse = await instituteService.updateCourse(req.user.userId, id, payload);
             return sendSuccess(res, 'تم تحديث الدورة بنجاح', updatedCourse);
         } catch (error: any) {
-            console.error('[updateCourse] Error:', error);
             return sendError(res, error.message, 400);
         }
     }

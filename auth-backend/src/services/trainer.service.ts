@@ -193,11 +193,6 @@ class TrainerService {
             if (latestBooking?.status === 'PENDING_PAYMENT') displayStatus = 'payment_required';
             else if (latestBooking?.status === 'PENDING_APPROVAL') displayStatus = 'pending_approval';
 
-            // Auto complete if end date passed
-            if (displayStatus === 'active' && c.endDate && new Date(c.endDate) < new Date()) {
-                displayStatus = 'completed';
-            }
-
             return {
                 id: c.id,
                 title: c.title,
@@ -240,11 +235,6 @@ class TrainerService {
 
         if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
 
-        let displayStatus = course.status.toLowerCase();
-        if (displayStatus === 'active' && course.endDate && new Date(course.endDate) < new Date()) {
-            displayStatus = 'completed';
-        }
-
         return {
             id: course.id,
             title: course.title,
@@ -257,7 +247,7 @@ class TrainerService {
             endDate: course.endDate,
             maxStudents: course.maxStudents,
             minStudents: course.minStudents,
-            status: displayStatus,
+            status: course.status.toLowerCase(),
             enrolledStudents: course._count.enrollments,
             category: course.category?.name ?? '',
             categoryId: course.categoryId ?? '',
@@ -289,103 +279,24 @@ class TrainerService {
         });
         if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
 
-        // Build update data
-        const updateData: any = {
-            ...(data.title !== undefined && { title: data.title }),
-            ...(data.description !== undefined && { description: data.description }),
-            ...(data.shortDescription !== undefined && { shortDescription: data.shortDescription }),
-            ...(data.image !== undefined && { image: data.image }),
-            ...(data.price !== undefined && { price: Number(data.price) }),
-            ...(data.duration !== undefined && { duration: Number(data.duration) }),
-            ...(data.maxStudents !== undefined && { maxStudents: Number(data.maxStudents) }),
-            ...(data.startDate && { startDate: new Date(data.startDate) }),
-            ...(data.endDate && { endDate: new Date(data.endDate) }),
-            ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
-            ...(data.status && {
-                status: (data.status.toUpperCase() === 'ACTIVE' && data.deliveryType === 'in_person')
-                    ? 'PENDING_REVIEW'
-                    : data.status.toUpperCase()
-            }),
-            ...(data.objectives !== undefined && { objectives: data.objectives ?? [] }),
-            ...(data.prerequisites !== undefined && { prerequisites: data.prerequisites?.length ? data.prerequisites.join('\n') : null }),
-            ...(data.tags !== undefined && { tags: data.tags ?? [] }),
-        };
-
-        const updated = await prisma.course.update({
+        return prisma.course.update({
             where: { id: courseId },
-            data: updateData,
+            data: {
+                title: data.title,
+                description: data.description,
+                shortDescription: data.shortDescription,
+                image: data.image,
+                price: Number(data.price),
+                duration: Number(data.duration),
+                maxStudents: Number(data.maxStudents),
+                startDate: data.startDate ? new Date(data.startDate) : undefined,
+                endDate: data.endDate ? new Date(data.endDate) : undefined,
+                categoryId: data.categoryId || null,
+                objectives: data.objectives ?? [],
+                prerequisites: data.prerequisites?.length ? data.prerequisites.join('\n') : null,
+                tags: data.tags ?? [],
+            },
         });
-
-        // If publishing (ACTIVE or PENDING_REVIEW) with sessions payload, create sessions
-        if ((data.status?.toUpperCase() === 'ACTIVE' || data.status?.toUpperCase() === 'PENDING_REVIEW') && Array.isArray(data.sessions) && data.sessions.length > 0) {
-            const sessionType = data.deliveryType === 'online' ? 'ONLINE' : 'IN_PERSON';
-            const mappedSessions = data.sessions.map((s: any) => ({
-                startTime: new Date(`${s.date}T${s.startTime}`),
-                endTime: new Date(`${s.date}T${s.endTime}`),
-                type: sessionType,
-                status: 'SCHEDULED' as const,
-                location: s.location || '',
-                meetingLink: s.meetingLink || null,
-                topic: s.topic || '',
-                courseId,
-            }));
-
-            // Delete old sessions for this course first
-            await prisma.session.deleteMany({ where: { courseId } });
-
-            if (data.hallId && data.paymentReceiptPath) {
-                // In-person: create room booking + payment + sessions linked to booking
-                const room = await prisma.room.findUnique({ where: { id: data.hallId } });
-                if (!room) throw new Error('القاعة غير موجودة');
-
-                const totalHours = mappedSessions.reduce((acc: number, s: any) => {
-                    return acc + (s.endTime.getTime() - s.startTime.getTime()) / 3600000;
-                }, 0);
-                const totalPrice = totalHours * Number(room.pricePerHour);
-                const sortedSessions = [...mappedSessions].sort((a: any, b: any) => a.startTime - b.startTime);
-
-                const roomBooking = await prisma.roomBooking.create({
-                    data: {
-                        bookingMode: 'CUSTOM_TIME',
-                        startDate: sortedSessions[0].startTime,
-                        endDate: sortedSessions[sortedSessions.length - 1].endTime,
-                        selectedDays: [],
-                        defaultStartTime: sortedSessions[0].startTime,
-                        defaultEndTime: sortedSessions[0].endTime,
-                        status: 'PENDING_APPROVAL',
-                        totalPrice,
-                        roomId: room.id,
-                        requestedById: userId,
-                        courseId,
-                        purpose: `حجز لدورة: ${updated.title}`
-                    }
-                });
-
-                await prisma.payment.create({
-                    data: {
-                        amount: totalPrice,
-                        currency: 'YER',
-                        depositSlipImage: data.paymentReceiptPath,
-                        notes: `إيصال دفع لحجز قاعة (${room.name})`,
-                        status: 'PENDING_REVIEW',
-                        roomBookingId: roomBooking.id
-                    }
-                });
-
-                await prisma.session.createMany({
-                    data: mappedSessions.map((s: any) => ({
-                        ...s,
-                        roomBookingId: roomBooking.id,
-                        roomId: room.id,
-                    }))
-                });
-            } else {
-                // Online or capacity_based: just create sessions
-                await prisma.session.createMany({ data: mappedSessions });
-            }
-        }
-
-        return updated;
     }
 
     /**
@@ -702,7 +613,7 @@ class TrainerService {
                 endDate: finalEndDate,
                 maxStudents: Number(data.maxStudents),
                 minStudents: Number(data.minStudents) || 1,
-                status: (data.status === 'ACTIVE' && sessionType === 'IN_PERSON') ? 'PENDING_REVIEW' : (data.status || 'DRAFT'),
+                status: "DRAFT", // Course stays DRAFT until RoomBooking is APPROVED
                 image: data.image,
                 trainerId: trainer.id,
                 instituteId: instituteId || null,
