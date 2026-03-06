@@ -8,13 +8,29 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Facebook, FileText, Globe, Instagram, Loader2, Lock, Mail, MapPin, Monitor, Phone, Projector, UploadCloud, Users, Wifi, X, ImageOff } from "lucide-react"
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Facebook, FileText, Globe, Instagram, Loader2, Lock, Mail, MapPin, Monitor, Phone, Projector, UploadCloud, Users, Wifi, X, ImageOff, Landmark, Check, Clock, AlertTriangle } from "lucide-react"
 import { cn, getFileUrl } from "@/lib/utils"
 import { HallImage } from "@/components/halls/HallImage"
 import { trainerService } from "@/lib/trainer-service"
 import { useEffect } from "react"
+import { toast } from "sonner"
 
 // Local HallImage component removed in favor of shared component
+
+const timeSlots = [
+  "08:00 - 09:00",
+  "09:00 - 10:00",
+  "10:00 - 11:00",
+  "11:00 - 12:00",
+  "12:00 - 13:00",
+  "13:00 - 14:00",
+  "14:00 - 15:00",
+  "15:00 - 16:00",
+  "16:00 - 17:00",
+  "17:00 - 18:00",
+  "18:00 - 19:00",
+  "19:00 - 20:00"
+]
 
 const halls = [
   {
@@ -90,29 +106,8 @@ const featureMap: Record<string, { label: string; icon: ReactNode }> = {
   computers: { label: "أجهزة", icon: <Monitor className="h-4 w-4" /> }
 }
 
-const bookingSteps = [
-  { id: 1, label: "تسجيل مبدئي" },
-  { id: 2, label: "انتظار موافقة المعهد" },
-  { id: 3, label: "تأكيد الدفع" },
-  { id: 4, label: "تم الحجز" },
-]
 
-const bankAccounts = [
-  {
-    id: "bank-1",
-    bankName: "بنك اليمن الدولي",
-    beneficiary: "أحمد محمد",
-    iban: "YE12 0001 2345 6789 0000 12",
-    accountNumber: "",
-  },
-  {
-    id: "bank-2",
-    bankName: "البنك المركزي اليمني",
-    beneficiary: "معهد منصة د",
-    iban: "",
-    accountNumber: "1234567890",
-  },
-]
+
 interface Hall {
   id: string
   name: string
@@ -134,6 +129,7 @@ interface Hall {
     address: string
     website: string
   }
+  bankAccounts?: any[]
 }
 
 export default function HallDetailsPage() {
@@ -189,30 +185,35 @@ export default function HallDetailsPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptInfo, setReceiptInfo] = useState({ name: "" })
   const [paymentError, setPaymentError] = useState("")
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const [expandedBankId, setExpandedBankId] = useState<string | null>(null)
   const paymentFileRef = useRef<HTMLInputElement | null>(null)
   const [activeDate, setActiveDate] = useState<string | null>(null)
-  const [selectedSlotsByDate, setSelectedSlotsByDate] = useState<Record<string, number[]>>({})
-  const [bookingStatus, setBookingStatus] = useState<
-    | "NONE"
-    | "PENDING_APPROVAL"
-    | "PAYMENT_PENDING"
-    | "PAYMENT_REVIEW"
-    | "PAYMENT_REJECTED"
-    | "BOOKED"
-    | "REJECTED"
-  >("NONE")
-  const [bookings, setBookings] = useState<
-    {
-      date: string
-      slots: number[]
-      status: "PENDING_APPROVAL" | "PAYMENT_PENDING" | "PAYMENT_REVIEW" | "PAYMENT_REJECTED" | "BOOKED" | "REJECTED"
-    }[]
-  >([
-    { date: "2025-03-10", slots: [9, 10], status: "BOOKED" },
-    { date: "2025-03-12", slots: [12], status: "PENDING_APPROVAL" },
-    { date: "2025-03-14", slots: [8, 9, 10], status: "PAYMENT_PENDING" },
-  ])
+  const [selectedSlotsByDate, setSelectedSlotsByDate] = useState<Record<string, string[]>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+
+  // For storing dynamic availability fetched from backend
+  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [isFetchingSlots, setIsFetchingSlots] = useState(false)
+  const [hallAvailabilityData, setHallAvailabilityData] = useState<any>(null)
+
+  // Global availability fetch removed. Per-date fetch in handleDateSelect.
+  useEffect(() => {
+    // Reset selection when hallId changes
+    setSelectedSlotsByDate({})
+    setActiveDate(null)
+    setAvailableSlots([])
+  }, [hallId])
+
+  // Cleanup receipt preview URL
+  useEffect(() => {
+    return () => {
+      if (receiptPreview) {
+        URL.revokeObjectURL(receiptPreview)
+      }
+    }
+  }, [receiptPreview])
 
   const today = new Date()
   const [monthOffset, setMonthOffset] = useState(0)
@@ -224,63 +225,99 @@ export default function HallDetailsPage() {
   const daysInMonth = monthEnd.getDate()
   const leadingBlanks = monthStart.getDay()
   const dayLabels = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]
-  const slots = Array.from({ length: 12 }, (_, i) => 8 + i)
 
-  const formatDateKey = (date: Date) => date.toISOString().slice(0, 10)
+  const formatDateKey = (date: Date) => {
+    // Standardize to local date string to avoid timezone shifts
+    const d = new Date(date);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
   const formatTime = (hour: number) => `${String(hour).padStart(2, "0")}:00`
   const formatDateLabel = (dateKey: string) => {
     const date = new Date(`${dateKey}T00:00:00`)
     return date.toLocaleDateString("ar-YE", { weekday: "short", day: "numeric", month: "long", year: "numeric" })
   }
-  const formatSlotRanges = (slotList: number[]) => {
+  const formatSlotRanges = (slotList: string[]) => {
     if (!slotList.length) return []
-    const sorted = slotList.slice().sort((a, b) => a - b)
+    // Convert "HH:00 - HH:00" to starting hour numbers for sorting/ranging
+    const hourList = slotList.map(s => parseInt(s.split(":")[0])).sort((a, b) => a - b)
     const ranges: Array<{ start: number; end: number }> = []
-    sorted.forEach((slot) => {
+    hourList.forEach((hour) => {
       const last = ranges[ranges.length - 1]
-      if (!last || slot !== last.end) {
-        ranges.push({ start: slot, end: slot + 1 })
+      if (!last || hour !== last.end) {
+        ranges.push({ start: hour, end: hour + 1 })
         return
       }
-      last.end = slot + 1
+      last.end = hour + 1
     })
     return ranges.map((range) => `${formatTime(range.start)} - ${formatTime(range.end)}`)
   }
   const isPastDate = (date: Date) => date.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0)
 
-  const getUnavailableSlots = (dateKey: string) => {
-    return bookings
-      .filter((booking) => booking.date === dateKey && booking.status !== "REJECTED")
-      .flatMap((booking) => booking.slots)
-  }
-
-  const isSlotUnavailable = (dateKey: string, slot: number) => {
-    return getUnavailableSlots(dateKey).includes(slot)
-  }
-
-  const hasAvailableSlots = (dateKey: string) => {
-    return slots.some((slot) => !isSlotUnavailable(dateKey, slot))
-  }
-
-  const handleDateSelect = (dateKey: string) => {
-    if (bookingStatus !== "NONE") return
+  const handleDateSelect = async (dateKey: string) => {
     setActiveDate(dateKey)
-    setSelectedSlotsByDate((prev) => (prev[dateKey] ? prev : { ...prev, [dateKey]: [] }))
+    setAvailableSlots([])
+
+    if (!selectedSlotsByDate[dateKey]) {
+      setSelectedSlotsByDate(prev => ({ ...prev, [dateKey]: [] }))
+    }
+
+    try {
+      setIsFetchingSlots(true)
+      const data = await trainerService.getHallAvailability(hallId, dateKey)
+      setHallAvailabilityData(data)
+
+      const [yearStr, monthStr, dayStr] = dateKey.split("-")
+      const dateObj = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr))
+      const dayOfWeekMap = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+      const dayName = dayOfWeekMap[dateObj.getDay()]
+
+      const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
+      const hasAvailabilityDefined = data.availability && data.availability.length > 0
+      const booked = data.bookedSessions || []
+
+      const openSlots = timeSlots.filter(slot => {
+        const [startHourStr, endHourStr] = slot.split(" - ")
+
+        // 1. Check against base availability (working hours)
+        if (hasAvailabilityDefined) {
+          const isWithinWorkingHours = allowedPeriods.some((period: any) => {
+            const pStart = period.startTime.substring(0, 5)
+            const pEnd = period.endTime.substring(0, 5)
+            return startHourStr >= pStart && endHourStr <= pEnd
+          })
+          if (!isWithinWorkingHours) return false
+        }
+
+        // 2. Check against booked sessions
+        const slotStart = new Date(`${dateKey}T${startHourStr}:00`)
+        const slotEnd = new Date(`${dateKey}T${endHourStr}:00`)
+
+        const isOverlap = booked.some((b: any) => {
+          const bStart = new Date(b.startTime)
+          const bEnd = new Date(b.endTime)
+          return slotStart < bEnd && slotEnd > bStart
+        })
+
+        return !isOverlap
+      })
+
+      setAvailableSlots(openSlots)
+    } catch (e) {
+      console.error("Failed to fetch slots", e)
+    } finally {
+      setIsFetchingSlots(false)
+    }
   }
 
-  const handleSlotToggle = (slot: number) => {
-    if (bookingStatus !== "NONE") return
+  const handleSlotToggle = (slot: string) => {
     if (!activeDate) return
-    if (isSlotUnavailable(activeDate, slot)) return
-
     setSelectedSlotsByDate((prev) => {
       const current = prev[activeDate] ?? []
       if (current.includes(slot)) {
-        const next = current.filter((value) => value !== slot)
-        return { ...prev, [activeDate]: next }
+        return { ...prev, [activeDate]: current.filter((v) => v !== slot) }
       }
-      const next = [...current, slot].sort((a, b) => a - b)
-      return { ...prev, [activeDate]: next }
+      return { ...prev, [activeDate]: [...current, slot].sort() }
     })
   }
 
@@ -290,118 +327,65 @@ export default function HallDetailsPage() {
 
   const handleInitialBooking = () => {
     if (Object.keys(selectedSlotsByDate).length === 0 || totalHours === 0) return
-    setBookings((prev) => [
-      ...prev,
-      ...Object.entries(selectedSlotsByDate).map(([date, slots]) => ({
-        date,
-        slots,
-        status: "PENDING_APPROVAL" as const,
-      })),
-    ])
-    setBookingStatus("PENDING_APPROVAL")
-  }
-
-  const handlePaymentConfirm = () => {
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.status === "PAYMENT_PENDING" ? { ...booking, status: "PAYMENT_REVIEW" } : booking
-      )
-    )
-    setBookingStatus("PAYMENT_REVIEW")
+    // Directly go to payment review if paying immediately, or pending if not paying immediately. Let's force payment receipt collection first.
+    setIsPaymentOpen(true)
   }
 
   const handleReceiptFile = (file: File | null) => {
     if (!file) return
+
+    // Cleanup previous preview
+    if (receiptPreview) {
+      URL.revokeObjectURL(receiptPreview)
+      setReceiptPreview(null)
+    }
+
     setReceiptFile(file)
     setReceiptInfo({ name: file.name })
     setPaymentError("")
+
+    // Generate preview if it's an image
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file)
+      setReceiptPreview(url)
+    }
   }
 
-  const handlePaymentConfirmation = () => {
+  const handlePaymentConfirmation = async () => {
     if (!receiptFile?.name && !receiptInfo.name) {
       setPaymentError("يرجى رفع سند الدفع قبل التأكيد.")
       return
     }
-    handlePaymentConfirm()
-    setIsPaymentOpen(false)
-  }
 
-  const handleApproveBooking = () => {
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.status === "PENDING_APPROVAL" ? { ...booking, status: "PAYMENT_PENDING" } : booking
-      )
-    )
-    setBookingStatus("PAYMENT_PENDING")
-  }
+    try {
+      setIsSubmitting(true)
 
-  const handleRejectBooking = () => {
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.status === "PENDING_APPROVAL" ? { ...booking, status: "REJECTED" } : booking
-      )
-    )
-    setBookingStatus("REJECTED")
-  }
+      // Transform selectedSlotsByDate to flat array
+      const flatSessions: { date: string; slot: number }[] = []
+      Object.entries(selectedSlotsByDate).forEach(([date, slotArr]) => {
+        slotArr.forEach(slotStr => {
+          const startHour = parseInt(slotStr.split(":")[0])
+          flatSessions.push({ date, slot: startHour })
+        })
+      })
 
-  const handlePaymentApprove = () => {
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.status === "PAYMENT_REVIEW" ? { ...booking, status: "BOOKED" } : booking
-      )
-    )
-    setBookingStatus("BOOKED")
-  }
+      await trainerService.bookHall(
+        hallId,
+        flatSessions,
+        receiptFile || undefined,
+        "حجز مباشر للقاعة من قبل المدرب"
+      );
 
-  const handlePaymentReject = () => {
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.status === "PAYMENT_REVIEW" ? { ...booking, status: "PAYMENT_REJECTED" } : booking
-      )
-    )
-    setBookingStatus("PAYMENT_REJECTED")
-  }
-
-  const getCurrentStepIndex = () => {
-    if (bookingStatus === "NONE") return 1
-    if (bookingStatus === "PENDING_APPROVAL") return 2
-    if (bookingStatus === "PAYMENT_PENDING") return 3
-    if (bookingStatus === "PAYMENT_REVIEW") return 3
-    if (bookingStatus === "PAYMENT_REJECTED") return 3
-    if (bookingStatus === "BOOKED") return 4
-    if (bookingStatus === "REJECTED") return 2
-    return 1
-  }
-
-  const getStepState = (stepId: number) => {
-    if (bookingStatus === "REJECTED") {
-      return stepId === 3 ? "rejected" : stepId < 3 ? "completed" : "upcoming"
+      toast.success("تم إرسال طلب الحجز بنجاح 🎉")
+      setIsSuccess(true)
+    } catch (err: any) {
+      setPaymentError(err?.response?.data?.message || err.message || "فشل في إرسال الحجز");
+    } finally {
+      setIsSubmitting(false)
     }
-
-    if (bookingStatus === "NONE") return stepId === 1 ? "active" : "upcoming"
-    if (bookingStatus === "PENDING_APPROVAL") {
-      return stepId === 1 ? "completed" : stepId === 2 ? "active" : "upcoming"
-    }
-    if (bookingStatus === "PAYMENT_PENDING") {
-      return stepId <= 2 ? "completed" : stepId === 3 ? "active" : "upcoming"
-    }
-    if (bookingStatus === "PAYMENT_REVIEW") {
-      return stepId <= 2 ? "completed" : stepId === 3 ? "active" : "upcoming"
-    }
-    if (bookingStatus === "PAYMENT_REJECTED") {
-      return stepId <= 2 ? "completed" : stepId === 3 ? "rejected" : "upcoming"
-    }
-    if (bookingStatus === "BOOKED") return "completed"
-    return "upcoming"
   }
 
-  const getConnectorClass = (stepId: number) => {
-    const state = getStepState(stepId)
-    if (state === "completed") return "bg-emerald-500"
-    if (state === "active") return "bg-blue-500/70"
-    if (state === "rejected") return "bg-red-500/70"
-    return "bg-white/20"
-  }
+
 
   if (loading) {
     return (
@@ -493,117 +477,14 @@ export default function HallDetailsPage() {
                   </span>
                 ))}
               </div>
-              {bookingStatus === "PENDING_APPROVAL" && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handleApproveBooking}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-400/60 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
-                  >
-                    محاكاة قبول الحجز
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRejectBooking}
-                    className="inline-flex items-center gap-2 rounded-full border border-red-400/60 bg-red-400/10 px-3 py-1 text-xs font-medium text-red-100 transition hover:bg-red-400/20"
-                  >
-                    محاكاة رفض الحجز
-                  </button>
-                </div>
-              )}
-              {bookingStatus === "PAYMENT_REVIEW" && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePaymentApprove}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-400/60 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
-                  >
-                    محاكاة تأكيد الدفع
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePaymentReject}
-                    className="inline-flex items-center gap-2 rounded-full border border-red-400/60 bg-red-400/10 px-3 py-1 text-xs font-medium text-red-100 transition hover:bg-red-400/20"
-                  >
-                    محاكاة رفض الدفع
-                  </button>
-                </div>
-              )}
-              <div className="w-full">
+              <div className="w-full mt-4">
                 <Button
-                  onClick={() => {
-                    if (bookingStatus === "PAYMENT_PENDING") {
-                      setIsPaymentOpen(true)
-                      return
-                    }
-                    if (bookingStatus === "PAYMENT_REJECTED") {
-                      setIsPaymentOpen(true)
-                      return
-                    }
-                    if (bookingStatus === "PENDING_APPROVAL" || bookingStatus === "PAYMENT_REVIEW" || bookingStatus === "BOOKED") {
-                      return
-                    }
-                    setIsBookingOpen(true)
-                  }}
-                  disabled={bookingStatus === "PENDING_APPROVAL" || bookingStatus === "PAYMENT_REVIEW" || bookingStatus === "BOOKED"}
+                  onClick={() => setIsBookingOpen(true)}
                   className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
                 >
-                  {bookingStatus === "PAYMENT_PENDING"
-                    ? "تأكيد الدفع"
-                    : bookingStatus === "PAYMENT_REVIEW"
-                      ? "تم إرسال الدفع"
-                      : bookingStatus === "PAYMENT_REJECTED"
-                        ? "تعديل الدفع"
-                        : bookingStatus === "PENDING_APPROVAL"
-                          ? "تم الحجز مبدئيًا"
-                          : bookingStatus === "BOOKED"
-                            ? "تم الحجز"
-                            : bookingStatus === "NONE"
-                              ? "حجز القاعة"
-                              : "تعديل الحجز"}
+                  حجز القاعة
                 </Button>
               </div>
-
-              {bookingStatus !== "NONE" && (
-                <div
-                  key={bookingStatus}
-                  dir="rtl"
-                  className={`mt-4 rounded-2xl border p-4 text-right text-sm backdrop-blur animate-stepper-reveal ${bookingStatus === "PENDING_APPROVAL"
-                    ? "border-white/10 bg-white/5 text-white/70 shadow-none opacity-75"
-                    : "border-white/15 bg-white/10 text-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
-                    }`}
-                >
-                  <div className="relative">
-                    <div className="absolute left-[calc(12.5%+20px)] right-[calc(12.5%+20px)] top-5 h-1 rounded-full bg-white/15">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-                        style={{ width: `${(getCurrentStepIndex() - 1) / (bookingSteps.length - 1) * 100}%` }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-4">
-                      {bookingSteps.map((step) => {
-                        const state = getStepState(step.id)
-                        const circleClass =
-                          state === "completed"
-                            ? "bg-emerald-500 text-white"
-                            : state === "active"
-                              ? "bg-blue-500 text-white ring-4 ring-blue-400/30"
-                              : state === "rejected"
-                                ? "bg-red-500 text-white"
-                                : "border border-white/30 bg-slate-900/80 text-white/70"
-                        return (
-                          <div key={step.id} className="relative z-10 flex flex-col items-center text-center">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${circleClass}`}>
-                              {state === "completed" ? "✓" : state === "rejected" ? "✕" : step.id}
-                            </div>
-                            <span className="mt-2 text-xs font-medium text-white/90">{step.label}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="relative -mt-4 aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-white/5 shadow-lg">
@@ -620,529 +501,429 @@ export default function HallDetailsPage() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-slate-50" />
       </div>
 
-      <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
-        <DialogContent dir="rtl" className="max-w-4xl overflow-hidden p-0">
-          <DialogHeader className="sr-only">
-            <DialogTitle>حجز القاعة</DialogTitle>
+      <Dialog open={isBookingOpen} onOpenChange={(open) => {
+        setIsBookingOpen(open)
+        if (!open) {
+          // Reset success state when closing
+          setTimeout(() => setIsSuccess(false), 300)
+        }
+      }}>
+        <DialogContent dir="rtl" className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none bg-slate-50/50 backdrop-blur-xl">
+          <DialogHeader className="p-6 bg-white border-b sticky top-0 z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl font-bold text-slate-900">حجز القاعة</DialogTitle>
+                <DialogDescription className="mt-1 text-slate-500">اختر المواعيد وأكمل عملية الدفع لتأكيد حجزك.</DialogDescription>
+              </div>
+              <DialogClose className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+                <X className="h-4 w-4" />
+              </DialogClose>
+            </div>
           </DialogHeader>
 
-          {bookingStatus === "NONE" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6">
-              <div className="flex flex-col gap-2 text-right md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">تسجيل مبدئي</h2>
-                  <p className="text-sm text-slate-500">اختر اليوم المناسب ثم الفترات المتاحة للحجز.</p>
+          <div className="p-6 space-y-6">
+            {isSuccess ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in duration-500">
+                <div className="h-24 w-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-100">
+                  <Check className="h-12 w-12 text-emerald-600" />
                 </div>
-                <div className="text-sm text-slate-500">
-                  السعر بالساعة: <span className="font-semibold text-slate-900">{hall.hourlyRate} ر.ي</span>
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">تم استلام طلب حجزك!</h3>
+                <p className="text-slate-500 max-w-sm mb-8">
+                  تم إرسال طلب الحجز وسند الدفع بنجاح. سيقوم المعهد بمراجعة طلبك والموافقة عليه في أقرب وقت.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                  <Button
+                    className="flex-1 h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold"
+                    onClick={() => window.location.href = "/trainer/room-bookings"}
+                  >
+                    عرض طلبات الحجز
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-12 rounded-xl font-bold"
+                    onClick={() => setIsBookingOpen(false)}
+                  >
+                    إغلاق
+                  </Button>
                 </div>
               </div>
-
-              <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1.2fr]">
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-700">
-                      {new Date(currentYear, currentMonth).toLocaleDateString("ar-YE", { month: "long", year: "numeric" })}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
-                        onClick={() => setMonthOffset((prev) => prev - 1)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
-                        onClick={() => setMonthOffset((prev) => prev + 1)}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs text-slate-500">
-                    {dayLabels.map((label) => (
-                      <span key={label}>{label}</span>
-                    ))}
-                  </div>
-                  <div className="mt-3 grid grid-cols-7 gap-2">
-                    {Array.from({ length: leadingBlanks + daysInMonth }, (_, idx) => {
-                      if (idx < leadingBlanks) {
-                        return <div key={`blank-${idx}`} />
-                      }
-                      const day = idx - leadingBlanks + 1
-                      const date = new Date(currentYear, currentMonth, day)
-                      const dateKey = formatDateKey(date)
-                      const disabled = isPastDate(date) || !hasAvailableSlots(dateKey)
-                      const isSelected = activeDate === dateKey
-                      const isToday = formatDateKey(new Date()) === dateKey
-                      const hasSelection = (selectedSlotsByDate[dateKey]?.length ?? 0) > 0
-
-                      return (
-                        <button
-                          key={dateKey}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => handleDateSelect(dateKey)}
-                          className={`h-9 rounded-lg text-sm transition ${isSelected
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : disabled
-                              ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                              : hasSelection
-                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                : "bg-white text-slate-700 hover:bg-blue-50 border border-slate-200"
-                            }`}
+            ) : (
+              <>
+                {/* Selection Section */}
+                <div className="grid gap-6 lg:grid-cols-[1.1fr_1.2fr]">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="font-bold text-slate-800">
+                        {new Date(currentYear, currentMonth).toLocaleDateString("ar-YE", { month: "long", year: "numeric" })}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 rounded-full"
+                          onClick={() => setMonthOffset((prev) => prev - 1)}
                         >
-                          <span className={`${isToday && !isSelected ? "rounded-full border border-blue-300 px-2 py-0.5" : ""}`}>
-                            {day}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 rounded-full"
+                          onClick={() => setMonthOffset((prev) => prev + 1)}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
 
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <h3 className="text-sm font-semibold text-slate-700 text-right">الفترات المتاحة</h3>
-                  {!activeDate ? (
-                    <p className="mt-3 text-sm text-slate-500 text-right">اختر يومًا أولاً لعرض الفترات.</p>
-                  ) : (
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {slots.map((slot) => {
-                        const disabled = isSlotUnavailable(activeDate, slot)
-                        const selected = (selectedSlotsByDate[activeDate] ?? []).includes(slot)
+                    <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      {dayLabels.map((label) => <span key={label}>{label}</span>)}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {Array.from({ length: leadingBlanks + daysInMonth }, (_, idx) => {
+                        if (idx < leadingBlanks) return <div key={`blank-${idx}`} />
+                        const day = idx - leadingBlanks + 1
+                        const date = new Date(currentYear, currentMonth, day)
+                        const dateKey = formatDateKey(date)
+                        const disabled = isPastDate(date) // removed hasAvailableSlots check as it's fetched per-date now
+                        const isSelected = activeDate === dateKey
+                        const isToday = formatDateKey(new Date()) === dateKey
+                        const hasSelection = (selectedSlotsByDate[dateKey]?.length ?? 0) > 0
+
                         return (
                           <button
-                            key={slot}
+                            key={dateKey}
                             type="button"
                             disabled={disabled}
-                            onClick={() => handleSlotToggle(slot)}
-                            className={`rounded-lg border px-3 py-2 text-sm transition ${selected
-                              ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                            onClick={() => handleDateSelect(dateKey)}
+                            className={`h-10 rounded-xl text-sm font-medium transition-all relative ${isSelected
+                              ? "bg-blue-600 text-white shadow-lg shadow-blue-200 scale-105 z-10"
                               : disabled
-                                ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                                : "border-blue-200 text-blue-700 hover:bg-blue-50"
+                                ? "bg-slate-50 text-slate-300 cursor-not-allowed"
+                                : hasSelection
+                                  ? "bg-blue-50 text-blue-700 border-2 border-blue-200"
+                                  : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
                               }`}
                           >
-                            <div className="flex items-center justify-center gap-1">
-                              {disabled && <Lock className="h-3 w-3" />}
-                              <span>{formatTime(slot)} - {formatTime(slot + 1)}</span>
-                            </div>
+                            {day}
+                            {isToday && !isSelected && (
+                              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-600"></span>
+                            )}
                           </button>
                         )
                       })}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 text-right">
-                <div className="text-sm text-slate-600">
-                  {activeDate
-                    ? `اليوم الحالي: ${activeDate}`
-                    : "لم يتم اختيار يوم بعد."}
-                  {totalHours > 0 && (
-                    <span className="mr-2">| عدد الأيام: {selectedDateCount} | عدد الساعات: {totalHours} | الإجمالي: {totalPrice} ر.ي</span>
-                  )}
-                </div>
-                {selectedDateCount > 0 && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
-                    <p className="font-semibold text-slate-800">الأيام والفترات المختارة</p>
-                    <ul className="mt-2 space-y-1">
-                      {Object.entries(selectedSlotsByDate)
-                        .filter(([, slots]) => slots.length > 0)
-                        .map(([date, slots]) => (
-                          <li key={date} className="flex flex-wrap items-center gap-2">
-                            <span className="text-slate-500">{formatDateLabel(date)}:</span>
-                            <span className="font-semibold">
-                              {formatSlotRanges(slots).join("، ")}
-                            </span>
-                          </li>
-                        ))}
-                    </ul>
                   </div>
-                )}
-                <Button
-                  className="w-full rounded-full bg-blue-600 text-white hover:bg-blue-700 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 disabled:opacity-60"
-                  disabled={totalHours === 0}
-                  onClick={handleInitialBooking}
-                >
-                  تسجيل مبدئي
-                </Button>
-              </div>
-            </div>
-          )}
 
-          {bookingStatus === "PENDING_APPROVAL" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6 text-right">
-              <h2 className="text-lg font-bold text-slate-900">انتظار موافقة المعهد</h2>
-              <p className="mt-2 text-sm text-slate-500">تم إرسال طلب الحجز ويجري مراجعته من المعهد.</p>
-              <div className="mt-3 text-sm text-slate-700">
-                عدد الأيام: {selectedDateCount} | عدد الساعات: {totalHours} | الإجمالي: {totalPrice} ر.ي
-              </div>
-            </div>
-          )}
-
-          {bookingStatus === "PAYMENT_PENDING" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6 text-right">
-              <h2 className="text-lg font-bold text-slate-900">تأكيد الدفع</h2>
-              <p className="mt-2 text-sm text-slate-500">راجع تفاصيل الحجز ثم أكد الدفع للانتقال لإتمام الحجز.</p>
-              <div className="mt-4 text-sm text-slate-700">
-                عدد الأيام: {selectedDateCount} | عدد الساعات: {totalHours} | الإجمالي: {totalPrice} ر.ي
-              </div>
-              <Button
-                className="mt-6 rounded-full bg-blue-600 text-white hover:bg-blue-700 h-11 px-8 text-sm"
-                onClick={() => setIsPaymentOpen(true)}
-              >
-                تأكيد الدفع
-              </Button>
-            </div>
-          )}
-
-          {bookingStatus === "PAYMENT_REVIEW" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6 text-right">
-              <h2 className="text-lg font-bold text-slate-900">مراجعة الدفع</h2>
-              <p className="mt-2 text-sm text-slate-500">تم إرسال سند الدفع وجاري مراجعته من المعهد.</p>
-              <div className="mt-4 text-sm text-slate-700">
-                عدد الأيام: {selectedDateCount} | عدد الساعات: {totalHours} | الإجمالي: {totalPrice} ر.ي
-              </div>
-            </div>
-          )}
-
-          {bookingStatus === "PAYMENT_REJECTED" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6 text-right">
-              <h2 className="text-lg font-bold text-red-600">تم رفض الدفع</h2>
-              <p className="mt-2 text-sm text-slate-600">يمكنك تعديل سند الدفع وإعادة الإرسال.</p>
-            </div>
-          )}
-
-          {bookingStatus === "BOOKED" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6 text-right">
-              <h2 className="text-lg font-bold text-emerald-600">تم الحجز</h2>
-              <p className="mt-2 text-sm text-slate-600">تم حجز القاعة بنجاح.</p>
-            </div>
-          )}
-
-          {bookingStatus === "REJECTED" && (
-            <div className="rounded-2xl border-t border-slate-100 bg-white p-6 text-right">
-              <h2 className="text-lg font-bold text-red-600">تم رفض الحجز</h2>
-              <p className="mt-2 text-sm text-slate-600">يمكنك اختيار موعد آخر وإعادة المحاولة.</p>
-              <Button
-                className="mt-4 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 h-10 px-6 text-sm"
-                onClick={() => {
-                  setBookingStatus("NONE")
-                  setActiveDate(null)
-                  setSelectedSlotsByDate({})
-                }}
-              >
-                حجز جديد
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-        <DialogContent
-          dir="rtl"
-          className="max-w-3xl [&>button[data-dialog-close='default']]:hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4"
-        >
-          <DialogClose className="absolute left-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">
-            <X className="h-4 w-4" />
-            <span className="sr-only">إغلاق</span>
-          </DialogClose>
-          <DialogHeader className="space-y-2 text-right">
-            <DialogTitle className="text-right">تأكيد الدفع</DialogTitle>
-            <DialogDescription className="text-right">
-              يرجى تحويل المبلغ وإرفاق سند الدفع لإكمال الخطوة.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 pt-4 lg:grid-cols-2">
-            <div className="order-2 space-y-4 text-right lg:order-1">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-semibold text-slate-900">رفع سند الدفع</h4>
-                  <span className="text-xs text-slate-500">صور أو PDF</span>
-                </div>
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    setIsDraggingFile(true)
-                  }}
-                  onDragLeave={() => setIsDraggingFile(false)}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    setIsDraggingFile(false)
-                    const file = event.dataTransfer.files?.[0] ?? null
-                    handleReceiptFile(file)
-                  }}
-                  onClick={() => paymentFileRef.current?.click()}
-                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
-                    }`}
-                >
-                  <UploadCloud className="h-6 w-6 text-blue-600" />
-                  <span className="font-medium text-slate-700">اسحب الملف هنا</span>
-                  <span className="text-xs text-slate-500">أو اختر ملفًا من جهازك</span>
-                  <Button type="button" size="sm" className="rounded-full">
-                    اختيار ملف
-                  </Button>
-                  <Input
-                    ref={paymentFileRef}
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null
-                      handleReceiptFile(file)
-                    }}
-                  />
-                </div>
-                {(receiptFile?.name || receiptInfo.name) && (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600">
-                    <div className="flex items-start gap-2">
-                      <FileText className="mt-0.5 h-4 w-4 text-slate-500" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-900">
-                          {receiptFile?.name ?? receiptInfo.name}
-                        </p>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      الفترات المتاحة
+                    </h3>
+                    {!activeDate ? (
+                      <div className="h-[240px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
+                        <Calendar className="h-8 w-8 mb-2 opacity-20" />
+                        <p className="text-sm">اختر يومًا من التقويم</p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setReceiptFile(null)
-                          setReceiptInfo({ name: "" })
-                        }}
-                        className="h-7 rounded-full px-3 text-xs"
-                      >
-                        إزالة الملف
-                      </Button>
-                    </div>
-                    <div className="mt-2 flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => paymentFileRef.current?.click()}
-                        className="h-7 rounded-full px-3 text-xs"
-                      >
-                        تغيير الملف
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {!receiptFile?.name && !receiptInfo.name && (
-                  <p className="mt-3 text-xs text-slate-500">
-                    ارفع سند الدفع أولاً حتى تتمكن من التأكيد.
-                  </p>
-                )}
-                {paymentError && <p className="mt-2 text-xs text-red-500">{paymentError}</p>}
-              </div>
-            </div>
-            <div className="order-1 space-y-4 text-right lg:order-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-semibold text-slate-900">الحسابات البنكية</h4>
-                  <span className="text-xs text-slate-500">اختر بنكًا لعرض التفاصيل</span>
-                </div>
-                <div className="mt-4 max-h-[320px] space-y-2 overflow-y-auto pr-1">
-                  {bankAccounts.map((bank) => {
-                    const isOpen = expandedBankId === bank.id
-                    const hasIban = Boolean(bank.iban)
-                    const hasAccountNumber = Boolean(bank.accountNumber)
-                    return (
-                      <div key={bank.id} className="rounded-xl border border-slate-200 bg-white">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedBankId((prev) => (prev === bank.id ? null : bank.id))
-                          }
-                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right"
-                          aria-expanded={isOpen}
-                        >
-                          <span className="text-sm font-semibold text-slate-900">
-                            {bank.bankName}
-                          </span>
-                          <ChevronDown
-                            className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""
-                              }`}
-                          />
-                        </button>
-                        {isOpen && (
-                          <div className="border-t border-slate-200 px-4 py-3 text-right text-sm">
-                            <p className="text-xs text-slate-500">
-                              اسم المستفيد: {bank.beneficiary}
-                            </p>
-                            {hasIban && (
-                              <div className="mt-3 space-y-2">
-                                <p className="text-xs text-slate-500">رقم IBAN</p>
-                                <p className="font-mono text-sm font-semibold text-slate-900">
-                                  {bank.iban}
-                                </p>
-                              </div>
-                            )}
-                            {!hasIban && hasAccountNumber && (
-                              <div className="mt-3 space-y-2">
-                                <p className="text-xs text-slate-500">رقم الحساب</p>
-                                <p className="font-mono text-sm font-semibold text-slate-900">
-                                  {bank.accountNumber}
-                                </p>
-                              </div>
-                            )}
+                    ) : (
+                      <div className="flex flex-col h-[240px]">
+                        {isFetchingSlots ? (
+                          <div className="flex-1 flex items-center justify-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                          </div>
+                        ) : availableSlots.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-2 overflow-y-auto pr-1">
+                            {availableSlots.map((slot) => {
+                              const selected = (selectedSlotsByDate[activeDate] ?? []).includes(slot)
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  onClick={() => handleSlotToggle(slot)}
+                                  className={`rounded-xl border p-3 text-xs font-medium transition-all ${selected
+                                    ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100"
+                                    : "border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                                    }`}
+                                >
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    <span>{slot}</span>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
+                            <Lock className="h-8 w-8 mb-2 opacity-20" />
+                            <p className="text-sm">لا توجد فترات متاحة لهذا اليوم</p>
                           </div>
                         )}
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-700">تفاصيل الإجمالي</p>
-                <div className="mt-2 text-sm text-slate-600">
-                  عدد الأيام: {selectedDateCount} | عدد الساعات: {totalHours}
-                </div>
-                {selectedDateCount > 0 && (
-                  <ul className="mt-3 space-y-1 text-sm text-slate-700">
-                    {Object.entries(selectedSlotsByDate)
-                      .filter(([, slots]) => slots.length > 0)
-                      .map(([date, slots]) => (
-                        <li key={date} className="flex flex-wrap items-center gap-2">
-                          <span className="text-slate-500">{formatDateLabel(date)}:</span>
-                          <span className="font-semibold">{formatSlotRanges(slots).join("، ")}</span>
-                        </li>
-                      ))}
-                  </ul>
+
+                {/* Summary & Payment Section */}
+                {totalHours > 0 && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                    <div className="bg-blue-600 rounded-2xl p-5 text-white flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl shadow-blue-100">
+                      <div className="space-y-1 text-center md:text-right">
+                        <p className="text-blue-100 text-sm">إجمالي الحجز</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold">{totalPrice.toLocaleString()}</span>
+                          <span className="text-blue-100">ر.ي</span>
+                        </div>
+                      </div>
+                      <div className="h-px w-full md:h-10 md:w-px bg-white/20" />
+                      <div className="flex-1 text-center md:text-right">
+                        <p className="text-blue-100 text-xs mb-2">الفترات المختارة ({totalHours} ساعة)</p>
+                        <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                          {Object.entries(selectedSlotsByDate)
+                            .filter(([, slots]) => slots.length > 0)
+                            .map(([date, slots]) => (
+                              <Badge key={date} variant="secondary" className="bg-white/10 text-white border-none hover:bg-white/20 whitespace-nowrap">
+                                {formatDateLabel(date)}: {slots.length} س
+                              </Badge>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                          <Landmark className="h-5 w-5 text-blue-600" />
+                          الحسابات البنكية للمعهد
+                        </h4>
+                        <div className="grid gap-3">
+                          {(hall?.bankAccounts || []).map((bank: any) => (
+                            <div key={bank.id} className="relative overflow-hidden group p-4 border rounded-2xl bg-white shadow-sm border-slate-200">
+                              <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-600"></div>
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                                  <Landmark className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <h5 className="font-bold text-slate-900">{bank.bankName}</h5>
+                                  <p className="text-xs text-slate-500">مستفيد: {bank.accountName}</p>
+                                </div>
+                              </div>
+                              <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] uppercase font-bold text-slate-400">رقم الحساب</span>
+                                  <span className="font-mono font-bold text-blue-900" dir="ltr">{bank.accountNumber}</span>
+                                </div>
+                                {bank.iban && (
+                                  <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400">IBAN</span>
+                                    <span className="font-mono text-xs text-slate-600" dir="ltr">{bank.iban}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                          <UploadCloud className="h-5 w-5 text-blue-600" />
+                          رفع إثبات الدفع
+                        </h4>
+                        <div
+                          onClick={() => paymentFileRef.current?.click()}
+                          className={`relative group h-full min-h-[200px] flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${receiptFile ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/30"
+                            }`}
+                        >
+                          <input
+                            ref={paymentFileRef}
+                            type="file"
+                            className="hidden"
+                            accept="image/*,.pdf"
+                            onChange={(e) => handleReceiptFile(e.target.files?.[0] ?? null)}
+                          />
+                          {receiptPreview ? (
+                            <div className="relative w-full h-[200px] rounded-xl overflow-hidden bg-slate-50 group">
+                              <Image
+                                src={receiptPreview}
+                                alt="Receipt Preview"
+                                fill
+                                className="object-contain"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                <UploadCloud className="h-6 w-6 text-white" />
+                                <span className="text-white text-xs font-bold">انقر لتغيير الملف</span>
+                              </div>
+                            </div>
+                          ) : receiptFile ? (
+                            <>
+                              <div className="h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                                <Check className="h-6 w-6" />
+                              </div>
+                              <div className="text-center px-4">
+                                <p className="font-bold text-emerald-900 text-sm truncate max-w-[200px]">{receiptFile.name}</p>
+                                <p className="text-emerald-600 text-[10px]">انقر لتغيير الملف</p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="h-12 w-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                                <UploadCloud className="h-6 w-6" />
+                              </div>
+                              <div className="text-center px-4">
+                                <p className="font-bold text-slate-700 text-sm">ارفع صورة السند</p>
+                                <p className="text-slate-400 text-xs mt-1">يمكنك سحب وإفلات الملف هنا أو النقر للاختيار</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {paymentError && (
+                          <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-xl text-xs border border-red-100 animate-in fade-in zoom-in-95">
+                            <AlertTriangle className="h-4 w-4" />
+                            {paymentError}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t sticky bottom-0 bg-slate-50/80 backdrop-blur-md pb-6">
+                      <Button
+                        onClick={handlePaymentConfirmation}
+                        disabled={!receiptFile || isSubmitting}
+                        className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-blue-200 transition-all active:scale-[0.98]"
+                      >
+                        {isSubmitting ? (
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>جاري إرسال الطلب...</span>
+                          </div>
+                        ) : (
+                          "تأكيد الحجز والدفع"
+                        )}
+                      </Button>
+                      {!receiptFile && (
+                        <p className="text-center text-xs text-slate-400 mt-3 flex items-center justify-center gap-2">
+                          <Lock className="h-3 w-3" />
+                          يجب رفع سند الدفع لتفعيل زر التأكيد
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-600">المبلغ المستحق</p>
-                <p className="text-lg font-semibold text-slate-900">{totalPrice} ر.ي</p>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="mt-2">
-            <Button
-              onClick={handlePaymentConfirmation}
-              disabled={!receiptFile?.name && !receiptInfo.name}
-              className="w-full"
-            >
-              تأكيد الدفع
-            </Button>
-            {!receiptFile?.name && !receiptInfo.name && (
-              <p className="mt-2 text-xs text-red-500 text-right">
-                ارفع السند أولاً لتفعيل زر التأكيد.
-              </p>
+              </>
             )}
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
-      <div className="container mx-auto px-4 py-10">
-        <div className="grid gap-6 lg:grid-cols-1">
-          <Card className="w-full rounded-2xl border border-slate-100 bg-white shadow-[0_10px_26px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-5">
-              <div className="flex flex-col gap-5 md:flex-row md:items-center">
-                <div className="flex items-center justify-start md:justify-end">
-                  <div className="relative h-28 w-28 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
-                    <Image
-                      src={hall.institute?.logo || "/images/logo.png"}
-                      alt={`شعار ${hall.institute?.name || "المعهد"}`}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                      sizes="112px"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex-1 text-right">
-                  <h2 className="text-lg font-bold text-slate-900">{hall.institute?.name || "المعهد غير متاح"}</h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {hall.institute?.description || "معهد تدريبي متخصص في القاعات التعليمية والدورات الاحترافية."}
-                  </p>
-
-                  <div className="mt-4 space-y-2 text-sm">
-                    {hall.institute?.phone && (
-                      <a href={`tel:${hall.institute.phone}`} className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
-                        <Phone className="h-4 w-4" />
-                        <span className="text-slate-500">رقم التواصل:</span>
-                        <span className="font-semibold">{hall.institute.phone}</span>
-                      </a>
-                    )}
-                    {hall.institute?.email && (
-                      <a href={`mailto:${hall.institute.email}`} className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
-                        <Mail className="h-4 w-4" />
-                        <span className="text-slate-500">البريد الإلكتروني:</span>
-                        <span className="font-semibold">{hall.institute.email}</span>
-                      </a>
-                    )}
+      {hall && (
+        <div className="container mx-auto px-4 py-10">
+          <div className="grid gap-6 lg:grid-cols-1">
+            <Card className="w-full rounded-2xl border border-slate-100 bg-white shadow-[0_10px_26px_rgba(15,23,42,0.08)]">
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-5 md:flex-row md:items-center">
+                  <div className="flex items-center justify-start md:justify-end">
+                    <div className="relative h-28 w-28 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                      <Image
+                        src={hall.institute?.logo || "/images/logo.png"}
+                        alt={`شعار ${hall.institute?.name || "المعهد"}`}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                        sizes="112px"
+                      />
+                    </div>
                   </div>
 
-                  <div className="mt-4 flex items-center gap-2">
-                    {hall.institute?.address ? (
-                      <span className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 px-3 text-sm text-slate-600 w-auto gap-2">
-                        <MapPin className="h-4 w-4" />
-                        {hall.institute.address}
-                      </span>
-                    ) : (
-                      hall.locationUrl ? (
-                        <a
-                          href={hall.locationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 px-3 gap-2"
-                          aria-label="الموقع على الخريطة"
-                        >
-                          <MapPin className="h-4 w-4" />
-                          عرض على الخريطة
+                  <div className="flex-1 text-right">
+                    <h2 className="text-lg font-bold text-slate-900">{hall.institute?.name || "المعهد غير متاح"}</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {hall.institute?.description || "معهد تدريبي متخصص في القاعات التعليمية والدورات الاحترافية."}
+                    </p>
+
+                    <div className="mt-4 space-y-2 text-sm">
+                      {hall.institute?.phone && (
+                        <a href={`tel:${hall.institute.phone}`} className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
+                          <Phone className="h-4 w-4" />
+                          <span className="text-slate-500">رقم التواصل:</span>
+                          <span className="font-semibold">{hall.institute.phone}</span>
                         </a>
-                      ) : (
-                        <span
-                          className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 text-slate-300 cursor-not-allowed px-3 gap-2"
-                          aria-label="الموقع غير متوفر"
-                        >
+                      )}
+                      {hall.institute?.email && (
+                        <a href={`mailto:${hall.institute.email}`} className="flex items-center gap-2 text-slate-700 hover:text-blue-700">
+                          <Mail className="h-4 w-4" />
+                          <span className="text-slate-500">البريد الإلكتروني:</span>
+                          <span className="font-semibold">{hall.institute.email}</span>
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      {hall.institute?.address ? (
+                        <span className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 px-3 text-sm text-slate-600 w-auto gap-2">
                           <MapPin className="h-4 w-4" />
-                          الموقع غير متوفر
+                          {hall.institute.address}
                         </span>
-                      ))}
-                    <a
-                      href="#"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-pink-200 hover:text-pink-600"
-                      aria-label="انستقرام"
-                    >
-                      <Instagram className="h-4 w-4" />
-                    </a>
-                    <a
-                      href="#"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700"
-                      aria-label="فيسبوك"
-                    >
-                      <Facebook className="h-4 w-4" />
-                    </a>
-                    {hall.institute?.website && (
+                      ) : (
+                        hall.locationUrl ? (
+                          <a
+                            href={hall.locationUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 px-3 gap-2"
+                            aria-label="الموقع على الخريطة"
+                          >
+                            <MapPin className="h-4 w-4" />
+                            عرض على الخريطة
+                          </a>
+                        ) : (
+                          <span
+                            className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 text-slate-300 cursor-not-allowed px-3 gap-2"
+                            aria-label="الموقع غير متوفر"
+                          >
+                            <MapPin className="h-4 w-4" />
+                            الموقع غير متوفر
+                          </span>
+                        ))}
                       <a
-                        href={hall.institute.website}
+                        href="#"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700"
-                        aria-label="الموقع الإلكتروني"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-pink-200 hover:text-pink-600"
+                        aria-label="انستقرام"
                       >
-                        <Globe className="h-4 w-4" />
+                        <Instagram className="h-4 w-4" />
                       </a>
-                    )}
+                      <a
+                        href="#"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700"
+                        aria-label="فيسبوك"
+                      >
+                        <Facebook className="h-4 w-4" />
+                      </a>
+                      {((hall as any).institute?.website) && (
+                        <a
+                          href={(hall as any).institute.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700"
+                          aria-label="الموقع الإلكتروني"
+                        >
+                          <Globe className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

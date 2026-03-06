@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 import prisma from './config/database';
 import redis from './config/redis';
+import { startSessionScheduler } from './utils/sessionScheduler';
 
 const app: Application = express();
 
@@ -91,6 +92,7 @@ const PORT = config.port;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 Environment: ${config.nodeEnv}`);
+    startSessionScheduler();
 });
 
 export default app;

@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, Banknote, Lock, Loader2 } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, Banknote, Lock, Loader2, Landmark } from "lucide-react"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -182,7 +182,8 @@ export default function CreateCoursePage() {
         image: h.image || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000",
         features: h.facilities && h.facilities.length > 0 ? h.facilities : ["مجهزة بالكامل"],
         description: h.description || `${h.facilities?.join(' • ') || 'لا يوجد وصف'}`,
-        owner: h.institute?.name || "المعهد"
+        owner: h.institute?.name || "المعهد",
+        bankAccounts: h.institute?.bankAccounts || []
     }))
 
     const selectedHall = mappedHalls.find(h => h.id === courseData.hallId)
@@ -830,9 +831,48 @@ export default function CreateCoursePage() {
                                                             <Banknote className="h-5 w-5 text-blue-600" />
                                                             بيانات الدفع لحجز القاعة
                                                         </CardTitle>
-                                                        <CardDescription>يرجى تحويل مبلغ {totalPrice.toLocaleString()} ر.ي إلى حساب المعهد وإرفاق صورة السند أدناه</CardDescription>
+                                                        <CardDescription>يرجى تحويل مبلغ {totalPrice.toLocaleString()} ر.ي إلى أحد الحسابات التالية وإرفاق صورة السند أدناه</CardDescription>
                                                     </CardHeader>
-                                                    <CardContent className="space-y-4">
+                                                    <CardContent className="space-y-6">
+
+                                                        <div className="space-y-3">
+                                                            <h4 className="text-sm font-semibold text-gray-700">الحسابات البنكية للمعهد</h4>
+                                                            {selectedHall?.bankAccounts && selectedHall.bankAccounts.length > 0 ? (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                    {selectedHall.bankAccounts.map((bank: any) => (
+                                                                        <div key={bank.id} className="relative overflow-hidden group p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow border-gray-100">
+                                                                            <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-600"></div>
+                                                                            <div className="flex items-center gap-3 mb-4">
+                                                                                <div className="h-10 w-10 bg-blue-50/80 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+                                                                                    <Landmark className="h-5 w-5" />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <h5 className="font-bold text-gray-900 leading-tight">{bank.bankName}</h5>
+                                                                                    <p className="text-xs text-gray-500 mt-1">{bank.accountName}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100/60">
+                                                                                <div className="flex justify-between items-center text-sm">
+                                                                                    <span className="text-xs text-gray-500 font-medium">رقم الحساب</span>
+                                                                                    <span className="font-mono font-semibold text-blue-900" dir="ltr">{bank.accountNumber}</span>
+                                                                                </div>
+                                                                                {bank.iban && (
+                                                                                    <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
+                                                                                        <span className="text-xs text-gray-500 font-medium">IBAN</span>
+                                                                                        <span className="font-mono text-xs font-semibold text-gray-700" dir="ltr">{bank.iban}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded-lg border border-dashed">
+                                                                    لا توجد حسابات بنكية مضافة لهذا المعهد حالياً. يمكنك التواصل مع المعهد مباشرة.
+                                                                </div>
+                                                            )}
+                                                        </div>
+
                                                         <div
                                                             className="relative h-48 w-full rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer overflow-hidden group"
                                                             onClick={() => paymentInputRef.current?.click()}

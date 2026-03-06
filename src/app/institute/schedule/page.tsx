@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, MapPin, Video, CheckCircle, Settings, AlertTriangle, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
-import { trainerService, Session } from "@/lib/trainer-service"
+import { instituteService } from "@/lib/institute-service"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TIME_SLOTS = [
@@ -22,18 +22,32 @@ const TIME_SLOTS = [
 ]
 const WEEK_DAYS = ["أحد", "اثن", "ثلا", "أرب", "خم", "جم", "سبت"]
 
+interface ScheduleSession {
+    id: string
+    title: string
+    courseTitle: string
+    startTime: string
+    endTime: string
+    type: string
+    status: string
+    meetingLink: string | null
+    location: string
+    enrolledStudents: number
+    roomId: string | null
+}
+
 function formatDateKey(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function TrainerSchedulePage() {
-    const [sessions, setSessions] = useState<Session[]>([])
+export default function InstituteSchedulePage() {
+    const [sessions, setSessions] = useState<ScheduleSession[]>([])
     const [loading, setLoading] = useState(true)
     const [now, setNow] = useState(() => new Date())
 
     // ── Manage Modal ──────────────────────────────────────────────────────────
-    const [selectedSession, setSelectedSession] = useState<Session | null>(null)
+    const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null)
     const [isManageOpen, setIsManageOpen] = useState(false)
     const [actionType, setActionType] = useState<'reschedule' | 'cancel'>('reschedule')
     const [reason, setReason] = useState("")
@@ -46,16 +60,16 @@ export default function TrainerSchedulePage() {
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
     const [isSlotsLoading, setIsSlotsLoading] = useState(false)
 
-    // ── Online reschedule (no room) ────────────────────────────────────────────
+    // ── Online reschedule fallback ─────────────────────────────────────────────
     const [newDate, setNewDate] = useState("")
     const [newStartTime, setNewStartTime] = useState("")
     const [newEndTime, setNewEndTime] = useState("")
 
     // ── Data ──────────────────────────────────────────────────────────────────
     useEffect(() => {
-        trainerService.getSchedule()
+        instituteService.getSchedule()
             .then(data => setSessions(data))
-            .catch(() => toast.error("حدث خطأ أثناء جلب الجدولة"))
+            .catch(() => toast.error("حدث خطأ أثناء جلب الجدول"))
             .finally(() => setLoading(false))
     }, [])
 
@@ -87,7 +101,9 @@ export default function TrainerSchedulePage() {
         if (!selectedSession?.roomId) return
         setIsSlotsLoading(true)
         try {
-            const data = await trainerService.getHallAvailability(selectedSession.roomId, dateKey)
+            // Use institute hall availability endpoint (requires hallId — session roomId is the room, need to get hallId)
+            // The institute service getHallAvailability takes hallId. roomId IS the room (hall) id.
+            const data = await instituteService.getHallAvailability(selectedSession.roomId, dateKey)
             const [y, m, d] = dateKey.split("-").map(Number)
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(y, m - 1, d).getDay()]
             const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
@@ -102,7 +118,6 @@ export default function TrainerSchedulePage() {
                 }
                 const slotStart = new Date(`${dateKey}T${s}:00`)
                 const slotEnd = new Date(`${dateKey}T${e}:00`)
-                // Exclude the current session's own slot from conflict check
                 return !booked.some((b: any) => {
                     if (b.id === selectedSession.id) return false
                     return slotStart < new Date(b.endTime) && slotEnd > new Date(b.startTime)
@@ -117,7 +132,7 @@ export default function TrainerSchedulePage() {
     }, [selectedSession])
 
     // ── Open manage modal ─────────────────────────────────────────────────────
-    const handleOpenManage = (session: Session) => {
+    const handleOpenManage = (session: ScheduleSession) => {
         setSelectedSession(session)
         setActionType('reschedule')
         setReason("")
@@ -148,7 +163,7 @@ export default function TrainerSchedulePage() {
         setIsSaving(true)
         try {
             if (actionType === 'cancel') {
-                await trainerService.updateSession(selectedSession.id, { status: 'CANCELLED' })
+                await instituteService.updateSession(selectedSession.id, { status: 'CANCELLED' })
                 setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, status: 'cancelled' } : s))
                 toast.error("تم إلغاء الجلسة")
             } else {
@@ -161,7 +176,7 @@ export default function TrainerSchedulePage() {
                     startTime = new Date(`${newDate}T${newStartTime}:00`).toISOString()
                     endTime = new Date(`${newDate}T${newEndTime}:00`).toISOString()
                 }
-                await trainerService.updateSession(selectedSession.id, { startTime, endTime })
+                await instituteService.updateSession(selectedSession.id, { startTime, endTime })
                 setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, startTime, endTime } : s))
                 toast.success("تم تغيير موعد الجلسة بنجاح")
             }
@@ -174,22 +189,20 @@ export default function TrainerSchedulePage() {
     }
 
     // ── Grouping ──────────────────────────────────────────────────────────────
-    const toLocalDateKey = (iso: string) => formatDateKey(new Date(iso))
     const sessionsByDate = sessions.reduce((acc, s) => {
-        const k = toLocalDateKey(s.startTime)
+        const k = formatDateKey(new Date(s.startTime))
         if (!acc[k]) acc[k] = []
         acc[k].push(s)
         return acc
-    }, {} as Record<string, Session[]>)
+    }, {} as Record<string, ScheduleSession[]>)
     const sortedDates = Object.keys(sessionsByDate).sort()
     sortedDates.forEach(k => sessionsByDate[k].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()))
 
-    const getEffectiveStatus = (s: Session) => {
+    const getEffectiveStatus = (s: ScheduleSession) => {
         if (s.status === 'cancelled') return 'cancelled'
         if (new Date(s.endTime).getTime() < now.getTime()) return 'completed'
         return s.status
     }
-
     const getStatusConfig = (status: string) => {
         switch (status) {
             case 'scheduled': return { label: 'قادم', className: 'bg-blue-100 text-blue-700' }
@@ -204,23 +217,23 @@ export default function TrainerSchedulePage() {
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <p className="text-gray-500">جاري جلب جدولك...</p>
+            <p className="text-gray-500">جاري جلب الجدول...</p>
         </div>
     )
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">جدولي</h1>
-                <p className="text-gray-600">إدارة ومتابعة مواعيد دروسك القادمة</p>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">جدول الجلسات</h1>
+                <p className="text-gray-600">جميع الجلسات المقررة في قاعات المعهد</p>
             </div>
 
             {sessions.length === 0 ? (
                 <Card className="bg-gray-50 border-dashed border-2">
                     <CardContent className="p-12 text-center">
                         <CalendarIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">لا يوجد دروس مجدولة</h3>
-                        <p className="text-gray-500">لم تقم بإضافة أي دروس بعد أو ليس لديك دروس قادمة.</p>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">لا توجد جلسات مجدولة</h3>
+                        <p className="text-gray-500">لم يتم حجز أي قاعات أو لا توجد جلسات قادمة.</p>
                     </CardContent>
                 </Card>
             ) : (
@@ -264,21 +277,9 @@ export default function TrainerSchedulePage() {
                                                     </div>
                                                     <div className="flex flex-col gap-2 min-w-[140px]">
                                                         {['scheduled', 'postponed'].includes(eff) && (
-                                                            <>
-                                                                {session.type === 'online' && session.meetingLink ? (
-                                                                    <Button asChild className="w-full">
-                                                                        <a href={session.meetingLink} target="_blank" rel="noopener noreferrer">بدء الدرس</a>
-                                                                    </Button>
-                                                                ) : (
-                                                                    <div className="flex items-center gap-2 text-gray-500 bg-gray-50 px-3 py-2 rounded-md justify-center border text-sm mb-1">
-                                                                        <MapPin className="h-4 w-4" />
-                                                                        <span className="truncate max-w-[120px]">{session.location}</span>
-                                                                    </div>
-                                                                )}
-                                                                <Button variant="outline" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => handleOpenManage(session)}>
-                                                                    <Settings className="w-4 h-4 ml-2" />إدارة الجلسة
-                                                                </Button>
-                                                            </>
+                                                            <Button variant="outline" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => handleOpenManage(session)}>
+                                                                <Settings className="w-4 h-4 ml-2" />إدارة الجلسة
+                                                            </Button>
                                                         )}
                                                         {eff === 'completed' && (
                                                             <div className="flex items-center gap-2 text-green-600 justify-center font-medium">
@@ -311,28 +312,24 @@ export default function TrainerSchedulePage() {
                     </DialogHeader>
 
                     <div className="grid gap-6 py-4">
-                        {/* Action selector */}
                         <RadioGroup value={actionType} onValueChange={v => setActionType(v as any)} className="grid grid-cols-2 gap-4">
                             <div>
-                                <RadioGroupItem value="reschedule" id="r-reschedule" className="peer sr-only" />
-                                <Label htmlFor="r-reschedule" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
+                                <RadioGroupItem value="reschedule" id="i-reschedule" className="peer sr-only" />
+                                <Label htmlFor="i-reschedule" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
                                     <Clock className="mb-3 h-6 w-6" />تغيير الموعد
                                 </Label>
                             </div>
                             <div>
-                                <RadioGroupItem value="cancel" id="r-cancel" className="peer sr-only" />
-                                <Label htmlFor="r-cancel" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-red-50 hover:text-red-900 peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
+                                <RadioGroupItem value="cancel" id="i-cancel" className="peer sr-only" />
+                                <Label htmlFor="i-cancel" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-red-50 hover:text-red-900 peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
                                     <AlertTriangle className="mb-3 h-6 w-6" />إلغاء الجلسة
                                 </Label>
                             </div>
                         </RadioGroup>
 
-                        {/* Reschedule content */}
                         {actionType === 'reschedule' && (
                             selectedSession?.roomId ? (
-                                /* Hall session → calendar + slot grid */
                                 <div className="space-y-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
-                                    {/* Month nav */}
                                     <div className="flex items-center justify-between mb-2">
                                         <Button variant="ghost" size="sm" onClick={() => setCalendarOffset(p => Math.max(0, p - 1))} disabled={calendarOffset === 0}>
                                             <ChevronRight className="h-4 w-4" />
@@ -342,27 +339,21 @@ export default function TrainerSchedulePage() {
                                             <ChevronLeft className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                    {/* Day headers */}
                                     <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-1">
                                         {WEEK_DAYS.map(d => <div key={d}>{d}</div>)}
                                     </div>
-                                    {/* Day cells */}
                                     <div className="grid grid-cols-7 gap-1">
                                         {calendarDays.map((d, i) => {
                                             if (!d) return <div key={i} />
                                             const isSel = selectedDate === d.dateKey
                                             return (
-                                                <button
-                                                    key={i} type="button"
-                                                    disabled={d.isPast}
+                                                <button key={i} type="button" disabled={d.isPast}
                                                     onClick={() => handleSelectDay(d.dateKey)}
                                                     className={`h-9 rounded-lg text-sm transition-all ${isSel ? 'bg-blue-600 text-white' : d.isPast ? 'bg-gray-100 text-gray-300' : 'bg-white border hover:bg-blue-50'}`}
                                                 >{d.day}</button>
                                             )
                                         })}
                                     </div>
-
-                                    {/* Available slots */}
                                     {selectedDate && (
                                         <div className="border-t pt-3">
                                             <h4 className="font-semibold text-sm mb-2">الأوقات المتاحة</h4>
@@ -371,8 +362,7 @@ export default function TrainerSchedulePage() {
                                             ) : availableSlots.length > 0 ? (
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {availableSlots.map(slot => (
-                                                        <button
-                                                            key={slot} type="button"
+                                                        <button key={slot} type="button"
                                                             onClick={() => setSelectedSlot(slot)}
                                                             className={`p-2 text-sm rounded border transition-colors ${selectedSlot === slot ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-blue-50 hover:border-blue-300'}`}
                                                         >{slot}</button>
@@ -385,7 +375,6 @@ export default function TrainerSchedulePage() {
                                     )}
                                 </div>
                             ) : (
-                                /* Online session → simple date+time inputs */
                                 <div className="space-y-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
                                     <div className="grid gap-2">
                                         <Label>التاريخ الجديد</Label>
@@ -405,26 +394,23 @@ export default function TrainerSchedulePage() {
                             )
                         )}
 
-                        {/* Cancel warning */}
                         {actionType === 'cancel' && (
                             <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
                                 <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
                                 <div>
                                     <h4 className="font-bold text-red-900 text-sm">تحذير هام</h4>
-                                    <p className="text-red-700 text-sm mt-1">هل أنت متأكد؟ سيتم إشعار جميع الطلاب المشتركين بإلغاء هذا الدرس. هذا الإجراء لا يمكن التراجع عنه.</p>
+                                    <p className="text-red-700 text-sm mt-1">هل أنت متأكد؟ سيتم إلغاء الجلسة وإتاحة وقتها في القاعة مجدداً.</p>
                                 </div>
                             </div>
                         )}
 
-                        {/* Reason */}
                         <div className="grid gap-2">
                             <Label>سبب التغيير/الإلغاء (إجباري)</Label>
                             <Textarea
-                                placeholder="مثلاً: ظروف صحية طارئة، تأجيل بطلب من الطلاب..."
+                                placeholder="مثلاً: إعادة جدولة بناءً على طلب الطلاب..."
                                 value={reason}
                                 onChange={e => setReason(e.target.value)}
                             />
-                            <p className="text-xs text-muted-foreground">سيظهر هذا النص في الإشعار المرسل للطلاب.</p>
                         </div>
                     </div>
 

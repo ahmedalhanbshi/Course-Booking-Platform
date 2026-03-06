@@ -94,6 +94,8 @@ export default function TrainerCoursesPage() {
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">بانتظار الموافقة</Badge>
       case 'pending_review':
         return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">بانتظار الموافقة على الدفع</Badge>
+      case 'completed':
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200">مكتمل</Badge>
       case 'rejected':
         return (
           <div className="flex flex-col gap-1 items-start">

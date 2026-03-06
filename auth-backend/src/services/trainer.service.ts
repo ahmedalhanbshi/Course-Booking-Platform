@@ -279,24 +279,103 @@ class TrainerService {
         });
         if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
 
-        return prisma.course.update({
+        // Build update data
+        const updateData: any = {
+            ...(data.title !== undefined && { title: data.title }),
+            ...(data.description !== undefined && { description: data.description }),
+            ...(data.shortDescription !== undefined && { shortDescription: data.shortDescription }),
+            ...(data.image !== undefined && { image: data.image }),
+            ...(data.price !== undefined && { price: Number(data.price) }),
+            ...(data.duration !== undefined && { duration: Number(data.duration) }),
+            ...(data.maxStudents !== undefined && { maxStudents: Number(data.maxStudents) }),
+            ...(data.startDate && { startDate: new Date(data.startDate) }),
+            ...(data.endDate && { endDate: new Date(data.endDate) }),
+            ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
+            ...(data.status && {
+                status: (data.status.toUpperCase() === 'ACTIVE' && data.deliveryType === 'in_person')
+                    ? 'PENDING_REVIEW'
+                    : data.status.toUpperCase()
+            }),
+            ...(data.objectives !== undefined && { objectives: data.objectives ?? [] }),
+            ...(data.prerequisites !== undefined && { prerequisites: data.prerequisites?.length ? data.prerequisites.join('\n') : null }),
+            ...(data.tags !== undefined && { tags: data.tags ?? [] }),
+        };
+
+        const updated = await prisma.course.update({
             where: { id: courseId },
-            data: {
-                title: data.title,
-                description: data.description,
-                shortDescription: data.shortDescription,
-                image: data.image,
-                price: Number(data.price),
-                duration: Number(data.duration),
-                maxStudents: Number(data.maxStudents),
-                startDate: data.startDate ? new Date(data.startDate) : undefined,
-                endDate: data.endDate ? new Date(data.endDate) : undefined,
-                categoryId: data.categoryId || null,
-                objectives: data.objectives ?? [],
-                prerequisites: data.prerequisites?.length ? data.prerequisites.join('\n') : null,
-                tags: data.tags ?? [],
-            },
+            data: updateData,
         });
+
+        // If publishing (ACTIVE or PENDING_REVIEW) with sessions payload, create sessions
+        if ((data.status?.toUpperCase() === 'ACTIVE' || data.status?.toUpperCase() === 'PENDING_REVIEW') && Array.isArray(data.sessions) && data.sessions.length > 0) {
+            const sessionType = data.deliveryType === 'online' ? 'ONLINE' : 'IN_PERSON';
+            const mappedSessions = data.sessions.map((s: any) => ({
+                startTime: new Date(`${s.date}T${s.startTime}`),
+                endTime: new Date(`${s.date}T${s.endTime}`),
+                type: sessionType,
+                status: 'SCHEDULED' as const,
+                location: s.location || '',
+                meetingLink: s.meetingLink || null,
+                topic: s.topic || '',
+                courseId,
+            }));
+
+            // Delete old sessions for this course first
+            await prisma.session.deleteMany({ where: { courseId } });
+
+            if (data.hallId && data.paymentReceiptPath) {
+                // In-person: create room booking + payment + sessions linked to booking
+                const room = await prisma.room.findUnique({ where: { id: data.hallId } });
+                if (!room) throw new Error('القاعة غير موجودة');
+
+                const totalHours = mappedSessions.reduce((acc: number, s: any) => {
+                    return acc + (s.endTime.getTime() - s.startTime.getTime()) / 3600000;
+                }, 0);
+                const totalPrice = totalHours * Number(room.pricePerHour);
+                const sortedSessions = [...mappedSessions].sort((a: any, b: any) => a.startTime - b.startTime);
+
+                const roomBooking = await prisma.roomBooking.create({
+                    data: {
+                        bookingMode: 'CUSTOM_TIME',
+                        startDate: sortedSessions[0].startTime,
+                        endDate: sortedSessions[sortedSessions.length - 1].endTime,
+                        selectedDays: [],
+                        defaultStartTime: sortedSessions[0].startTime,
+                        defaultEndTime: sortedSessions[0].endTime,
+                        status: 'PENDING_APPROVAL',
+                        totalPrice,
+                        roomId: room.id,
+                        requestedById: userId,
+                        courseId,
+                        purpose: `حجز لدورة: ${updated.title}`
+                    }
+                });
+
+                await prisma.payment.create({
+                    data: {
+                        amount: totalPrice,
+                        currency: 'YER',
+                        depositSlipImage: data.paymentReceiptPath,
+                        notes: `إيصال دفع لحجز قاعة (${room.name})`,
+                        status: 'PENDING_REVIEW',
+                        roomBookingId: roomBooking.id
+                    }
+                });
+
+                await prisma.session.createMany({
+                    data: mappedSessions.map((s: any) => ({
+                        ...s,
+                        roomBookingId: roomBooking.id,
+                        roomId: room.id,
+                    }))
+                });
+            } else {
+                // Online or capacity_based: just create sessions
+                await prisma.session.createMany({ data: mappedSessions });
+            }
+        }
+
+        return updated;
     }
 
     /**
@@ -458,7 +537,14 @@ class TrainerService {
             where: { isActive: true },
             include: {
                 institute: {
-                    select: { id: true, name: true }
+                    select: {
+                        id: true,
+                        name: true,
+                        bankAccounts: {
+                            where: { isActive: true },
+                            select: { id: true, bankName: true, accountName: true, accountNumber: true, iban: true }
+                        }
+                    }
                 }
             },
             orderBy: { name: 'asc' }
@@ -471,7 +557,11 @@ class TrainerService {
             include: {
                 institute: {
                     include: {
-                        user: { select: { avatar: true } }
+                        user: { select: { avatar: true } },
+                        bankAccounts: {
+                            where: { isActive: true },
+                            select: { id: true, bankName: true, accountName: true, accountNumber: true, iban: true }
+                        }
                     }
                 }
             }
@@ -483,6 +573,7 @@ class TrainerService {
             ...room,
             instituteDescription: room.institute?.description,
             instituteLogo: room.institute?.logo || room.institute?.user?.avatar,
+            bankAccounts: room.institute?.bankAccounts || [],
         };
     }
 
@@ -561,6 +652,89 @@ class TrainerService {
         };
     }
 
+    /**
+     * Book a hall directly without creating a course
+     */
+    async bookHall(trainerId: string, hallId: string, sessions: { date: string; slot: number }[], receiptFile?: string, notes?: string) {
+        const room = await prisma.room.findFirst({
+            where: { id: hallId, isActive: true }
+        });
+
+        if (!room) {
+            throw new Error('القاعة غير موجودة أو غير متاحة');
+        }
+
+        if (!sessions || sessions.length === 0) {
+            throw new Error('يجب تحديد موعد واحد على الأقل للحجز');
+        }
+
+        // Sort sessions by date and slot
+        const sortedSessions = [...sessions].sort((a, b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            return a.slot - b.slot;
+        });
+
+        const startDate = new Date(sortedSessions[0].date);
+        const endDate = new Date(sortedSessions[sortedSessions.length - 1].date);
+
+        // Calculate total hours
+        const totalHours = sessions.length;
+        const totalAmount = Number(room.pricePerHour) * totalHours;
+
+        return prisma.$transaction(async (tx) => {
+            // 1. Create Room Booking
+            const roomBooking = await tx.roomBooking.create({
+                data: {
+                    roomId: hallId,
+                    requestedById: trainerId,
+                    bookingMode: 'CUSTOM_TIME',
+                    totalPrice: totalAmount,
+                    startDate,
+                    endDate,
+                    defaultStartTime: new Date(`${startDate.toISOString().substring(0, 10)}T08:00:00`),
+                    defaultEndTime: new Date(`${endDate.toISOString().substring(0, 10)}T18:00:00`),
+                    status: receiptFile ? 'PENDING_APPROVAL' : 'PENDING_PAYMENT',
+                    notes: notes || 'حجز مباشر للقاعة من قبل المدرب'
+                }
+            });
+
+            // 2. Create individual Sessions
+            const createdSessions = await Promise.all(sessions.map(s => {
+                const sDate = s.date;
+                const startTime = new Date(`${sDate}T${String(s.slot).padStart(2, '0')}:00:00`);
+                const endTime = new Date(`${sDate}T${String(s.slot + 1).padStart(2, '0')}:00:00`);
+                return tx.session.create({
+                    data: {
+                        roomId: hallId,
+                        roomBookingId: roomBooking.id,
+                        type: 'IN_PERSON',
+                        startTime,
+                        endTime,
+                        status: 'SCHEDULED'
+                    }
+                });
+            }));
+
+            // 3. Create Payment record if receipt provided
+            if (receiptFile) {
+                await tx.payment.create({
+                    data: {
+                        amount: totalAmount,
+                        currency: 'YER',
+                        status: 'PENDING_REVIEW',
+                        depositSlipImage: receiptFile,
+                        notes: 'تحويل بنكي لحجز مباشر',
+                        roomBookingId: roomBooking.id
+                    }
+                });
+            }
+
+            return {
+                roomBooking,
+                sessions: createdSessions
+            };
+        });
+    }
 
     /**
      * Create a new course (Trainer)
@@ -613,7 +787,7 @@ class TrainerService {
                 endDate: finalEndDate,
                 maxStudents: Number(data.maxStudents),
                 minStudents: Number(data.minStudents) || 1,
-                status: "DRAFT", // Course stays DRAFT until RoomBooking is APPROVED
+                status: (data.status === 'ACTIVE' && sessionType === 'IN_PERSON') ? 'PENDING_REVIEW' : (data.status || 'DRAFT'),
                 image: data.image,
                 trainerId: trainer.id,
                 instituteId: instituteId || null,
@@ -1125,8 +1299,51 @@ class TrainerService {
             status: s.status.toLowerCase(),
             meetingLink: s.meetingLink,
             location: s.room?.name || s.location || (s.type === 'ONLINE' ? 'أونلاين' : 'غير محدد'),
-            enrolledStudents: s.course.enrollments.length
+            enrolledStudents: s.course.enrollments.length,
+            roomId: s.roomId ?? null
         }));
+    }
+
+    /**
+     * Reschedule or cancel a session belonging to this trainer
+     */
+    async updateSession(userId: string, sessionId: string, data: { startTime?: Date; endTime?: Date; status?: string }) {
+        // Get all course IDs for this trainer
+        const courses = await prisma.course.findMany({
+            where: { trainerId: userId },
+            select: { id: true }
+        });
+        const courseIds = courses.map(c => c.id);
+
+        const session = await prisma.session.findFirst({
+            where: { id: sessionId, courseId: { in: courseIds } }
+        });
+        if (!session) throw new Error('الجلسة غير موجودة أو لا تنتمي إليك');
+
+        // Conflict check for reschedule with a hall
+        if ((data.startTime || data.endTime) && session.roomId) {
+            const newStart = data.startTime ?? session.startTime;
+            const newEnd = data.endTime ?? session.endTime;
+            const conflict = await prisma.session.findFirst({
+                where: {
+                    id: { not: sessionId },
+                    roomId: session.roomId,
+                    status: { not: 'CANCELLED' },
+                    startTime: { lt: newEnd },
+                    endTime: { gt: newStart }
+                }
+            });
+            if (conflict) throw new Error('هذا الوقت محجوز بالفعل في نفس القاعة');
+        }
+
+        return prisma.session.update({
+            where: { id: sessionId },
+            data: {
+                ...(data.startTime && { startTime: data.startTime }),
+                ...(data.endTime && { endTime: data.endTime }),
+                ...(data.status && { status: data.status as any })
+            }
+        });
     }
 }
 

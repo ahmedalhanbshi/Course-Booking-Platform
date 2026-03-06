@@ -176,6 +176,29 @@ class InstituteService {
     }
 
     // =====================================================
+    // BANK ACCOUNTS
+    // =====================================================
+
+    async getBankAccounts(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/bank-accounts');
+        return response.data.data;
+    }
+
+    async addBankAccount(data: { bankName: string; accountName: string; accountNumber: string; iban?: string }): Promise<any> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/bank-accounts', data);
+        return response.data.data;
+    }
+
+    async updateBankAccount(accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }): Promise<any> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/bank-accounts/${accountId}`, data);
+        return response.data.data;
+    }
+
+    async deleteBankAccount(accountId: string): Promise<void> {
+        await apiClient.delete(`/api/institute/bank-accounts/${accountId}`);
+    }
+
+    // =====================================================
     // ROOM BOOKINGS
     // =====================================================
 
@@ -186,6 +209,18 @@ class InstituteService {
 
     async updateRoomBookingStatus(bookingId: string, data: { status: 'APPROVED' | 'REJECTED'; notes?: string; roomId?: string }): Promise<any> {
         const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/halls/bookings/${bookingId}/status`, data);
+        return response.data.data;
+    }
+
+    async getSchedule(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/schedule');
+        return response.data.data;
+    }
+
+    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string }): Promise<any> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(
+            `/api/institute/sessions/${sessionId}`, data
+        );
         return response.data.data;
     }
 }

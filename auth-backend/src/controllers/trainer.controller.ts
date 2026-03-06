@@ -113,6 +113,44 @@ class TrainerController {
         }
     }
 
+    /**
+     * Book a hall as a trainer outside of a course creation flow
+     */
+    async bookHall(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { hallId } = req.params;
+            const { sessions, notes } = req.body;
+
+            // Handle file upload
+            let receiptFile = undefined;
+            if (req.file) {
+                receiptFile = `/uploads/${req.file.filename}`;
+            }
+
+            const parsedSessions = typeof sessions === 'string' ? JSON.parse(sessions) : sessions;
+
+            if (!parsedSessions || !Array.isArray(parsedSessions) || parsedSessions.length === 0) {
+                return sendError(res, 'يجب تحديد المواعيد للحجز', 400);
+            }
+
+            const result = await trainerService.bookHall(
+                req.user.userId,
+                hallId,
+                parsedSessions,
+                receiptFile,
+                notes
+            );
+
+            return sendSuccess(res, 'تم إرسال طلب حجز القاعة بنجاح', result);
+        } catch (error: any) {
+            console.error('[bookHall] Error:', error);
+            return sendError(res, error.message, 400);
+        }
+    }
+
 
     /**
      * Get all courses created by this trainer
@@ -177,16 +215,16 @@ class TrainerController {
                 hallId: body.hallId || undefined,
             };
 
-            // Handle file upload
-            if (req.file) {
+            // Handle file uploads (both image and paymentReceipt via upload.fields)
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+            if (files?.image?.[0]) {
+                payload.image = `/uploads/${files.image[0].filename}`;
+            } else if (req.file) {
+                // fallback for single upload
                 payload.image = `/uploads/${req.file.filename}`;
             }
-
-            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-            let paymentReceiptPath: string | undefined;
             if (files?.paymentReceipt?.[0]) {
-                paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
-                payload.paymentReceiptPath = paymentReceiptPath;
+                payload.paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
             }
 
             const updated = await trainerService.updateTrainerCourse(req.user.userId, courseId, payload);
@@ -474,6 +512,23 @@ class TrainerController {
 
             const updated = await trainerService.cancelBooking(req.user.userId, courseId, bookingId);
             return sendSuccess(res, 'تم إلغاء طلب الحجز والدورة بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateSession(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { sessionId } = req.params;
+            const { startTime, endTime, status } = req.body;
+            const data = {
+                ...(startTime && { startTime: new Date(startTime) }),
+                ...(endTime && { endTime: new Date(endTime) }),
+                ...(status && { status })
+            };
+            const updated = await trainerService.updateSession(req.user.userId, sessionId, data);
+            return sendSuccess(res, 'تم تحديث الجلسة بنجاح', updated);
         } catch (error: any) {
             return sendError(res, error.message, 400);
         }

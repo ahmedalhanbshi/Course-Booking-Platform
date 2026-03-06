@@ -15,9 +15,15 @@ router.get('/dashboard', instituteController.getDashboard);
 router.get('/profile', instituteController.getProfile);
 router.put('/profile', upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), instituteController.updateProfile);
 
+// Bank Accounts
+router.get('/bank-accounts', instituteController.getBankAccounts);
+router.post('/bank-accounts', instituteController.addBankAccount);
+router.patch('/bank-accounts/:accountId', instituteController.updateBankAccount);
+router.delete('/bank-accounts/:accountId', instituteController.deleteBankAccount);
+
 // Course management
 router.get('/courses', instituteController.getCourses);
-router.post('/courses', upload.single('image'), instituteController.createCourse);
+router.post('/courses', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'paymentReceipt', maxCount: 1 }]), instituteController.createCourse);
 router.delete('/courses/:id', instituteController.deleteCourse);
 router.put('/courses/:id/trainer', instituteController.changeTrainer);
 
@@ -43,7 +49,7 @@ router.put('/courses/:id/students/:enrollmentId/unenroll', instituteController.u
 
 // Course Details & Edit
 router.get('/courses/:id', instituteController.getCourseById);
-router.put('/courses/:id', upload.single('image'), instituteController.updateCourse);
+router.put('/courses/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'paymentReceipt', maxCount: 1 }]), instituteController.updateCourse);
 
 // Metadata
 router.get('/categories', instituteController.getCategories);
@@ -58,5 +64,9 @@ router.post('/staff', instituteController.addStaff);
 router.patch('/staff/:staffId', instituteController.updateStaff);
 router.delete('/staff/:staffId', instituteController.removeStaff);
 router.patch('/staff/:staffId/status', instituteController.updateStaffStatus);
+
+// Schedule
+router.get('/schedule', instituteController.getSchedule);
+router.patch('/sessions/:sessionId', instituteController.updateSession);
 
 export default router;

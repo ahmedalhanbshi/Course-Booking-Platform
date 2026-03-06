@@ -152,6 +152,7 @@ model User {
   roomBookingsApproved  RoomBooking[]     @relation("ApprovedBookings")
   paymentsReviewed    Payment[]
   tokens              Token[]
+  bankAccounts        BankAccount[]
 
   @@index([email])
   @@map("users")
@@ -207,8 +208,27 @@ model Institute {
   courses Course[]
   rooms   Room[]
   staff   InstituteStaff[]
+  bankAccounts BankAccount[]
 
   @@map("institutes")
+}
+
+model BankAccount {
+  id            String    @id @default(uuid())
+  bankName      String    @map("bank_name")
+  accountName   String    @map("account_name")
+  accountNumber String    @map("account_number")
+  iban          String?
+  isActive      Boolean   @default(true) @map("is_active")
+  instituteId   String?   @map("institute_id")
+  trainerId     String?   @map("trainer_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  institute     Institute? @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  trainer       User?      @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@map("bank_accounts")
 }
 
 enum StaffStatus {
@@ -341,13 +361,13 @@ model Session {
   type            SessionType   @default(ONLINE)
   status          SessionStatus @default(SCHEDULED)
   meetingLink     String?       @map("meeting_link")
-  courseId        String        @map("course_id")
+  courseId        String?       @map("course_id")
   roomBookingId   String?       @map("room_booking_id")
   roomId          String?       @map("room_id")
   location        String?
   topic           String?
 
-  course        Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course        Course?       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   roomBooking   RoomBooking?  @relation(fields: [roomBookingId], references: [id])
   room          Room?         @relation(fields: [roomId], references: [id])
 

@@ -100,6 +100,7 @@ export interface Session {
     meetingLink: string | null;
     location: string;
     enrolledStudents: number;
+    roomId: string | null;
 }
 
 class TrainerService {
@@ -262,6 +263,27 @@ class TrainerService {
             `/api/trainer/courses/${courseId}/bookings/${bookingId}`
         );
         return response.data.data;
+    }
+
+    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string }): Promise<any> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(
+            `/api/trainer/sessions/${sessionId}`, data
+        );
+        return response.data.data;
+    }
+
+    async bookHall(hallId: string, sessions: { date: string; slot: number }[], receipt?: File, note?: string): Promise<any> {
+        const formData = new FormData();
+        formData.append('sessions', JSON.stringify(sessions));
+        if (receipt) formData.append('paymentReceipt', receipt);
+        if (note) formData.append('note', note);
+
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>(
+            `/api/trainer/halls/${hallId}/book`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+        return response.data;
     }
 
 }
