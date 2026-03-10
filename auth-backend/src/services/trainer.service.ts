@@ -545,7 +545,7 @@ class TrainerService {
                 sessions: {
                     where: { status: { not: 'CANCELLED' } },
                     orderBy: { startTime: 'asc' },
-                    include: { room: { select: { name: true, location: true } } },
+                    include: { room: { select: { id: true, name: true, location: true } } },
                 },
                 enrollments: {
                     where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
@@ -585,7 +585,8 @@ class TrainerService {
                 status: s.status,
                 meetingLink: s.meetingLink ?? null,
                 location: s.location ?? null,
-                room: s.room ? { name: s.room.name, location: s.room.location ?? null } : null,
+                roomId: s.roomId ?? null,
+                room: s.room ? { id: s.room.id, name: s.room.name, location: s.room.location ?? null } : null,
             })),
             instructor: {
                 name: course.trainer?.name ?? 'مدرب',
@@ -640,6 +641,7 @@ class TrainerService {
 
         return {
             ...room,
+            instituteName: room.institute?.name,
             instituteDescription: room.institute?.description,
             instituteLogo: room.institute?.logo || room.institute?.user?.avatar,
             bankAccounts: room.institute?.bankAccounts || [],

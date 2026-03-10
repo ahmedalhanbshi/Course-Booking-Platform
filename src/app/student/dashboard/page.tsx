@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { BookOpen, Play, TrendingUp, Users, Bell, ChevronLeft, Search, Heart, Loader2, AlertCircle } from "lucide-react"
 import { studentService, StudentDashboardData } from "@/lib/student-service"
 import { formatDate } from "@/lib/utils"
+import { toast } from "sonner"
 
 const courseImagePlaceholder = "/images/course-abstract.svg"
 
@@ -38,10 +39,20 @@ export default function StudentDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  const toggleFavorite = (id: string) => {
-    setFavoriteIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    )
+  const toggleFavorite = async (id: string) => {
+    try {
+      const result = await studentService.toggleWishlist(id)
+      setFavoriteIds((prev) =>
+        result.added ? [...prev, id] : prev.filter((item) => item !== id)
+      )
+      if (result.added) {
+        toast.success("تم إضافة الدورة إلى قائمة الرغبات")
+      } else {
+        toast.success("تم إزالة الدورة من قائمة الرغبات")
+      }
+    } catch (error: any) {
+      toast.error(error.message || "حدث خطأ أثناء تحديث قائمة الرغبات")
+    }
   }
 
   if (loading) {

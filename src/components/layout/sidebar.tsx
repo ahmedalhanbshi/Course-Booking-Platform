@@ -44,9 +44,7 @@ const studentMenuItems = [
   { href: "/student/courses", label: "استعراض الدورات", icon: BookOpen },
   { href: "/student/my-courses", label: "دوراتي", icon: GraduationCap },
   { href: "/student/schedule", label: "الجدول", icon: Calendar },
-  { href: "/student/certificates", label: "الشهادات", icon: Award },
   { href: "/student/wishlist", label: "قائمة الرغبات", icon: Heart },
-  { href: "/student/settings", label: "الإعدادات", icon: Settings },
 ]
 
 const trainerMenuItems = [

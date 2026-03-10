@@ -19,6 +19,8 @@ import {
 import { Search, Filter, AlertCircle, Loader2 } from "lucide-react"
 import { CourseCard } from "@/components/course-card"
 import { trainerService, ExploreCourse } from "@/lib/trainer-service"
+import { studentService } from "@/lib/student-service"
+import { useAuth } from "@/contexts/auth-context"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
@@ -54,6 +56,9 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
   const [priceRange, setPriceRange] = useState([0, 100000])
   const [sortBy, setSortBy] = useState("newest")
 
+  const { user } = useAuth() ?? {}
+  const [wishlistIds, setWishlistIds] = useState<string[]>([])
+
   const fetchData = () => {
     setLoading(true)
     setError(null)
@@ -76,6 +81,18 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (user?.id) {
+      studentService.getWishlist()
+        .then((data) => {
+          setWishlistIds(data.map((item: any) => item.id))
+        })
+        .catch(() => { })
+    } else {
+      setWishlistIds([])
+    }
+  }, [user?.id])
 
   const toggleDeliveryType = (typeLabel: string) => {
     const typeValue = deliveryTypesMap[typeLabel]
@@ -270,6 +287,7 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                     avatar: resolveImage(course.trainer.avatar)
                   }}
                   basePath={basePath}
+                  isFavorite={wishlistIds.includes(course.id)}
                 />
               ))}
             </div>

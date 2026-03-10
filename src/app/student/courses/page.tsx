@@ -15,6 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { trainerService, ExploreCourse } from "@/lib/trainer-service"
+import { studentService } from "@/lib/student-service"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
@@ -35,11 +38,13 @@ function resolveImage(src: string | null): string {
   return `${API_BASE}${separator}${cleanSrc}`
 }
 
-export default function StudentCoursesPage({
-  basePath = "/student/explore/course",
-}: {
+interface StudentCoursesPageProps {
   basePath?: string
-} = {}) {
+}
+
+export default function StudentCoursesPage(props: StudentCoursesPageProps) {
+  const basePath = props.basePath ?? "/student/explore/course"
+  const { user } = useAuth() ?? {}
   const [courses, setCourses] = useState<ExploreCourse[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: "all", name: "الكل" }])
   const [loading, setLoading] = useState(true)
@@ -68,13 +73,43 @@ export default function StudentCoursesPage({
     fetchData()
   }, [])
 
+  useEffect(() => {
+    if (user?.id) {
+      studentService.getWishlist()
+        .then((data) => {
+          setFavoriteIds(data.map((item: any) => item.id))
+        })
+        .catch(() => { })
+    } else {
+      setFavoriteIds([])
+    }
+  }, [user?.id])
+
   const formatPrice = (value: number) =>
     `${new Intl.NumberFormat("en-US").format(value)} ر.ي`
 
-  const toggleFavorite = (id: string) => {
-    setFavoriteIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    )
+  const toggleFavorite = async (id: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!user?.id) {
+      toast.error("يرجى تسجيل الدخول لإضافة الدورة إلى قائمة الرغبات")
+      return
+    }
+
+    try {
+      const result = await studentService.toggleWishlist(id)
+      setFavoriteIds((prev) =>
+        result.added ? [...prev, id] : prev.filter((item) => item !== id)
+      )
+      if (result.added) {
+        toast.success("تم إضافة الدورة إلى قائمة الرغبات")
+      } else {
+        toast.success("تم إزالة الدورة من قائمة الرغبات")
+      }
+    } catch (error: any) {
+      toast.error(error.message || "حدث خطأ أثناء تحديث قائمة الرغبات")
+    }
   }
 
   const filteredCourses = useMemo(() => {
@@ -223,7 +258,7 @@ export default function StudentCoursesPage({
                   />
                   <button
                     type="button"
-                    onClick={() => toggleFavorite(course.id)}
+                    onClick={(e) => toggleFavorite(course.id, e)}
                     aria-label="إضافة إلى المفضلة"
                     className={`absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm ring-1 ring-slate-200/60 transition-transform duration-150 ${favoriteIds.includes(course.id) ? "text-red-600 scale-105" : "hover:text-red-600"
                       }`}

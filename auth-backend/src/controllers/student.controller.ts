@@ -35,6 +35,21 @@ class StudentController {
     }
 
     /**
+     * Get the student's schedule (upcoming and past sessions)
+     */
+    async getSchedule(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'STUDENT') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const data = await studentService.getSchedule(req.user.userId);
+            return sendSuccess(res, 'تم جلب الجدول بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
      * Get the student's enrollment status for a specific course
      */
     async getEnrollmentStatus(req: AuthRequest, res: Response, _next: NextFunction) {
@@ -158,6 +173,22 @@ class StudentController {
             return sendSuccess(res, message, result);
         } catch (error: any) {
             return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
+     * Get public hall details by ID
+     */
+    async getHallById(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'STUDENT') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { hallId } = req.params;
+            const data = await studentService.getHallById(hallId);
+            return sendSuccess(res, 'تم جلب تفاصيل القاعة بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 404);
         }
     }
 }

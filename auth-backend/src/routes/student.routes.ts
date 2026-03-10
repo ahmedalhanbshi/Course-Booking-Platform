@@ -12,11 +12,17 @@ router.get('/dashboard', authenticate, studentController.getDashboard);
 // My Courses
 router.get('/my-courses', authenticate, studentController.getMyCourses);
 
+// Schedule
+router.get('/schedule', authenticate, studentController.getSchedule);
+
 // Enrollment Status
 router.get('/courses/:courseId/enrollment-status', authenticate, studentController.getEnrollmentStatus);
 
 // Course Details
 router.get('/courses/:id', authenticate, studentController.getCourseDetails);
+
+// Halls
+router.get('/halls/:hallId', authenticate, studentController.getHallById);
 
 // Wishlist
 router.get('/wishlist', authenticate, studentController.getWishlist);

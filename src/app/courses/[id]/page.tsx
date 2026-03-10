@@ -131,6 +131,26 @@ export default function CourseDetailsPage() {
   const [registrationId, setRegistrationId] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
 
+  // Hall Information Modal
+  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
+  const [hallData, setHallData] = useState<any>(null)
+  const [isLoadingHall, setIsLoadingHall] = useState(false)
+  const [hallImageError, setHallImageError] = useState(false)
+
+  const openHallModal = async (hallId: string) => {
+    try {
+      setIsLoadingHall(true)
+      setHallImageError(false)
+      const data = await studentService.getHallById(hallId)
+      setHallData(data)
+      setIsHallModalOpen(true)
+    } catch (err: any) {
+      toast.error(err.message || "فشل تحميل بيانات القاعة")
+    } finally {
+      setIsLoadingHall(false)
+    }
+  }
+
   // surveyLink and bank accounts are not in the DB model yet
   const shouldShowSurvey = false
   const bankAccounts = useMemo(() => {
@@ -182,22 +202,6 @@ export default function CourseDetailsPage() {
 
   const formatYER = (value: number) =>
     `${new Intl.NumberFormat("en-US").format(value)} ر.ي`
-
-  const readFavorites = () => {
-    if (typeof window === "undefined") return [] as string[]
-    try {
-      const stored = window.localStorage.getItem(FAVORITES_KEY)
-      return stored ? (JSON.parse(stored) as string[]) : []
-    } catch {
-      return []
-    }
-  }
-
-  const writeFavorites = (items: string[]) => {
-    if (typeof window === "undefined") return
-    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(items))
-    window.dispatchEvent(new Event("favorites-updated"))
-  }
 
   const readRegistrationForm = () => {
     if (typeof window === "undefined") return null
@@ -618,24 +622,6 @@ export default function CourseDetailsPage() {
   }, [bankAccounts, expandedBankId, isPaymentDialogOpen])
 
   useEffect(() => {
-    const syncFavorite = () => {
-      const favorites = readFavorites()
-      setIsFavorite(favorites.includes(course?.id ?? ""))
-    }
-
-    syncFavorite()
-    if (typeof window === "undefined") return
-
-    const handleUpdate = () => syncFavorite()
-    window.addEventListener("favorites-updated", handleUpdate)
-    window.addEventListener("storage", handleUpdate)
-    return () => {
-      window.removeEventListener("favorites-updated", handleUpdate)
-      window.removeEventListener("storage", handleUpdate)
-    }
-  }, [course?.id])
-
-  useEffect(() => {
     // We removed the IntersectionObserver logic and replaced it with pure CSS animations
     // to prevent race conditions that keep cards hidden.
   }, [])
@@ -670,7 +656,7 @@ export default function CourseDetailsPage() {
               asChild
               className="rounded-full transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950"
             >
-              <Link href="/student/explore">
+              <Link href="/student/courses">
                 <ArrowLeft className="ml-2 h-4 w-4" />
                 العودة للاستكشاف
               </Link>
@@ -710,7 +696,16 @@ export default function CourseDetailsPage() {
                 {course.sessions[0]?.room && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    <span>{course.sessions[0].room.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const roomId = course.sessions[0]?.room?.id;
+                        if (roomId) openHallModal(roomId);
+                      }}
+                      className="text-right hover:text-blue-200 hover:underline transition-colors focus:outline-none focus:ring-1 focus:ring-white/20 rounded px-1 -mx-1"
+                    >
+                      {course.sessions[0].room.name}
+                    </button>
                   </div>
                 )}
               </div>
@@ -1001,12 +996,10 @@ export default function CourseDetailsPage() {
                 onClick={toggleFavorite}
                 aria-label="إضافة إلى المفضلة"
                 aria-pressed={isFavorite}
-                className={`absolute left-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 text-slate-200 backdrop-blur transition-all duration-200 hover:scale-105 hover:text-white ${isFavorite ? "text-red-500 hover:text-red-500" : ""
-                  }`}
+                className={`absolute left-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/40 bg-white/90 shadow-sm transition-all duration-300 hover:scale-110 active:scale-95 text-red-500`}
               >
                 <Heart
-                  className={`h-5 w-5 transition-all duration-200 ${isFavorite ? "fill-current scale-110" : ""
-                    }`}
+                  className={`h-5 w-5 transition-transform duration-200 ${isFavorite ? "fill-current text-red-500 scale-110" : ""}`}
                 />
               </button>
               <Image
@@ -1465,6 +1458,101 @@ export default function CourseDetailsPage() {
           }
         }
       `}</style>
-    </div >
+
+      {/* Hall Information Modal */}
+      <Dialog open={isHallModalOpen} onOpenChange={setIsHallModalOpen}>
+        <DialogContent className="max-w-md overflow-hidden p-0 rounded-2xl border-none shadow-2xl [&>button[data-dialog-close='default']]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>معلومات القاعة التدريبية</DialogTitle>
+          </DialogHeader>
+
+          {hallData && (
+            <div className="flex flex-col text-right" dir="rtl">
+              {/* Hall Header/Image */}
+              <div className="relative h-48 w-full bg-slate-100">
+                {hallData.image && !hallImageError ? (
+                  <Image
+                    src={resolveImage(hallData.image)}
+                    alt={hallData.name}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                    onError={() => setHallImageError(true)}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300">
+                    <ImageIcon className="h-12 w-12" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 right-4 text-white">
+                  <h3 className="text-xl font-bold mb-0">{hallData.name}</h3>
+
+                </div>
+                <DialogClose className="absolute left-4 top-4 rounded-full bg-black/20 p-2 text-white hover:bg-black/40 transition-colors">
+                  <X className="h-4 w-4" />
+                </DialogClose>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="text-[10px] text-slate-500 mb-1">نوع القاعة</p>
+                    <p className="text-sm font-bold text-slate-900">{hallData.type || "—"}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="text-[10px] text-slate-500 mb-1">السعة الاستيعابية</p>
+                    <p className="text-sm font-bold text-slate-900">{hallData.capacity} مقعد</p>
+                  </div>
+                </div>
+
+                {/* Location Info */}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 mb-0.5">الموقع</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {hallData.location || "الموقع غير محدد بدقة"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                        <p className="text-[10px] text-slate-500 mb-0.5">الجهة المالكة</p>
+                        <p className="text-sm font-bold text-slate-900">{hallData.instituteName}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-2 flex gap-3 text-right" dir="rtl">
+                  {hallData.locationUrl && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-slate-200 h-11 font-cairo"
+                      asChild
+                    >
+                      <a href={hallData.locationUrl} target="_blank" rel="noopener noreferrer">
+                        خرائط جوجل
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

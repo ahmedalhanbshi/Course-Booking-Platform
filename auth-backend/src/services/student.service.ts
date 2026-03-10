@@ -552,6 +552,87 @@ class StudentService {
             return { added: true };
         }
     }
+
+    /**
+     * Get details for a specific hall (room)
+     */
+    async getHallById(hallId: string) {
+        const room = await prisma.room.findFirst({
+            where: { id: hallId, isActive: true },
+            include: {
+                institute: {
+                    include: {
+                        user: { select: { avatar: true } },
+                        bankAccounts: {
+                            where: { isActive: true },
+                            select: { id: true, bankName: true, accountName: true, accountNumber: true, iban: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!room) throw new Error("القاعة غير موجودة أو غير نشطة");
+
+        return {
+            ...room,
+            instituteName: room.institute?.name,
+            instituteDescription: room.institute?.description,
+            instituteLogo: room.institute?.logo || room.institute?.user?.avatar,
+            bankAccounts: room.institute?.bankAccounts || [],
+        };
+    }
+
+    /**
+     * Get the student's schedule (all sessions for their courses)
+     */
+    async getSchedule(userId: string) {
+        // 1. Get all active or completed enrollments for the student
+        const enrollments = await prisma.enrollment.findMany({
+            where: {
+                studentId: userId,
+                status: { in: ['ACTIVE', 'COMPLETED'] },
+                deletedAt: null
+            },
+            select: { courseId: true }
+        });
+
+        const courseIds = enrollments.map(e => e.courseId);
+
+        if (courseIds.length === 0) return [];
+
+        // 2. Get all sessions for these courses
+        const sessions = await prisma.session.findMany({
+            where: {
+                courseId: { in: courseIds },
+                status: { not: 'CANCELLED' }
+            },
+            include: {
+                room: { select: { name: true } },
+                course: {
+                    select: {
+                        title: true,
+                        trainer: { select: { name: true } }
+                    }
+                }
+            },
+            orderBy: { startTime: 'asc' }
+        });
+
+        return sessions.map(s => ({
+            id: s.id,
+            topic: s.topic || 'جلسة تدريبية',
+            courseTitle: s.course.title,
+            trainerName: s.course.trainer?.name || 'مدرب',
+            startTime: s.startTime,
+            endTime: s.endTime,
+            type: s.type.toLowerCase(),
+            status: s.status.toLowerCase(),
+            meetingLink: s.meetingLink,
+            location: s.room?.name || s.location || (s.type === 'ONLINE' ? 'أونلاين' : 'غير محدد'),
+            roomId: s.roomId ?? null
+        }));
+    }
 }
 
 export default new StudentService();

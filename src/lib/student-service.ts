@@ -50,6 +50,14 @@ export const studentService = {
     },
 
     /**
+     * Get the student's schedule (upcoming and past sessions)
+     */
+    async getSchedule(): Promise<any[]> {
+        const response = await apiClient.get('/api/student/schedule');
+        return response.data.data;
+    },
+
+    /**
      * Get the student's enrollment status for a specific course
      */
     async getEnrollmentStatus(courseId: string): Promise<{ status: string }> {
@@ -112,6 +120,14 @@ export const studentService = {
      */
     async toggleWishlist(courseId: string): Promise<{ added: boolean }> {
         const response = await apiClient.post(`/api/student/wishlist/${courseId}/toggle`);
+        return response.data.data;
+    },
+
+    /**
+     * Get public hall details by ID
+     */
+    async getHallById(hallId: string): Promise<any> {
+        const response = await apiClient.get(`/api/student/halls/${hallId}`);
         return response.data.data;
     }
 };

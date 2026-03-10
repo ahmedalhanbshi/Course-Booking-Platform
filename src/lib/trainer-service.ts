@@ -78,7 +78,8 @@ export interface CourseDetail {
         status: string;
         meetingLink: string | null;
         location: string | null;
-        room: { name: string; location: string | null } | null;
+        room: { id: string; name: string; location: string | null } | null;
+        roomId?: string | null;
     }[];
     instructor: {
         name: string;

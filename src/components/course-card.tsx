@@ -7,6 +7,9 @@ import { Users, Clock, ArrowRight, Heart } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
+import { studentService } from "@/lib/student-service"
 
 const FAVORITES_KEY = "courseFavorites"
 
@@ -25,6 +28,7 @@ export interface CourseCardProps {
     }
     category: string
     basePath?: string
+    isFavorite?: boolean
 }
 
 export function CourseCard({
@@ -38,45 +42,42 @@ export function CourseCard({
     image,
     instructor,
     category,
-    basePath = "/courses"
+    basePath = "/courses",
+    isFavorite: initialIsFavorite = false
 }: CourseCardProps) {
-    const [isFavorite, setIsFavorite] = useState(false)
+    const { user } = useAuth() ?? {}
+    const [isFavorite, setIsFavorite] = useState(initialIsFavorite)
+    const [isToggling, setIsToggling] = useState(false)
 
     useEffect(() => {
-        const sync = () => {
-            if (typeof window === "undefined") return
-            try {
-                const stored = window.localStorage.getItem(FAVORITES_KEY)
-                const list = stored ? (JSON.parse(stored) as string[]) : []
-                setIsFavorite(list.includes(id))
-            } catch {
-                setIsFavorite(false)
-            }
-        }
+        setIsFavorite(initialIsFavorite)
+    }, [initialIsFavorite])
 
-        sync()
-        if (typeof window === "undefined") return
-
-        const handleUpdate = () => sync()
-        window.addEventListener("favorites-updated", handleUpdate)
-        window.addEventListener("storage", handleUpdate)
-        return () => {
-            window.removeEventListener("favorites-updated", handleUpdate)
-            window.removeEventListener("storage", handleUpdate)
-        }
-    }, [id])
-
-    const toggleFavorite = (event: MouseEvent<HTMLButtonElement>) => {
+    const toggleFavorite = async (event: MouseEvent<HTMLButtonElement>) => {
         event.preventDefault()
         event.stopPropagation()
 
-        if (typeof window === "undefined") return
-        const stored = window.localStorage.getItem(FAVORITES_KEY)
-        const list = stored ? (JSON.parse(stored) as string[]) : []
-        const next = list.includes(id) ? list.filter((item) => item !== id) : [...list, id]
-        window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
-        window.dispatchEvent(new Event("favorites-updated"))
-        setIsFavorite(next.includes(id))
+        if (!user?.id) {
+            toast.error("يرجى تسجيل الدخول لإضافة الدورة إلى قائمة الرغبات")
+            return
+        }
+
+        if (isToggling) return
+        setIsToggling(true)
+
+        try {
+            const result = await studentService.toggleWishlist(id)
+            setIsFavorite(result.added)
+            if (result.added) {
+                toast.success("تم إضافة الدورة إلى قائمة الرغبات")
+            } else {
+                toast.success("تم إزالة الدورة من قائمة الرغبات")
+            }
+        } catch (error: any) {
+            toast.error(error.message || "حدث خطأ أثناء تحديث قائمة الرغبات")
+        } finally {
+            setIsToggling(false)
+        }
     }
 
     return (
@@ -112,7 +113,7 @@ export function CourseCard({
                     aria-label="إضافة إلى المفضلة"
                     aria-pressed={isFavorite}
                     onClick={toggleFavorite}
-                    className="absolute top-3 left-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/20 text-slate-200 backdrop-blur-md transition-all duration-200 hover:scale-105 hover:text-white"
+                    className={`absolute top-4 left-4 z-20 flex h-10 w-10 shrink-0 aspect-square p-0 items-center justify-center rounded-full border-2 border-white/40 bg-white/90 shadow-sm transition-all duration-300 hover:scale-110 active:scale-95 text-red-500`}
                 >
                     <Heart className={`w-5 h-5 transition-transform duration-200 ${isFavorite ? "fill-current text-red-500 scale-110" : ""}`} />
                 </button>

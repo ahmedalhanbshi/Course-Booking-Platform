@@ -26,8 +26,17 @@ import {
   Play,
   Ban,
   Lock,
-  MapPin
+  MapPin,
+  ImageIcon,
+  X
 } from "lucide-react"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
 
 const cairo = Cairo({
   subsets: ["arabic"],
@@ -44,6 +53,26 @@ export default function StudentCourseDashboard() {
   const [courseData, setCourseData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Hall Information Modal
+  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
+  const [hallData, setHallData] = useState<any>(null)
+  const [isLoadingHall, setIsLoadingHall] = useState(false)
+  const [hallImageError, setHallImageError] = useState(false)
+
+  const openHallModal = async (hallId: string) => {
+    try {
+      setIsLoadingHall(true)
+      setHallImageError(false)
+      const data = await studentService.getHallById(hallId)
+      setHallData(data)
+      setIsHallModalOpen(true)
+    } catch (err: any) {
+      toast.error(err.message || "فشل تحميل بيانات القاعة")
+    } finally {
+      setIsLoadingHall(false)
+    }
+  }
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -219,7 +248,20 @@ export default function StudentCourseDashboard() {
                   ) : (
                     <Video className="h-4 w-4 text-blue-400" />
                   )}
-                  <span>{courseDeliveryType === "حضوري" ? "القاعة/المكان:" : "المنصة:"} {coursePlatform}</span>
+                  <span>
+                    {courseDeliveryType === "حضوري" ? "القاعة/المكان:" : "المنصة:"}{" "}
+                    {courseDeliveryType === "حضوري" && courseData.sessions?.[0]?.roomId ? (
+                      <button
+                        type="button"
+                        onClick={() => openHallModal(courseData.sessions[0].roomId)}
+                        className="text-right hover:text-blue-200 hover:underline transition-colors focus:outline-none focus:ring-1 focus:ring-white/20 rounded px-1 -mx-1"
+                      >
+                        {coursePlatform}
+                      </button>
+                    ) : (
+                      coursePlatform
+                    )}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-blue-400" />
@@ -486,6 +528,117 @@ export default function StudentCourseDashboard() {
           </div>
         </div>
       </div>
+      {/* Hall Information Modal */}
+      <Dialog open={isHallModalOpen} onOpenChange={setIsHallModalOpen}>
+        <DialogContent className="max-w-md overflow-hidden p-0 rounded-2xl border-none shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>معلومات القاعة التدريبية</DialogTitle>
+          </DialogHeader>
+
+          {hallData && (
+            <div className="flex flex-col text-right" dir="rtl">
+              {/* Hall Header/Image */}
+              <div className="relative h-48 w-full bg-slate-100">
+                {hallData.image && !hallImageError ? (
+                  <Image
+                    src={getFileUrl(hallData.image) || ""}
+                    alt={hallData.name}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                    onError={() => setHallImageError(true)}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300">
+                    <ImageIcon className="h-12 w-12" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 right-4 text-white">
+                  <h3 className="text-xl font-bold mb-0">{hallData.name}</h3>
+                  <p className="text-white/80 text-xs text-right">القاعة التدريبية</p>
+                </div>
+                <DialogClose className="absolute left-4 top-4 rounded-full bg-black/20 p-2 text-white hover:bg-black/40 transition-colors">
+                  <X className="h-4 w-4" />
+                </DialogClose>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-right">
+                    <p className="text-[10px] text-slate-500 mb-1">نوع القاعة</p>
+                    <p className="text-sm font-bold text-slate-900">{hallData.type || "—"}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-right">
+                    <p className="text-[10px] text-slate-500 mb-1">السعة الاستيعابية</p>
+                    <p className="text-sm font-bold text-slate-900">{hallData.capacity} مقعد</p>
+                  </div>
+                </div>
+
+                {/* Location Info */}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 text-right">
+                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 mb-0.5">الموقع</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {hallData.location || "الموقع غير محدد بدقة"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 text-right">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                      <ImageIcon className="h-4 w-4" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                        <p className="text-[10px] text-slate-500 mb-0.5">الجهة المالكة</p>
+                        <p className="text-sm font-bold text-slate-900">{hallData.instituteName}</p>
+                      </div>
+                      {hallData.instituteLogo && (
+                        <div className="h-8 w-8 relative overflow-hidden rounded border border-slate-100">
+                          <Image
+                            src={getFileUrl(hallData.instituteLogo) || ""}
+                            alt={hallData.instituteName}
+                            fill
+                            className="object-contain"
+                            unoptimized={true}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-2 flex gap-3 text-right" dir="rtl">
+                  <Button
+                    className="flex-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white h-11 font-cairo shadow-sm"
+                    onClick={() => setIsHallModalOpen(false)}
+                  >
+                    موافق
+                  </Button>
+                  {hallData.locationUrl && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-slate-200 h-11 font-cairo shadow-sm"
+                      asChild
+                    >
+                      <a href={hallData.locationUrl} target="_blank" rel="noopener noreferrer">
+                        خرائط جوجل
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
