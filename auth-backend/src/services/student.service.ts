@@ -633,6 +633,39 @@ class StudentService {
             roomId: s.roomId ?? null
         }));
     }
+
+    /**
+     * Cancel an enrollment
+     */
+    async cancelEnrollment(userId: string, enrollmentId: string) {
+        // 1. Verify enrollment belongs to the student
+        const enrollment = await prisma.enrollment.findFirst({
+            where: {
+                id: enrollmentId,
+                studentId: userId,
+                deletedAt: null
+            }
+        });
+
+        if (!enrollment) {
+            throw new Error("التسجيل غير موجود");
+        }
+
+        // 2. Check if the current status allows cancellation
+        if (enrollment.status === 'CANCELLED') {
+            throw new Error("التسجيل ملغى بالفعل");
+        }
+
+        if (enrollment.status === 'COMPLETED') {
+            throw new Error("لا يمكن إلغاء دورة مكتملة");
+        }
+
+        // 3. Update status to CANCELLED
+        return prisma.enrollment.update({
+            where: { id: enrollmentId },
+            data: { status: 'CANCELLED' }
+        });
+    }
 }
 
 export default new StudentService();

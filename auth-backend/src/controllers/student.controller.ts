@@ -191,6 +191,22 @@ class StudentController {
             return sendError(res, error.message, 404);
         }
     }
+
+    /**
+     * Cancel an enrollment
+     */
+    async cancelEnrollment(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'STUDENT') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { enrollmentId } = req.params;
+            await studentService.cancelEnrollment(req.user.userId, enrollmentId);
+            return sendSuccess(res, 'تم إلغاء التسجيل بنجاح');
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
 }
 
 export default new StudentController();

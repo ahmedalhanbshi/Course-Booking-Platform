@@ -86,30 +86,31 @@ function StatusPill({
 export default function MyCoursesPage() {
   const [activeTab, setActiveTab] = useState("active")
   const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  const [selectedEnrollment, setSelectedEnrollment] = useState<string | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentWithCourse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const fetchCourses = async () => {
+    try {
+      setIsLoading(true)
+      const data = await studentService.getMyCourses()
+      // Map backend responses if necessary (naming conventions)
+      const mapped = data.map((e: any) => ({
+        ...e,
+        enrolledAt: new Date(e.enrolledAt),
+        status: e.status.toLowerCase()
+      }))
+      setEnrollments(mapped)
+    } catch (error) {
+      console.error("Failed to fetch courses", error)
+      toast.error("فشل في تحميل الدورات")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        setIsLoading(true)
-        const data = await studentService.getMyCourses()
-        // Map backend responses if necessary (naming conventions)
-        const mapped = data.map((e: any) => ({
-          ...e,
-          enrolledAt: new Date(e.enrolledAt),
-          status: e.status.toLowerCase()
-        }))
-        setEnrollments(mapped)
-      } catch (error) {
-        console.error("Failed to fetch courses", error)
-        toast.error("فشل في تحميل الدورات")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchCourses()
   }, [])
 
@@ -120,16 +121,27 @@ export default function MyCoursesPage() {
     return enrollments.filter(enrollment => enrollment.status === status)
   }
 
-  const handleCancelEnrollment = (courseId: string) => {
-    setSelectedCourse(courseId)
+  const handleCancelEnrollment = (enrollmentId: string) => {
+    setSelectedEnrollment(enrollmentId)
     setShowCancelDialog(true)
   }
 
-  const confirmCancellation = () => {
-    // In real app, this would make an API call
-    console.log('Cancelling enrollment for course:', selectedCourse)
-    setShowCancelDialog(false)
-    setSelectedCourse(null)
+  const confirmCancellation = async () => {
+    if (!selectedEnrollment) return
+
+    try {
+      setIsUpdating(true)
+      await studentService.cancelEnrollment(selectedEnrollment)
+      toast.success("تم إلغاء التسجيل بنجاح")
+      fetchCourses()
+      setShowCancelDialog(false)
+      setSelectedEnrollment(null)
+    } catch (error: any) {
+      console.error("Failed to cancel enrollment", error)
+      toast.error(error.message || "حدث خطأ أثناء إلغاء التسجيل")
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   const renderCourseCard = (enrollment: EnrollmentWithCourse) => {
@@ -193,14 +205,18 @@ export default function MyCoursesPage() {
                   <Link href={courseLink}>تفاصيل الدورة</Link>
                 </Button>
 
-                {enrollment.status === 'active' && (
-                  <Dialog open={showCancelDialog && selectedCourse === enrollment.course.id} onOpenChange={setShowCancelDialog}>
+                {['active', 'preliminary', 'pending_payment'].includes(enrollment.status) && (
+                  <Dialog open={showCancelDialog && selectedEnrollment === enrollment.id} onOpenChange={(open) => {
+                    setShowCancelDialog(open)
+                    if (!open) setSelectedEnrollment(null)
+                  }}>
                     <DialogTrigger asChild>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleCancelEnrollment(enrollment.course.id)}
+                        onClick={() => handleCancelEnrollment(enrollment.id)}
+                        disabled={isUpdating}
                       >
                         <X className="ml-2 h-4 w-4" />
                         إلغاء
@@ -215,11 +231,11 @@ export default function MyCoursesPage() {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="flex gap-2 justify-end mt-4">
-                        <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+                        <Button variant="outline" onClick={() => setShowCancelDialog(false)} disabled={isUpdating}>
                           تراجع
                         </Button>
-                        <Button variant="destructive" onClick={confirmCancellation}>
-                          تأكيد الإلغاء
+                        <Button variant="destructive" onClick={confirmCancellation} disabled={isUpdating}>
+                          {isUpdating ? "جاري الإلغاء..." : "تأكيد الإلغاء"}
                         </Button>
                       </div>
                     </DialogContent>

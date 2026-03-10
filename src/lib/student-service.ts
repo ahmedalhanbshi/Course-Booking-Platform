@@ -129,5 +129,12 @@ export const studentService = {
     async getHallById(hallId: string): Promise<any> {
         const response = await apiClient.get(`/api/student/halls/${hallId}`);
         return response.data.data;
+    },
+
+    /**
+     * Cancel an enrollment
+     */
+    async cancelEnrollment(enrollmentId: string): Promise<void> {
+        await apiClient.post(`/api/student/enrollments/${enrollmentId}/cancel`);
     }
 };

@@ -51,5 +51,8 @@ router.post(
     studentController.submitPaymentProof
 );
 
+// Enrollment Cancellation
+router.post('/enrollments/:enrollmentId/cancel', authenticate, studentController.cancelEnrollment);
+
 export default router;
 
