@@ -34,10 +34,12 @@ import {
   Tag,
   UploadCloud,
   Users,
-  X
+  X,
+  ImageIcon
 } from "lucide-react"
 import { toast } from "sonner"
 import { trainerService, CourseDetail } from "@/lib/trainer-service"
+import { studentService } from "@/lib/student-service"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
@@ -131,16 +133,30 @@ export default function CourseDetailsPage() {
 
   // surveyLink and bank accounts are not in the DB model yet
   const shouldShowSurvey = false
-  const bankAccounts = useMemo(() => [
-    {
-      id: "primary",
-      bankName: "—",
-      iban: "—",
-      accountNumber: "—",
-      beneficiary: course?.instructor?.name ?? "—"
+  const bankAccounts = useMemo(() => {
+    if (course?.instructor?.bankAccounts && course.instructor.bankAccounts.length > 0) {
+      return course.instructor.bankAccounts.map(b => ({
+        id: b.id,
+        bankName: b.bankName,
+        iban: b.iban,
+        accountNumber: b.accountNumber,
+        beneficiary: b.accountName || course.instructor.name,
+        isActive: b.isActive
+      })).filter(b => b.isActive)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [course?.instructor?.name])
+
+    // Default fallback if no bank accounts are found
+    return [
+      {
+        id: "primary",
+        bankName: "—",
+        iban: "—",
+        accountNumber: "—",
+        beneficiary: course?.instructor?.name ?? "—",
+        isActive: true
+      }
+    ]
+  }, [course])
 
   const formatFileSize = (size?: number) => {
     if (!size || Number.isNaN(size)) return ""
@@ -242,13 +258,23 @@ export default function CourseDetailsPage() {
     }
   }
 
-  const toggleFavorite = () => {
-    const favorites = readFavorites()
-    const nextFavorites = favorites.includes(course?.id ?? "")
-      ? favorites.filter((id) => id !== course?.id)
-      : [...favorites, course?.id ?? ""]
-    writeFavorites(nextFavorites)
-    setIsFavorite(nextFavorites.includes(course?.id ?? ""))
+  const toggleFavorite = async () => {
+    if (!user?.id) {
+      toast.error("يرجى تسجيل الدخول لإضافة الدورة إلى قائمة الرغبات");
+      return;
+    }
+
+    try {
+      const result = await studentService.toggleWishlist(courseId);
+      setIsFavorite(result.added);
+      if (result.added) {
+        toast.success("تم إضافة الدورة إلى قائمة الرغبات");
+      } else {
+        toast.success("تم إزالة الدورة من قائمة الرغبات");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "حدث خطأ أثناء تحديث قائمة الرغبات");
+    }
   }
 
   const handleReceiptFile = (file: File | null) => {
@@ -368,102 +394,43 @@ export default function CourseDetailsPage() {
   }
 
 
-  const updateRegistrationStatus = async (
-    status: RegistrationStatus,
-    endpoint: string,
-    payload?: Record<string, unknown>
-  ) => {
-    if (!user?.id) {
-      toast.error("يرجى تسجيل الدخول أولًا")
-      return false
-    }
-
-    setIsUpdatingStatus(true)
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          courseId,
-          status,
-          ...payload
-        })
-      })
-
-      if (response.ok) {
-        const payload = await response.json()
-        const nextStatus = (payload?.status as RegistrationStatus) || status
-        setRegistrationStatus(nextStatus)
-        persistRegistrationStatus(nextStatus)
-        return true
-      }
-
-      if (response.status === 401) {
-        toast.error("يرجى تسجيل الدخول أولًا")
-        return false
-      }
-
-      // Fallback to local state for demo flow if API fails.
-      setRegistrationStatus(status)
-      persistRegistrationStatus(status)
-      return true
-    } catch {
-      // Network error fallback for demo flow.
-      setRegistrationStatus(status)
-      persistRegistrationStatus(status)
-      return true
-    } finally {
-      setIsUpdatingStatus(false)
-    }
-  }
-
   const handlePaymentConfirmation = async () => {
     if (!receiptFile && !receiptInfo.name) {
       setPaymentError("يرجى رفع سند الدفع قبل التأكيد.")
       return
     }
     setPaymentError("")
-    const success = await updateRegistrationStatus(
-      "PAYMENT_PENDING",
-      "/api/payment-proof"
-    )
-    if (success) {
-      const nextInfo = {
-        name: receiptFile?.name ?? receiptInfo.name,
-        note: receiptInfo.note
+
+    if (!user?.id) {
+      toast.error("يرجى تسجيل الدخول أولًا")
+      return
+    }
+
+    if (receiptFile) {
+      setIsUpdatingStatus(true)
+      try {
+        const data = await studentService.submitPaymentProof(courseId, receiptFile)
+        const nextStatus = (data?.status as RegistrationStatus) || "PAYMENT_PENDING"
+        setRegistrationStatus(nextStatus)
+        persistRegistrationStatus(nextStatus)
+
+        const nextInfo = {
+          name: receiptFile.name,
+          note: receiptInfo.note
+        }
+        setReceiptInfo(nextInfo)
+        persistReceiptInfo(nextInfo)
+        setIsPaymentDialogOpen(false)
+        toast.success("تم رفع سند الدفع وسيتم مراجعته من الإدارة.")
+      } catch (error: any) {
+        toast.error(error.message || "فشل رفع السند. حاول مرة أخرى.")
+      } finally {
+        setIsUpdatingStatus(false)
       }
-      setReceiptInfo(nextInfo)
-      persistReceiptInfo(nextInfo)
+    } else {
+      // Just mock success if they already uploaded something previously
       setIsPaymentDialogOpen(false)
-      toast.success("تم رفع سند الدفع وسيتم مراجعته من المدرب.")
-    }
-  }
-
-  const handlePaymentApprovalSimulation = async () => {
-    const success = await updateRegistrationStatus(
-      "ENROLLED",
-      "/api/payment-approve"
-    )
-    if (success) {
-      saveEnrollment()
-      toast.success("تم تأكيد الدفع بنجاح، تم تسجيلك بالدورة 🎉")
-    }
-  }
-
-  const handlePaymentRejectionSimulation = () => {
-    setRegistrationStatus("PAYMENT_REJECTED")
-    persistRegistrationStatus("PAYMENT_REJECTED")
-    toast.error("تم رفض الدفع، يرجى تعديل السند.")
-  }
-
-  const handleTrainerApprovalSimulation = async () => {
-    const success = await updateRegistrationStatus(
-      "APPROVED",
-      "/api/trainer-approve"
-    )
-    if (success) {
-      toast.success("تمت الموافقة المبدئية على التسجيل")
+      toast.success("تم التأكيد (سبق رفع السند).")
     }
   }
 
@@ -553,38 +520,23 @@ export default function CourseDetailsPage() {
     setIsSubmitting(true)
     setFormErrors({})
     try {
-      const response = await fetch("/api/pre-register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          courseId,
-          fullName: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          userId: user?.id
-        })
+      const data = await studentService.preRegisterCourse(courseId, {
+        fullName: formData.name,
+        email: formData.email,
+        phone: formData.phone
       })
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        setFormErrors({
-          submit: payload?.message || "تعذر إرسال الطلب الآن"
-        })
-        return
-      }
-
-      const payload = await response.json()
-      const nextStatus = payload?.status || "PENDING_APPROVAL"
+      const nextStatus = (data?.status as RegistrationStatus) || "PENDING_APPROVAL"
       persistRegistrationForm(formData)
       setRegistrationStatus(nextStatus)
       persistRegistrationStatus(nextStatus)
       setIsDialogOpen(false)
       toast.success("تم إرسال طلب التسجيل المبدئي", {
-        description: "سيتم التواصل معك لتأكيد الحجز"
+        description: "سيتم مراجعته من قبل إدارة المنصة."
       })
-    } catch (error) {
+    } catch (error: any) {
       setFormErrors({
-        submit: "حدث خطأ غير متوقع. حاول مرة أخرى."
+        submit: error.message || "تعذر إرسال الطلب الآن"
       })
     } finally {
       setIsSubmitting(false)
@@ -594,29 +546,34 @@ export default function CourseDetailsPage() {
   useEffect(() => {
     const controller = new AbortController()
     const loadStatus = async () => {
-      if (typeof window !== "undefined") {
-        const savedStatus = window.localStorage.getItem(registrationStorageKey)
-        if (savedStatus) {
-          setRegistrationStatus(savedStatus as RegistrationStatus)
-          return
+      // If user is logged in, ALWAYS fetch from API to get the latest trainer approval status
+      if (!user?.id) {
+        if (typeof window !== "undefined") {
+          const savedStatus = window.localStorage.getItem(registrationStorageKey)
+          if (savedStatus) {
+            setRegistrationStatus(savedStatus as RegistrationStatus)
+            return
+          }
         }
+        return
       }
+
       try {
-        const params = new URLSearchParams()
-        if (user?.id) {
-          params.set("userId", user.id)
+        const [enrollmentData, wishlistData] = await Promise.all([
+          studentService.getEnrollmentStatus(courseId),
+          studentService.getWishlist()
+        ]);
+
+        if (enrollmentData?.status) {
+          setRegistrationStatus(enrollmentData.status as RegistrationStatus)
+          persistRegistrationStatus(enrollmentData.status as RegistrationStatus)
+        } else {
+          setRegistrationStatus("NONE")
         }
-        params.set("courseId", courseId)
-        const response = await fetch(`/api/enrollment-status?${params.toString()}`, {
-          signal: controller.signal,
-          cache: "no-store"
-        })
-        if (!response.ok) return
-        const payload = await response.json()
-        if (payload?.status) {
-          setRegistrationStatus(payload.status)
-          persistRegistrationStatus(payload.status)
-        }
+
+        // Check if current course is in wishlist
+        const isInWishlist = wishlistData.some((item: any) => item.id === courseId);
+        setIsFavorite(isInWishlist);
       } catch {
         // ignore
       }
@@ -759,52 +716,18 @@ export default function CourseDetailsPage() {
               </div>
               {(() => {
                 const firstMeetingLink = course.sessions.find(s => s.meetingLink)?.meetingLink
-                return (firstMeetingLink ||
-                  registrationStatus === "PAYMENT_PENDING" ||
-                  registrationStatus === "PENDING_APPROVAL" ||
-                  registrationStatus === "PAYMENT_REJECTED") && (
-                    <div className="flex flex-wrap items-center gap-4">
-                      {firstMeetingLink && (
-                        <a
-                          href={firstMeetingLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-200 underline underline-offset-4 self-start"
-                        >
-                          رابط الاجتماع
-                        </a>
-                      )}
-                      {registrationStatus === "PENDING_APPROVAL" && (
-                        <button
-                          type="button"
-                          onClick={handleTrainerApprovalSimulation}
-                          disabled={isUpdatingStatus}
-                          className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
-                        >
-                          محاكاة الموافقة المبدئية
-                        </button>
-                      )}
-                      {registrationStatus === "PAYMENT_PENDING" && (
-                        <button
-                          type="button"
-                          onClick={handlePaymentApprovalSimulation}
-                          disabled={isUpdatingStatus}
-                          className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white disabled:opacity-60"
-                        >
-                          محاكاة تأكيد الدفع
-                        </button>
-                      )}
-                      {registrationStatus === "PAYMENT_PENDING" && (
-                        <button
-                          type="button"
-                          onClick={handlePaymentRejectionSimulation}
-                          className="text-sm text-blue-200 underline underline-offset-4 self-start transition hover:text-white"
-                        >
-                          محاكاة رفض الدفع
-                        </button>
-                      )}
-                    </div>
-                  )
+                return firstMeetingLink && (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <a
+                      href={firstMeetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-200 underline underline-offset-4 self-start"
+                    >
+                      رابط الاجتماع
+                    </a>
+                  </div>
+                )
               })()}
               <div className="flex flex-wrap gap-2">
                 {(course.tags ?? []).map((tag) => (
@@ -1236,169 +1159,209 @@ export default function CourseDetailsPage() {
               يرجى تحويل المبلغ وإرفاق سند الدفع لإكمال الخطوة.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 pt-4 lg:grid-cols-2">
-            <div className="order-2 space-y-4 text-right lg:order-1">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-semibold text-slate-900">رفع سند الدفع</h4>
-                  <span className="text-xs text-slate-500">صور أو PDF</span>
-                </div>
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    setIsDraggingFile(true)
-                  }}
-                  onDragLeave={() => setIsDraggingFile(false)}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    setIsDraggingFile(false)
-                    const file = event.dataTransfer.files?.[0] ?? null
-                    handleReceiptFile(file)
-                  }}
-                  onClick={() => paymentFileRef.current?.click()}
-                  className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-5 text-sm transition ${isDraggingFile ? "border-blue-500 bg-blue-50/60" : "border-slate-200 bg-slate-50/60"
-                    }`}
-                >
-                  <UploadCloud className="h-6 w-6 text-blue-600" />
-                  <span className="font-medium text-slate-700">اسحب الملف هنا</span>
-                  <span className="text-xs text-slate-500">أو اختر ملفًا من جهازك</span>
-                  <Button type="button" size="sm" className="rounded-full">
-                    اختيار ملف
-                  </Button>
-                  <Input
-                    ref={paymentFileRef}
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null
-                      handleReceiptFile(file)
-                    }}
-                  />
-                </div>
-                {(receiptFile?.name || receiptInfo.name) && (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600">
-                    <div className="flex items-start gap-2">
-                      <FileText className="mt-0.5 h-4 w-4 text-slate-500" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-900">
-                          {receiptFile?.name ?? receiptInfo.name}
-                        </p>
-                        {receiptFile && (
-                          <p className="text-[11px] text-slate-500">
-                            {receiptFile.type || "ملف"} · {formatFileSize(receiptFile.size)}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setReceiptFile(null)
-                          setReceiptInfo((prev) => ({ ...prev, name: "" }))
-                        }}
-                        className="h-7 rounded-full px-3 text-xs"
-                      >
-                        إزالة الملف
-                      </Button>
-                    </div>
-                    <div className="mt-2 flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => paymentFileRef.current?.click()}
-                        className="h-7 rounded-full px-3 text-xs"
-                      >
-                        تغيير الملف
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {!receiptFile?.name && !receiptInfo.name && (
-                  <p className="mt-3 text-xs text-slate-500">
-                    ارفع سند الدفع أولاً حتى تتمكن من التأكيد.
-                  </p>
-                )}
-                {paymentError && <p className="mt-2 text-xs text-red-500">{paymentError}</p>}
+
+          {/* Payment Summary */}
+          <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-right">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-blue-600 font-medium">المبلغ المطلوب سداده</span>
+                <span className="text-2xl font-bold text-blue-900">{formatYER(course.price)}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-slate-500 block mb-1">بيانات الدورة</span>
+                <span className="text-sm font-semibold text-slate-900 truncate max-w-[200px] block">
+                  {course.title}
+                </span>
               </div>
             </div>
-            <div className="order-1 space-y-4 text-right lg:order-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-semibold text-slate-900">الحسابات البنكية</h4>
-                  <span className="text-xs text-slate-500">اختر بنكًا لعرض التفاصيل</span>
+          </div>
+          <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="flex flex-col gap-6">
+              {/* Bank Accounts Section (Now at the top) */}
+              <div className="space-y-4 text-right">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-base font-semibold text-slate-900">الحسابات البنكية</h4>
+                    <span className="text-xs text-slate-500">اختر بنكًا لعرض التفاصيل</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {bankAccounts.map((bank) => {
+                      const isOpen = expandedBankId === bank.id
+                      const hasIban = Boolean(bank.iban)
+                      const hasAccountNumber = Boolean(bank.accountNumber)
+                      return (
+                        <div key={bank.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden transition-all duration-200">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedBankId((prev) => (prev === bank.id ? null : bank.id))
+                            }
+                            className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-right transition-colors ${isOpen ? "bg-slate-50" : "hover:bg-slate-50/50"}`}
+                            aria-expanded={isOpen}
+                          >
+                            <span className="text-sm font-semibold text-slate-900">
+                              {bank.bankName}
+                            </span>
+                            <ChevronDown
+                              className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+                                }`}
+                            />
+                          </button>
+                          {isOpen && (
+                            <div className="border-t border-slate-200 px-4 py-4 text-right text-sm space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                              <div className="flex flex-col gap-1">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">اسم المستفيد</p>
+                                <p className="text-sm font-bold text-slate-900">{bank.beneficiary}</p>
+                              </div>
+
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                {hasAccountNumber && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">رقم الحساب</p>
+                                    <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                      <span className="font-mono text-xs font-bold text-slate-700">{bank.accountNumber}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyValue(bank.accountNumber ?? "", "رقم الحساب")}
+                                        className="text-blue-600 hover:text-blue-700 transition"
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {hasIban && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">رقم IBAN</p>
+                                    <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                      <span className="font-mono text-xs font-bold text-slate-700">{bank.iban}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyValue(bank.iban ?? "", "رقم الآيبان")}
+                                        className="text-blue-600 hover:text-blue-700 transition"
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-                <div className="mt-4 max-h-[320px] space-y-2 overflow-y-auto pr-1">
-                  {bankAccounts.map((bank) => {
-                    const isOpen = expandedBankId === bank.id
-                    const hasIban = Boolean(bank.iban)
-                    const hasAccountNumber = Boolean(bank.accountNumber)
-                    return (
-                      <div key={bank.id} className="rounded-xl border border-slate-200 bg-white">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedBankId((prev) => (prev === bank.id ? null : bank.id))
-                          }
-                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right"
-                          aria-expanded={isOpen}
-                        >
-                          <span className="text-sm font-semibold text-slate-900">
-                            {bank.bankName}
-                          </span>
-                          <ChevronDown
-                            className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""
-                              }`}
-                          />
-                        </button>
-                        {isOpen && (
-                          <div className="border-t border-slate-200 px-4 py-3 text-right text-sm">
-                            <p className="text-xs text-slate-500">
-                              اسم المستفيد: {bank.beneficiary}
+              </div>
+
+              {/* Payment Upload Section (Now at the bottom) */}
+              <div className="space-y-4 text-right">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-base font-semibold text-slate-900">رفع سند الدفع</h4>
+                    <span className="text-xs text-slate-500 font-medium">صور أو ملفات PDF</span>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[1fr_200px]">
+                    <div
+                      onDragOver={(event) => {
+                        event.preventDefault()
+                        setIsDraggingFile(true)
+                      }}
+                      onDragLeave={() => setIsDraggingFile(false)}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        setIsDraggingFile(false)
+                        const file = event.dataTransfer.files?.[0] ?? null
+                        handleReceiptFile(file)
+                      }}
+                      onClick={() => paymentFileRef.current?.click()}
+                      className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-sm transition-all duration-200 ${isDraggingFile ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-slate-50/50 hover:bg-slate-50"
+                        }`}
+                    >
+                      <div className="rounded-full bg-blue-100 p-3 text-blue-600">
+                        <UploadCloud className="h-6 w-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold text-slate-700">اسحب الملف هنا</p>
+                        <p className="text-xs text-slate-400 mt-1">أو انقر لاختيار ملف من جهازك</p>
+                      </div>
+                      <Input
+                        ref={paymentFileRef}
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null
+                          handleReceiptFile(file)
+                        }}
+                      />
+                    </div>
+
+                    {/* Image Preview Area */}
+                    <div className="relative aspect-[4/5] md:aspect-auto md:h-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 flex items-center justify-center">
+                      {receiptFile && receiptFile.type.startsWith('image/') ? (
+                        <img
+                          src={URL.createObjectURL(receiptFile)}
+                          alt="Preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : receiptFile ? (
+                        <div className="flex flex-col items-center gap-2 p-4 text-center">
+                          <FileText className="h-8 w-8 text-slate-400" />
+                          <span className="text-[10px] font-medium text-slate-500 break-all">{receiptFile.name}</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-slate-300">
+                          <ImageIcon className="h-8 w-8 opacity-20" />
+                          <span className="text-[10px] font-medium">لا يوجد معاينة</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {(receiptFile?.name || receiptInfo.name) && (
+                    <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-lg bg-white p-2 border border-blue-100">
+                            <FileText className="h-4 w-4 text-blue-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900 truncate max-w-[200px]">
+                              {receiptFile?.name ?? receiptInfo.name}
                             </p>
-                            {hasIban && (
-                              <div className="mt-3 space-y-2">
-                                <p className="text-xs text-slate-500">رقم IBAN</p>
-                                <p className="font-mono text-sm font-semibold text-slate-900">
-                                  {bank.iban}
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleCopyValue(bank.iban, "رقم الآيبان")}
-                                  className="h-7 rounded-full px-3 text-xs"
-                                >
-                                  نسخ IBAN
-                                </Button>
-                              </div>
-                            )}
-                            {!hasIban && hasAccountNumber && (
-                              <div className="mt-3 space-y-2">
-                                <p className="text-xs text-slate-500">رقم الحساب</p>
-                                <p className="font-mono text-sm font-semibold text-slate-900">
-                                  {bank.accountNumber}
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleCopyValue(bank.accountNumber ?? "", "رقم الحساب")
-                                  }
-                                  className="h-7 rounded-full px-3 text-xs"
-                                >
-                                  نسخ رقم الحساب
-                                </Button>
-                              </div>
+                            {receiptFile && (
+                              <p className="text-[10px] text-slate-500 font-medium">
+                                {receiptFile.type.split('/')[1].toUpperCase()} · {formatFileSize(receiptFile.size)}
+                              </p>
                             )}
                           </div>
-                        )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setReceiptFile(null)
+                            setReceiptInfo((prev) => ({ ...prev, name: "" }))
+                          }}
+                          className="h-8 w-8 rounded-full p-0 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                    )
-                  })}
+                    </div>
+                  )}
+                  {!receiptFile?.name && !receiptInfo.name && (
+                    <div className="mt-4 flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <p className="text-xs font-medium">بانتظار رفع سند الدفع...</p>
+                    </div>
+                  )}
+                  {paymentError && <p className="mt-2 text-xs font-bold text-red-500">{paymentError}</p>}
                 </div>
               </div>
             </div>
@@ -1475,6 +1438,20 @@ export default function CourseDetailsPage() {
 
         .animate-stepper-pop {
           animation: stepper-pop 320ms ease-in-out 1;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
         }
 
         @media (prefers-reduced-motion: reduce) {

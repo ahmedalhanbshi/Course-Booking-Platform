@@ -68,5 +68,6 @@ router.post(
 router.post('/logout', authenticate, authController.logout);
 
 router.get('/me', authenticate, authController.getProfile);
+router.patch('/profile', authenticate, upload.single('avatar'), authController.updateProfile);
 
 export default router;

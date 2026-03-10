@@ -19,6 +19,61 @@ class TrainerController {
         }
     }
 
+    // ==========================================
+    // Trainer Bank Accounts
+    // ==========================================
+
+    async getBankAccounts(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const accounts = await trainerService.getBankAccounts(req.user.userId);
+            return sendSuccess(res, 'تم جلب الحسابات البنكية بنجاح', accounts);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async addBankAccount(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const body = req.body;
+            if (!body.bankName || !body.accountName || !body.accountNumber) {
+                return sendError(res, 'يرجى إدخال جميع الحقول المطلوبة (اسم البنك، اسم الحساب، رقم الحساب)', 400);
+            }
+            const account = await trainerService.addBankAccount(req.user.userId, body);
+            return sendSuccess(res, 'تم إضافة الحساب البنكي بنجاح', account);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateBankAccount(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { accountId } = req.params;
+            const body = req.body;
+            const account = await trainerService.updateBankAccount(req.user.userId, accountId, body);
+            return sendSuccess(res, 'تم تحديث الحساب البنكي بنجاح', account);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async deleteBankAccount(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { accountId } = req.params;
+            await trainerService.deleteBankAccount(req.user.userId, accountId);
+            return sendSuccess(res, 'تم حذف الحساب البنكي بنجاح');
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    // ==========================================
+    // Course Catalog & Explore
+    // ==========================================
+
     /**
      * Get publicly browsable active courses (explore page)
      */
@@ -437,8 +492,8 @@ class TrainerController {
             const { enrollmentId } = req.params;
             const { status, reason } = req.body;
 
-            if (!['ACTIVE', 'CANCELLED'].includes(status)) {
-                return sendError(res, 'حالة غير صالحة. يجب أن تكون ACTIVE أو CANCELLED', 400);
+            if (!['ACTIVE', 'CANCELLED', 'REJECT_PAYMENT'].includes(status)) {
+                return sendError(res, 'حالة غير صالحة. يجب أن تكون ACTIVE أو CANCELLED أو REJECT_PAYMENT', 400);
             }
 
             const updated = await trainerService.updateEnrollmentStatus(req.user.userId, enrollmentId, status, reason);

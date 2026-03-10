@@ -1,3 +1,4 @@
+import { EnrollmentStatus } from '@prisma/client';
 import prisma from '../config/database';
 import { hashPassword, comparePassword } from '../utils/password';
 
@@ -145,6 +146,63 @@ class TrainerService {
             })),
             categories: [{ id: 'all', name: 'الكل' }, ...categories.map(c => ({ id: c.id, name: c.name }))],
         };
+    }
+
+    /**
+     * Get trainer bank accounts
+     */
+    async getBankAccounts(userId: string) {
+        return prisma.bankAccount.findMany({
+            where: { trainerId: userId },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    /**
+     * Add a bank account for trainer
+     */
+    async addBankAccount(userId: string, data: { bankName: string; accountName: string; accountNumber: string; iban?: string }) {
+        return prisma.bankAccount.create({
+            data: {
+                ...data,
+                trainerId: userId,
+            },
+        });
+    }
+
+    /**
+     * Update trainer bank account
+     */
+    async updateBankAccount(userId: string, accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }) {
+        const account = await prisma.bankAccount.findFirst({
+            where: { id: accountId, trainerId: userId },
+        });
+
+        if (!account) {
+            throw new Error('لم يتم العثور على حساب البنك المخصص للتحديث');
+        }
+
+        return prisma.bankAccount.update({
+            where: { id: accountId },
+            data,
+        });
+    }
+
+    /**
+     * Delete a trainer bank account
+     */
+    async deleteBankAccount(userId: string, accountId: string) {
+        const account = await prisma.bankAccount.findFirst({
+            where: { id: accountId, trainerId: userId },
+        });
+
+        if (!account) {
+            throw new Error('لم يتم العثور على الحساب المخصص للحذف');
+        }
+
+        await prisma.bankAccount.delete({
+            where: { id: accountId },
+        });
     }
 
     /**
@@ -470,6 +528,16 @@ class TrainerService {
                         email: true,
                         trainerProfile: {
                             select: { bio: true, specialties: true }
+                        },
+                        bankAccounts: {
+                            select: {
+                                id: true,
+                                bankName: true,
+                                accountName: true,
+                                accountNumber: true,
+                                iban: true,
+                                isActive: true,
+                            }
                         }
                     }
                 },
@@ -525,6 +593,7 @@ class TrainerService {
                 email: course.trainer?.email ?? null,
                 bio: course.trainer?.trainerProfile?.bio ?? null,
                 specialties: course.trainer?.trainerProfile?.specialties ?? [],
+                bankAccounts: course.trainer?.bankAccounts ?? [],
             },
         };
     }
@@ -1124,7 +1193,7 @@ class TrainerService {
     /**
      * Update enrollment status (Accept/Reject)
      */
-    async updateEnrollmentStatus(trainerId: string, enrollmentId: string, status: 'ACTIVE' | 'CANCELLED', reason?: string) {
+    async updateEnrollmentStatus(trainerId: string, enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string) {
         const enrollment = await prisma.enrollment.findFirst({
             where: {
                 id: enrollmentId,
@@ -1133,7 +1202,8 @@ class TrainerService {
                 }
             },
             include: {
-                payments: true
+                payments: true,
+                course: true
             }
         });
 
@@ -1141,7 +1211,35 @@ class TrainerService {
             throw new Error('التسجيل غير موجود أو لا تنتمي لدوراتك');
         }
 
-        const updateData: any = { status };
+        if (status === 'REJECT_PAYMENT') {
+            const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+            if (!latestPayment || latestPayment.status !== 'PENDING_REVIEW') {
+                throw new Error('لا يوجد دفعة معلقة للمراجعة');
+            }
+
+            await prisma.payment.update({
+                where: { id: latestPayment.id },
+                data: {
+                    status: 'REJECTED',
+                    reviewedBy: trainerId,
+                    reviewedAt: new Date(),
+                    rejectionReason: reason || 'تم الرفض من قبل المدرب'
+                }
+            });
+
+            return { ...enrollment, status: enrollment.status, paymentStatus: 'REJECTED' };
+        }
+
+        let targetStatus: EnrollmentStatus = status;
+        // If trainer accepts a PRELIMINARY enrollment, move it to PENDING_PAYMENT if course is not free
+        if (status === 'ACTIVE' && enrollment.status === 'PRELIMINARY') {
+            const price = Number(enrollment.course.price);
+            if (price > 0) {
+                targetStatus = 'PENDING_PAYMENT';
+            }
+        }
+
+        const updateData: any = { status: targetStatus };
         if (reason) {
             updateData.cancellationReason = reason;
         }
@@ -1154,6 +1252,16 @@ class TrainerService {
         // If status is ACTIVE, approve the latest payment as well if it's pending review
         if (status === 'ACTIVE' && enrollment.payments.length > 0) {
             const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+            if (enrollment.status === 'PENDING_PAYMENT') {
+                // Check if there is a payment under review
+                const latestPayment = enrollment.payments[0];
+                if (latestPayment && latestPayment.status === 'PENDING_REVIEW') {
+                    return { status: 'PAYMENT_CONFIRMED' }; // Meaning they submitted the receipt, waiting for trainer
+                } else if (latestPayment && latestPayment.status === 'REJECTED') {
+                    return { status: 'PAYMENT_REJECTED' };
+                }
+                return { status: 'APPROVED' }; // Wait for payment upload (frontend expected 'APPROVED' to show payment step)
+            }
             if (latestPayment.status === 'PENDING_REVIEW') {
                 await prisma.payment.update({
                     where: { id: latestPayment.id },

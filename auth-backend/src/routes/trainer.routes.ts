@@ -137,4 +137,10 @@ router.delete('/courses/:courseId/bookings/:bookingId', trainerController.cancel
 // Session Management
 router.patch('/sessions/:sessionId', trainerController.updateSession);
 
+// Trainer Bank Accounts
+router.get('/bank-accounts', trainerController.getBankAccounts);
+router.post('/bank-accounts', trainerController.addBankAccount);
+router.patch('/bank-accounts/:accountId', trainerController.updateBankAccount);
+router.delete('/bank-accounts/:accountId', trainerController.deleteBankAccount);
+
 export default router;

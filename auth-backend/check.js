@@ -1,1 +1,19 @@
-const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const now = new Date(); console.log('Now UTC:', now.toISOString()); const s = await prisma.session.findMany({ take: 10, orderBy: { startTime: 'asc' }, select: { topic: true, startTime: true, endTime: true, status: true } }); s.forEach(x => console.log(x.status, '|', x.endTime.toISOString(), '| isPast:', x.endTime < now)); } main().catch(console.error).finally(() => prisma.$disconnect());
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+async function main() {
+    const data = await prisma.enrollment.findMany({
+        where: {
+            status: { in: ['PRELIMINARY', 'PENDING_PAYMENT', 'ACTIVE'] }
+        },
+        include: {
+            course: { select: { title: true } },
+            student: { select: { name: true } }
+        }
+    });
+    console.log(JSON.stringify(data, null, 2));
+}
+
+main()
+    .catch(console.error)
+    .finally(() => prisma.$disconnect());

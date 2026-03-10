@@ -20,7 +20,7 @@ export function StudentSidebar() {
       {/* App Logo/Header Area */}
       <div className="p-6 h-16 flex items-center gap-3 border-b border-gray-100 dark:border-slate-800">
         <div className="relative w-10 h-10">
-           <Image src="/images/logo.png" alt="منصة د" fill className="object-contain" />
+          <Image src="/images/logo.png" alt="منصة د" fill className="object-contain" />
         </div>
         <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
           منصة د
@@ -32,16 +32,16 @@ export function StudentSidebar() {
         {links.map((link) => {
           let isActive = false;
           if (link.href === "/student/courses") {
-             // Browse Courses: Active on exact match OR when viewing a course in explore mode
-             isActive = pathname === link.href || pathname.startsWith("/student/explore/course/");
+            // Browse Courses: Active on exact match OR when viewing a course in explore mode
+            isActive = pathname === link.href || pathname.startsWith("/student/explore/course/");
           } else if (link.href === "/student/my-courses") {
-             // My Courses: Active on /student/my-courses OR /student/courses/[id]
-             // We verify it is NOT the explore path
-             isActive = pathname.startsWith(link.href) || (pathname.startsWith("/student/courses/") && pathname !== "/student/courses");
+            // My Courses: Active on /student/my-courses OR /student/courses/[id]
+            // We verify it is NOT the explore path
+            isActive = pathname.startsWith(link.href) || (pathname.startsWith("/student/courses/") && pathname !== "/student/courses");
           } else {
-             isActive = pathname.startsWith(link.href);
+            isActive = pathname.startsWith(link.href);
           }
-          
+
           const Icon = link.icon
           return (
             <Link

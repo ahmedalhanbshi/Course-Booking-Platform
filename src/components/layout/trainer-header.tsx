@@ -63,11 +63,19 @@ export function TrainerHeader({ isSidebarOpen, onMenuClick }: TrainerHeaderProps
         {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-              <Avatar className="h-10 w-10 border border-gray-200">
-                <AvatarImage src={avatarSrc} alt={user?.name ?? ""} />
-                <AvatarFallback>{user?.name?.charAt(0) ?? "؟"}</AvatarFallback>
-              </Avatar>
+            <Button variant="ghost" className="pl-2 pr-1 py-1 h-auto rounded-full hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all dark:hover:bg-slate-800 dark:border-transparent dark:hover:border-slate-700">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9 border border-gray-200 dark:border-slate-700">
+                  <AvatarImage src={avatarSrc} alt={user?.name ?? ""} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                    {user?.name?.charAt(0) ?? "؟"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-slate-900 leading-none mb-1 dark:text-slate-100">{user?.name ?? "—"}</p>
+                  <p className="text-[10px] text-blue-600 font-bold leading-none uppercase">مدرب</p>
+                </div>
+              </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>

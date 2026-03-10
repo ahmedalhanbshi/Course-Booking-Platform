@@ -9,10 +9,23 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { BookOpen, Calendar, Clock, Award, FileText, Download, X, CheckCircle, AlertCircle, Play, ArrowLeft, Users } from "lucide-react"
 import { Course, Enrollment, User } from "@/types"
-import { formatDate, formatTime } from "@/lib/utils"
+import { studentService } from "@/lib/student-service"
+import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
+import { toast } from "sonner"
 
-const ENROLLMENTS_KEY = "myCoursesEnrollments"
-type EnrollmentWithCourse = Enrollment & { course: Course & { image: string } }
+type EnrollmentWithCourse = {
+  id: string
+  status: string
+  progress: number
+  enrolledAt: Date
+  course: Course & { image: string }
+  nextSession?: {
+    startTime: string
+    endTime: string
+    topic: string | null
+    type: string
+  }
+}
 
 const statusVariants = {
   active: {
@@ -29,6 +42,16 @@ const statusVariants = {
     label: "ملغاة",
     activeClass: "bg-white text-slate-900 shadow-sm",
     inactiveClass: "text-slate-600 hover:text-slate-900"
+  },
+  pending_payment: {
+    label: "قيد الدفع",
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
+  },
+  preliminary: {
+    label: "قيد المراجعة",
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
   }
 } as const
 
@@ -39,346 +62,61 @@ function StatusPill({
   isActive,
   onClick
 }: {
-  status: StatusKey
+  status: string
   isActive: boolean
   onClick?: () => void
 }) {
-  const styles = statusVariants[status]
+  const styles = statusVariants[status as StatusKey] || {
+    label: status,
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
+  }
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`h-9 w-full rounded-full px-4 text-sm font-medium text-center transition ${
-        isActive ? styles.activeClass : styles.inactiveClass
-      }`}
+      className={`h-9 w-full rounded-full px-4 text-sm font-medium text-center transition ${isActive ? styles.activeClass : styles.inactiveClass
+        }`}
     >
       {styles.label}
     </button>
   )
 }
 
-// Mock user data
-const mockUser: User = {
-  id: "1",
-  name: "أحمد محمد",
-  email: "ahmed@example.com",
-  role: 'student' as const,
-  status: 'active',
-  createdAt: new Date(),
-  updatedAt: new Date()
-}
-
-// Mock enrolled courses with different statuses
-const mockEnrollments: EnrollmentWithCourse[] = [
-  {
-    id: "1",
-    studentId: "1",
-    courseId: "1",
-    enrolledAt: new Date("2025-01-15"),
-    status: 'active',
-    progress: 75,
-    course: {
-      id: "1",
-      title: "تعلم React من الصفر",
-      description: "دورة شاملة في تعلم React.js مع مشاريع عملية",
-      shortDescription: "تعلم React من الصفر مع مشاريع عملية",
-      trainerId: "1",
-      trainer: {
-        id: "1",
-        name: "أحمد محمد",
-        email: "ahmed@example.com",
-        role: 'trainer' as const,
-        status: 'active',
-        avatar: "/images/avatar-1.png",
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      },
-      price: 29900,
-      duration: 40,
-      startDate: new Date("2025-02-01"),
-      endDate: new Date("2025-03-15"),
-      maxStudents: 50,
-      enrolledStudents: 23,
-      rating: 4.8,
-      reviewCount: 156,
-      status: 'active',
-      category: "تطوير الويب",
-      image: "/images/course-web.png",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
-    }
-  },
-  {
-    id: "4",
-    studentId: "1",
-    courseId: "4",
-    enrolledAt: new Date("2025-02-10"),
-    status: 'active',
-    progress: 15,
-    course: {
-      id: "4",
-      title: "مقدمة في الذكاء الاصطناعي",
-      description: "فهم أساسيات الذكاء الاصطناعي وتعلم الآلة.",
-      shortDescription: "فهم أساسيات الذكاء الاصطناعي وتعلم الآلة.",
-      trainerId: "5",
-      trainer: {
-        id: "5",
-        name: "خالد عمر",
-        email: "khaled@example.com",
-        role: 'trainer' as const,
-        status: 'active',
-        avatar: "/images/avatar-2.png",
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      },
-      price: 15000,
-      duration: 25,
-      startDate: new Date("2025-02-20"),
-      endDate: new Date("2025-03-20"),
-      maxStudents: 60,
-      enrolledStudents: 45,
-      rating: 4.6,
-      reviewCount: 90,
-      status: 'active',
-      category: "علوم البيانات",
-      image: "/images/course-design.png",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
-    }
-  },
-  {
-    id: "2",
-    studentId: "1",
-    courseId: "2",
-    enrolledAt: new Date("2024-11-01"),
-    status: 'completed',
-    progress: 100,
-    course: {
-      id: "2",
-      title: "تصميم واجهات المستخدم",
-      description: "تعلم مبادئ التصميم وأدوات التصميم الحديثة",
-      shortDescription: "تعلم مبادئ التصميم وأدوات التصميم الحديثة",
-      trainerId: "2",
-      trainer: {
-        id: "2",
-        name: "فاطمة علي",
-        email: "fatima@example.com",
-        role: 'trainer' as const,
-        status: 'active',
-        avatar: "/images/avatar-2.png",
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      },
-      price: 39900,
-      duration: 30,
-      startDate: new Date("2024-09-01"),
-      endDate: new Date("2024-10-15"),
-      maxStudents: 30,
-      enrolledStudents: 25,
-      rating: 4.9,
-      reviewCount: 89,
-      status: 'completed',
-      category: "التصميم",
-      image: "/images/course-design.png",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
-    }
-  },
-  {
-    id: "5",
-    studentId: "1",
-    courseId: "5",
-    enrolledAt: new Date("2024-08-01"),
-    status: 'completed',
-    progress: 100,
-    course: {
-      id: "5",
-      title: "أساسيات التسويق الرقمي",
-      description: "كيف تبني استراتيجية تسويقية ناجحة.",
-      shortDescription: "كيف تبني استراتيجية تسويقية ناجحة.",
-      trainerId: "6",
-      trainer: {
-        id: "6",
-        name: "سارة حسن",
-        email: "sara@example.com",
-        role: 'trainer' as const,
-        status: 'active',
-        avatar: "/images/avatar-3.png",
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      },
-      price: 20000,
-      duration: 20,
-      startDate: new Date("2024-08-10"),
-      endDate: new Date("2024-09-10"),
-      maxStudents: 50,
-      enrolledStudents: 48,
-      rating: 4.7,
-      reviewCount: 110,
-      status: 'completed',
-      category: "التسويق",
-      image: "/images/course-web.png",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
-    }
-  },
-  {
-    id: "3",
-    studentId: "1",
-    courseId: "3",
-    enrolledAt: new Date("2024-12-01"),
-    status: 'cancelled',
-    progress: 20,
-    course: {
-      id: "3",
-      title: "إدارة المشاريع الرقمية",
-      description: "تعلم إدارة المشاريع الرقمية باستخدام أدوات حديثة",
-      shortDescription: "تعلم إدارة المشاريع الرقمية باستخدام أدوات حديثة",
-      trainerId: "4",
-      trainer: {
-        id: "4",
-        name: "محمد حسن",
-        email: "mohamed@example.com",
-        role: 'trainer' as const,
-        status: 'active',
-        avatar: "/images/avatar-4.png",
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      },
-      price: 49900,
-      duration: 50,
-      startDate: new Date("2024-12-15"),
-      endDate: new Date("2025-02-15"),
-      maxStudents: 40,
-      enrolledStudents: 15,
-      rating: 4.7,
-      reviewCount: 203,
-      status: 'active',
-      category: "إدارة الأعمال",
-      image: "/images/course-web.png",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
-    }
-  },
-  {
-    id: "6",
-    studentId: "1",
-    courseId: "6",
-    enrolledAt: new Date("2024-12-20"),
-    status: 'cancelled',
-    progress: 0,
-    course: {
-      id: "6",
-      title: "مقدمة في الأمن السيبراني",
-      description: "حماية الأنظمة والشبكات من الهجمات الرقمية.",
-      shortDescription: "حماية الأنظمة والشبكات من الهجمات الرقمية.",
-      trainerId: "7",
-      trainer: {
-        id: "7",
-        name: "عمر خالد",
-        email: "omar@example.com",
-        role: 'trainer' as const,
-        status: 'active',
-        avatar: "/images/avatar-1.png",
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
-      },
-      price: 35000,
-      duration: 45,
-      startDate: new Date("2025-01-05"),
-      endDate: new Date("2025-02-25"),
-      maxStudents: 40,
-      enrolledStudents: 10,
-      rating: 4.8,
-      reviewCount: 50,
-      status: 'active',
-      category: "الأمن السيبراني",
-      image: "/images/course-design.png",
-      createdAt: new Date("2024-01-01"),
-      updatedAt: new Date("2024-01-01"),
-    }
-  }
-]
-
 export default function MyCoursesPage() {
   const [activeTab, setActiveTab] = useState("active")
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
-  const [enrollments, setEnrollments] = useState<EnrollmentWithCourse[]>(mockEnrollments)
-
-  const buildLocalEnrollment = (item: any): EnrollmentWithCourse => {
-    const now = new Date()
-    return {
-      id: `local-${item.courseId}`,
-      studentId: mockUser.id,
-      courseId: item.courseId,
-      enrolledAt: new Date(item.createdAt ?? now.toISOString()),
-      status: 'active',
-      progress: 0,
-      course: {
-        id: item.courseId,
-        title: item.title,
-        description: item.description || item.shortDescription || "",
-        shortDescription: item.shortDescription || item.description || "",
-        trainerId: "local-trainer",
-        trainer: {
-          id: "local-trainer",
-          name: item.instructorName || "مدرب الدورة",
-          email: "trainer@example.com",
-          role: 'trainer' as const,
-          status: 'active',
-          avatar: item.instructorAvatar || "/images/avatar-1.png",
-          createdAt: now,
-          updatedAt: now,
-        },
-        price: item.price || 0,
-        duration: 0,
-        startDate: item.startDate ? new Date(item.startDate) : now,
-        endDate: item.endDate ? new Date(item.endDate) : now,
-        maxStudents: item.maxStudents || 0,
-        enrolledStudents: 0,
-        rating: 0,
-        reviewCount: 0,
-        status: 'active',
-        category: item.category || "",
-        image: item.image || "/images/course-web.png",
-        createdAt: now,
-        updatedAt: now,
-      }
-    }
-  }
+  const [enrollments, setEnrollments] = useState<EnrollmentWithCourse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const loadLocalEnrollments = () => {
-      if (typeof window === "undefined") return
+    const fetchCourses = async () => {
       try {
-        const stored = window.localStorage.getItem(ENROLLMENTS_KEY)
-        const list = stored ? (JSON.parse(stored) as any[]) : []
-        const localEnrollments = list.map(buildLocalEnrollment)
-        const merged = [
-          ...localEnrollments,
-          ...mockEnrollments.filter(
-            (enrollment) => !localEnrollments.some((item) => item.courseId === enrollment.courseId)
-          )
-        ]
-        setEnrollments(merged)
-      } catch {
-        setEnrollments(mockEnrollments)
+        setIsLoading(true)
+        const data = await studentService.getMyCourses()
+        // Map backend responses if necessary (naming conventions)
+        const mapped = data.map((e: any) => ({
+          ...e,
+          enrolledAt: new Date(e.enrolledAt),
+          status: e.status.toLowerCase()
+        }))
+        setEnrollments(mapped)
+      } catch (error) {
+        console.error("Failed to fetch courses", error)
+        toast.error("فشل في تحميل الدورات")
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    loadLocalEnrollments()
-    if (typeof window === "undefined") return
-
-    window.addEventListener("enrollments-updated", loadLocalEnrollments)
-    window.addEventListener("storage", loadLocalEnrollments)
-    return () => {
-      window.removeEventListener("enrollments-updated", loadLocalEnrollments)
-      window.removeEventListener("storage", loadLocalEnrollments)
-    }
+    fetchCourses()
   }, [])
 
-  const getEnrollmentsByStatus = (status: Enrollment['status']) => {
+  const getEnrollmentsByStatus = (status: string) => {
+    if (status === 'active') {
+      return enrollments.filter(e => ['active', 'pending_payment', 'preliminary'].includes(e.status))
+    }
     return enrollments.filter(enrollment => enrollment.status === status)
   }
 
@@ -394,13 +132,11 @@ export default function MyCoursesPage() {
     setSelectedCourse(null)
   }
 
-  const renderCourseCard = (enrollment: Enrollment & { course: Course & { image: string } }) => {
-    const nextSession = new Date() // Mock next session
-    const courseLink = `/student/courses/${enrollment.course.id}${enrollment.status === 'completed' ? '?status=completed' : enrollment.status === 'cancelled' ? '?status=cancelled' : ''}`
-    const nextSessionLabel =
-      enrollment.status === 'active'
-        ? `${formatDate(nextSession)} • ${formatTime(nextSession)}`
-        : 'لا توجد جلسات قادمة'
+  const renderCourseCard = (enrollment: EnrollmentWithCourse) => {
+    const courseLink = `/student/courses/${enrollment.course.id}`
+
+    const hasUpcomingSession = ['active', 'pending_payment', 'preliminary'].includes(enrollment.status) && enrollment.nextSession
+    const nextDate = hasUpcomingSession ? new Date(enrollment.nextSession!.startTime) : null
 
     return (
       <Card key={enrollment.id} className="w-full overflow-hidden border border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
@@ -411,9 +147,10 @@ export default function MyCoursesPage() {
               className="group relative w-full aspect-square md:w-[240px] md:h-[240px] rounded-xl overflow-hidden bg-muted shrink-0"
             >
               <Image
-                src={enrollment.course.image}
+                src={getFileUrl(enrollment.course.image) || "/images/course-placeholder.png"}
                 alt={enrollment.course.title}
                 fill
+                unoptimized
                 sizes="(min-width: 768px) 240px, 100vw"
                 className="object-cover transition-transform duration-200 group-hover:scale-105"
               />
@@ -438,7 +175,17 @@ export default function MyCoursesPage() {
                   <Calendar className="h-4 w-4" />
                   <span className="font-medium">الدرس القادم</span>
                 </div>
-                <p className="text-foreground">{nextSessionLabel}</p>
+                <div className="text-foreground flex items-center gap-2" dir="rtl">
+                  {nextDate ? (
+                    <>
+                      <span className="whitespace-nowrap">{formatDate(nextDate)}</span>
+                      <span className="text-muted-foreground select-none">•</span>
+                      <span className="whitespace-nowrap">{formatTime(nextDate)}</span>
+                    </>
+                  ) : (
+                    <span>لا توجد جلسات قادمة</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row-reverse gap-2 pt-1">

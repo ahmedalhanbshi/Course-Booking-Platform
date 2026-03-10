@@ -86,6 +86,14 @@ export interface CourseDetail {
         email: string | null;
         bio: string | null;
         specialties: string[];
+        bankAccounts?: {
+            id: string;
+            bankName: string;
+            accountName: string;
+            accountNumber: string;
+            iban: string | null;
+            isActive: boolean;
+        }[];
     };
 }
 
@@ -237,7 +245,7 @@ class TrainerService {
         return response.data.data;
     }
 
-    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED', reason?: string): Promise<any> {
+    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string): Promise<any> {
         const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/trainer/enrollments/${enrollmentId}/status`, { status, reason });
         return response.data.data;
     }
@@ -284,6 +292,29 @@ class TrainerService {
             { headers: { 'Content-Type': 'multipart/form-data' } }
         );
         return response.data;
+    }
+
+    // ==========================================
+    // Trainer Bank Accounts
+    // ==========================================
+
+    async getBankAccounts(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/bank-accounts');
+        return response.data.data;
+    }
+
+    async addBankAccount(data: { bankName: string; accountName: string; accountNumber: string; iban?: string }): Promise<any> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/trainer/bank-accounts', data);
+        return response.data.data;
+    }
+
+    async updateBankAccount(accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }): Promise<any> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/trainer/bank-accounts/${accountId}`, data);
+        return response.data.data;
+    }
+
+    async deleteBankAccount(accountId: string): Promise<void> {
+        await apiClient.delete(`/api/trainer/bank-accounts/${accountId}`);
     }
 
 }

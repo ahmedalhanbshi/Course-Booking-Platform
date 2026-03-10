@@ -542,6 +542,34 @@ export class AuthService {
 
         return user;
     }
+
+    async updateProfile(userId: string, data: { name?: string; phone?: string; avatar?: string }) {
+        const user = await prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: data.name,
+                phone: data.phone,
+                avatar: data.avatar,
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                status: true,
+                emailVerified: true,
+                createdAt: true,
+                avatar: true,
+                phone: true,
+            },
+        });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        return user;
+    }
 }
 
 export default new AuthService();

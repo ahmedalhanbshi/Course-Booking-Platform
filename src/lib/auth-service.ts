@@ -140,6 +140,22 @@ class AuthService {
         });
         return response.data;
     }
+
+    /**
+     * Update user profile
+     */
+    async updateProfile(data: FormData): Promise<User> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: User }>(
+            '/api/auth/profile',
+            data,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            }
+        );
+        return response.data.data;
+    }
 }
 
 // Export singleton instance

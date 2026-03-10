@@ -1,71 +1,84 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Play, TrendingUp, Users, Bell, ChevronLeft, Search, Heart } from "lucide-react"
-import { User } from "@/types"
-
-// Mock data for student dashboard
-const mockUser: User = {
-  id: "1",
-  name: "أحمد محمد",
-  email: "ahmed@example.com",
-  role: 'student' as const,
-  status: 'active',
-  createdAt: new Date(),
-  updatedAt: new Date()
-}
+import { BookOpen, Play, TrendingUp, Users, Bell, ChevronLeft, Search, Heart, Loader2, AlertCircle } from "lucide-react"
+import { studentService, StudentDashboardData } from "@/lib/student-service"
+import { formatDate } from "@/lib/utils"
 
 const courseImagePlaceholder = "/images/course-abstract.svg"
 
-const currentCourses = [
-  {
-    id: "1",
-    title: "تعلم React من الصفر",
-    shortDescription: "دورة عملية تغطي أساسيات React وبناء المكونات وإدارة الحالة بأسلوب تطبيقي.",
-    trainer: "أحمد محمد",
-    image: "/images/course-web.png",
-    category: "تطوير الويب",
-  },
-  {
-    id: "2",
-    title: "تصميم واجهات المستخدم",
-    shortDescription: "تعلم مبادئ تصميم الواجهات وبناء تجارب مستخدم احترافية قابلة للتنفيذ.",
-    trainer: "فاطمة علي",
-    image: "/images/course-design.png",
-    category: "تصميم",
-  }
-]
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-const recentNotifications = [
-  {
-    id: "1",
-    title: "تم رفع مادة جديدة",
-    message: "تم رفع محاضرة 'المكونات في React' في دورة تعلم React",
-    time: "منذ ساعتين",
-    type: "material"
-  },
-  {
-    id: "2",
-    title: "تذكير بالدرس",
-    message: "درس 'Hooks في React' سيبدأ غداً",
-    time: "منذ 4 ساعات",
-    type: "reminder"
-  }
-]
+function resolveImage(src: string | null | undefined): string {
+  if (!src) return courseImagePlaceholder
+  if (src.startsWith("http")) return src
+  const cleanSrc = src.replace(/\\/g, "/")
+  const separator = cleanSrc.startsWith("/") ? "" : "/"
+  return `${API_BASE}${separator}${cleanSrc}`
+}
 
 export default function StudentDashboard() {
+  const [data, setData] = useState<StudentDashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [favoriteIds, setFavoriteIds] = useState<string[]>([])
+
+  useEffect(() => {
+    studentService.getDashboard()
+      .then(dashboardData => {
+        setData(dashboardData)
+        setFavoriteIds(dashboardData.favoriteIds)
+      })
+      .catch(() => setError("فشل تحميل بيانات لوحة التحكم"))
+      .finally(() => setLoading(false))
+  }, [])
 
   const toggleFavorite = (id: string) => {
     setFavoriteIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     )
   }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-gray-400">
+        <Loader2 className="h-7 w-7 animate-spin ml-3" />
+        <span className="text-lg">جاري تحميل لوحة التحكم...</span>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-red-500">
+        <AlertCircle className="h-10 w-10" />
+        <p className="text-lg">{error || "حدث خطأ غير متوقع"}</p>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setLoading(true)
+            setError(null)
+            studentService.getDashboard()
+              .then(dashboardData => {
+                setData(dashboardData)
+                setFavoriteIds(dashboardData.favoriteIds)
+              })
+              .catch(() => setError("فشل تحميل بيانات لوحة التحكم"))
+              .finally(() => setLoading(false))
+          }}
+        >
+          إعادة المحاولة
+        </Button>
+      </div>
+    )
+  }
+
+  const { user: dashboardUser, currentCourses, recentNotifications, stats } = data;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-10">
@@ -79,10 +92,10 @@ export default function StudentDashboard() {
           <div className="space-y-3 text-center md:text-right max-w-2xl">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">
-                مرحباً بك، {mockUser.name} 👋
+                مرحباً بك، {dashboardUser.name} 👋
               </h1>
               <p className="text-blue-100 text-sm md:text-base opacity-90">
-                لديك <span className="font-bold text-white">{currentCourses.length} دورات نشطة</span> في حسابك.
+                لديك <span className="font-bold text-white">{stats.activeCourses} دورات نشطة</span> في حسابك.
               </p>
             </div>
 
@@ -105,17 +118,14 @@ export default function StudentDashboard() {
           {/* Compact Stats */}
           <div className="hidden lg:flex gap-4">
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">{currentCourses.length}</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.activeCourses}</div>
               <div className="text-[10px] font-medium text-blue-200 uppercase">دورات نشطة</div>
             </div>
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">2</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.completedCourses}</div>
               <div className="text-[10px] font-medium text-blue-200 uppercase">دورات مكتملة</div>
             </div>
-            <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">3</div>
-              <div className="text-[10px] font-medium text-blue-200 uppercase">شهادات</div>
-            </div>
+
           </div>
         </div>
       </div>
@@ -147,28 +157,27 @@ export default function StudentDashboard() {
                     {/* Course Image */}
                     <div className="relative w-full md:w-[260px] h-[260px] shrink-0 overflow-hidden">
                       <Image
-                        src={course.image || courseImagePlaceholder}
+                        src={resolveImage(course.image)}
                         alt={course.title}
                         fill
                         sizes="(min-width: 768px) 260px, 100vw"
                         className="object-cover"
                         style={{ display: "block" }}
+                        unoptimized={true}
                       />
                       <button
                         type="button"
                         onClick={() => toggleFavorite(course.id)}
                         aria-pressed={favoriteIds.includes(course.id)}
                         aria-label={favoriteIds.includes(course.id) ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}
-                        className={`absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm ring-1 ring-slate-200/60 transition-all duration-150 ${
-                          favoriteIds.includes(course.id)
-                            ? "text-red-600 scale-105"
-                            : "hover:text-red-600"
-                        }`}
+                        className={`absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm ring-1 ring-slate-200/60 transition-all duration-150 ${favoriteIds.includes(course.id)
+                          ? "text-red-600 scale-105"
+                          : "hover:text-red-600"
+                          }`}
                       >
                         <Heart
-                          className={`h-4 w-4 transition-opacity ${
-                            favoriteIds.includes(course.id) ? "fill-current" : ""
-                          }`}
+                          className={`h-4 w-4 transition-opacity ${favoriteIds.includes(course.id) ? "fill-current" : ""
+                            }`}
                         />
                       </button>
                     </div>
@@ -252,7 +261,7 @@ export default function StudentDashboard() {
                         {notification.message}
                       </p>
                       <span className="text-[9px] text-gray-400 mt-1 block font-medium">
-                        {notification.time}
+                        {notification.time ? formatDate(new Date(notification.time)) : 'منذ فترة'}
                       </span>
                     </div>
                   </div>

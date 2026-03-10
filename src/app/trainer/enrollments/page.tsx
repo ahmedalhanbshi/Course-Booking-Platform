@@ -14,6 +14,14 @@ import { toast } from "sonner"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
+function resolveImage(src: string | null | undefined): string {
+    if (!src) return "/images/placeholder.png"
+    if (src.startsWith("http")) return src
+    const cleanSrc = src.replace(/\\/g, "/")
+    const separator = cleanSrc.startsWith("/") ? "" : "/"
+    return `${API_BASE_URL}${separator}${cleanSrc}`
+}
+
 export default function TrainerEnrollmentsPage() {
     const [enrollments, setEnrollments] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -69,6 +77,21 @@ export default function TrainerEnrollmentsPage() {
         }
     }
 
+    const handleRejectPayment = async (id: string) => {
+        const reason = window.prompt("سبب رفض الدفعة (اختياري):") || "";
+        try {
+            setProcessingId(id)
+            await trainerService.updateEnrollmentStatus(id, 'REJECT_PAYMENT', reason)
+            toast.success("تم رفض الدفعة بنجاح")
+            fetchEnrollments()
+            setIsDialogOpen(false)
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "فشل في رفض الدفعة")
+        } finally {
+            setProcessingId(null)
+        }
+    }
+
     const openPaymentDetails = (enrollment: any) => {
         setSelectedEnrollment(enrollment)
         setIsDialogOpen(true)
@@ -116,7 +139,8 @@ export default function TrainerEnrollmentsPage() {
                         const student = enrollment.student;
                         const course = enrollment.course;
                         const latestPayment = enrollment.payments?.[0];
-                        const isPending = ["PRELIMINARY", "PENDING_PAYMENT"].includes(enrollment.status);
+                        const isPending = enrollment.status === "PRELIMINARY" ||
+                            (enrollment.status === "PENDING_PAYMENT" && latestPayment?.status === "PENDING_REVIEW");
 
                         return (
                             <Card key={enrollment.id} className="overflow-hidden bg-white shadow-sm border border-slate-100">
@@ -242,12 +266,13 @@ export default function TrainerEnrollmentsPage() {
                                             سند الدفع
                                         </h4>
                                         <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
-                                            {selectedEnrollment.payments?.[0]?.evidenceImage ? (
+                                            {selectedEnrollment.payments?.[0]?.depositSlipImage ? (
                                                 <Image
-                                                    src={`${API_BASE_URL}${selectedEnrollment.payments[0].evidenceImage}`}
+                                                    src={resolveImage(selectedEnrollment.payments[0].depositSlipImage)}
                                                     alt="سند الدفع"
                                                     fill
                                                     className="object-contain"
+                                                    unoptimized={true}
                                                 />
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center h-full text-slate-400">
@@ -257,12 +282,6 @@ export default function TrainerEnrollmentsPage() {
                                                 </div>
                                             )}
                                         </div>
-                                        {selectedEnrollment.payments?.[0]?.transactionId && (
-                                            <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                <p className="text-xs text-slate-500 mb-1">رقم العملية</p>
-                                                <p className="text-sm font-mono font-bold text-slate-700">{selectedEnrollment.payments[0].transactionId}</p>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
 
@@ -270,7 +289,7 @@ export default function TrainerEnrollmentsPage() {
                                     <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-12 w-12 border border-slate-200 shadow-sm">
-                                                <AvatarImage src={selectedEnrollment.student.avatar ? `${API_BASE_URL}${selectedEnrollment.student.avatar}` : ""} />
+                                                <AvatarImage src={resolveImage(selectedEnrollment.student.avatar)} />
                                                 <AvatarFallback>{selectedEnrollment.student.name[0]}</AvatarFallback>
                                             </Avatar>
                                             <div className="flex-1">
@@ -313,31 +332,38 @@ export default function TrainerEnrollmentsPage() {
                             </div>
 
                             <DialogFooter className="mt-6">
-                                {["PRELIMINARY", "PENDING_PAYMENT"].includes(selectedEnrollment.status) && (
-                                    <div className="flex gap-2 w-full">
-                                        <Button
-                                            disabled={processingId === selectedEnrollment.id}
-                                            onClick={() => handleAccept(selectedEnrollment.id)}
-                                            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                                        >
-                                            {processingId === selectedEnrollment.id ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <CheckCircle className="ml-2 h-4 w-4" />
-                                            )}
-                                            تأكيد وقبول
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            disabled={processingId === selectedEnrollment.id}
-                                            onClick={() => handleReject(selectedEnrollment.id)}
-                                            className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50"
-                                        >
-                                            <XCircle className="ml-2 h-4 w-4" />
-                                            رفض
-                                        </Button>
-                                    </div>
-                                )}
+                                {(selectedEnrollment.status === "PRELIMINARY" ||
+                                    (selectedEnrollment.status === "PENDING_PAYMENT" && selectedEnrollment.payments?.[0]?.status === "PENDING_REVIEW")) && (
+                                        <div className="flex gap-2 w-full">
+                                            <Button
+                                                disabled={processingId === selectedEnrollment.id}
+                                                onClick={() => handleAccept(selectedEnrollment.id)}
+                                                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                                            >
+                                                {processingId === selectedEnrollment.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <CheckCircle className="ml-2 h-4 w-4" />
+                                                )}
+                                                تأكيد وقبول
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                disabled={processingId === selectedEnrollment.id}
+                                                onClick={() => {
+                                                    if (selectedEnrollment.status === 'PENDING_PAYMENT') {
+                                                        handleRejectPayment(selectedEnrollment.id);
+                                                    } else {
+                                                        handleReject(selectedEnrollment.id);
+                                                    }
+                                                }}
+                                                className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50"
+                                            >
+                                                <XCircle className="ml-2 h-4 w-4" />
+                                                رفض
+                                            </Button>
+                                        </div>
+                                    )}
                             </DialogFooter>
                         </div>
                     )}
