@@ -1,3 +1,4 @@
+import { EnrollmentStatus } from "@prisma/client";
 import prisma from "../config/database";
 
 class InstituteService {
@@ -319,8 +320,12 @@ class InstituteService {
         // Fetch all enrollments for institute courses
         const enrollments = (await prisma.enrollment.findMany({
             where: {
-                course: { instituteId: institute.id },
-                status: { in: ["ACTIVE", "COMPLETED", "PRELIMINARY"] },
+                course: {
+                    instituteId: institute.id,
+                    status: { notIn: ["CANCELLED", "REJECTED"] }
+                },
+                status: { in: ["ACTIVE", "COMPLETED", "PRELIMINARY", "PENDING_PAYMENT"] },
+                deletedAt: null,
             },
             include: {
                 student: {
@@ -329,7 +334,9 @@ class InstituteService {
                         name: true,
                         email: true,
                         phone: true,
+                        avatar: true,
                         status: true,
+                        deletedAt: true,
                     },
                 },
                 course: {
@@ -337,48 +344,76 @@ class InstituteService {
                         id: true,
                         title: true,
                         trainer: { select: { name: true } },
+                        staffTrainer: { select: { name: true } },
                     },
                 },
             },
             orderBy: { enrolledAt: "desc" },
         })) as any[];
 
-        // Group by student — one row per student
-        const studentsMap = new Map<
+        // Group by student — matching TrainerService shape
+        const studentMap = new Map<
             string,
             {
                 id: string;
                 name: string;
                 email: string;
                 phone: string | null;
+                avatar: string | null;
                 status: string;
-                enrolledCourses: string[];
-                trainerNames: string[];
-                enrollmentStatuses: string[];
+                enrolledCourses: {
+                    courseId: string;
+                    courseTitle: string;
+                    enrollmentId: string;
+                    status: string;
+                    enrolledAt: Date;
+                    trainerName: string;
+                }[];
+                lastActivity: Date;
             }
         >();
 
-        for (const enrollment of enrollments) {
-            const s = enrollment.student;
-            if (!studentsMap.has(s.id)) {
-                studentsMap.set(s.id, {
+        for (const e of enrollments) {
+            const s = e.student;
+            // Additional safety check for soft-deleted students
+            if (s.deletedAt) continue;
+
+            if (!studentMap.has(s.id)) {
+                studentMap.set(s.id, {
                     id: s.id,
                     name: s.name,
                     email: s.email,
                     phone: s.phone,
+                    avatar: s.avatar,
                     status: s.status.toLowerCase(),
                     enrolledCourses: [],
-                    trainerNames: [],
-                    enrollmentStatuses: [],
+                    lastActivity: e.enrolledAt,
                 });
             }
-            const entry = studentsMap.get(s.id)!;
-            entry.enrolledCourses.push(enrollment.course.title);
-            entry.trainerNames.push(enrollment.course.trainer?.name ?? "");
-            entry.enrollmentStatuses.push(enrollment.status.toLowerCase());
+            const entry = studentMap.get(s.id)!;
+            entry.enrolledCourses.push({
+                courseId: e.course.id,
+                courseTitle: e.course.title,
+                enrollmentId: e.id,
+                status: e.status.toLowerCase(),
+                enrolledAt: e.enrolledAt,
+                trainerName: e.course.staffTrainer?.name || e.course.trainer?.name || "",
+            });
+            if (e.enrolledAt > entry.lastActivity) {
+                entry.lastActivity = e.enrolledAt;
+            }
         }
 
-        return Array.from(studentsMap.values());
+        const students = Array.from(studentMap.values()).map(s => ({
+            ...s,
+            totalCourses: s.enrolledCourses.length,
+        }));
+
+        return {
+            students,
+            totalStudents: students.length,
+            totalEnrollments: enrollments.length,
+        };
     }
 
     // =====================================================
@@ -1126,23 +1161,23 @@ class InstituteService {
             throw new Error("الدورة غير موجودة أو لا تنتمي لهذا المعهد");
         }
 
-        const enrollment = await prisma.enrollment.findFirst({
-            where: { id: enrollmentId, courseId },
+        return prisma.$transaction(async (tx) => {
+            // Delete associated payments
+            await tx.payment.deleteMany({
+                where: { enrollmentId: enrollmentId }
+            });
+
+            // Update enrollment status
+            await tx.enrollment.update({
+                where: { id: enrollmentId },
+                data: {
+                    status: "CANCELLED",
+                    cancellationReason: reason,
+                },
+            });
+
+            return { message: "تم إلغاء تسجيل الطالب بنجاح" };
         });
-
-        if (!enrollment) {
-            throw new Error("التسجيل غير موجود");
-        }
-
-        await prisma.enrollment.update({
-            where: { id: enrollmentId },
-            data: {
-                status: "CANCELLED",
-                cancellationReason: reason,
-            },
-        });
-
-        return { message: "تم إلغاء تسجيل الطالب بنجاح" };
     }
 
     /**
@@ -1368,7 +1403,7 @@ class InstituteService {
     /**
      * Create a new course
      */
-    async createCourse(userId: string, data: any) {
+    async createCourse(userId: string, data: any, paymentReceiptPath?: string) {
         const institute = await prisma.institute.findUnique({
             where: { userId },
         });
@@ -1396,6 +1431,7 @@ class InstituteService {
             type: sessionType,
             status: "SCHEDULED" as const,
             location: session.location,
+            meetingLink: session.meetingLink || data.meetingLink || null,
             topic: session.topic || "",
         }));
 
@@ -1418,7 +1454,7 @@ class InstituteService {
                 startDate: finalStartDate,
                 endDate: finalEndDate,
                 maxStudents: Number(data.maxStudents),
-                status: "DRAFT",
+                status: data.status || 'DRAFT',
                 image: data.image,
                 staffTrainerId: data.trainerId,
                 trainerId: null,
@@ -1456,7 +1492,7 @@ class InstituteService {
                     selectedDays: [], // Can be populated if needed
                     defaultStartTime: mappedSessions[0].startTime,
                     defaultEndTime: mappedSessions[0].endTime,
-                    status: "PENDING_PAYMENT",
+                    status: "APPROVED", // Auto-approved for Institute Owner
                     totalPrice: totalPrice,
                     roomId: room.id,
                     requestedById: userId,
@@ -1464,6 +1500,20 @@ class InstituteService {
                     purpose: `حجز لدورة: ${course.title}`
                 }
             });
+
+            // Create Payment Request (Internal for institute owner)
+            if (paymentReceiptPath) {
+                await prisma.payment.create({
+                    data: {
+                        amount: totalPrice,
+                        currency: "YER",
+                        depositSlipImage: paymentReceiptPath,
+                        notes: `إيصال دفع حجز قاعة للدورة: ${course.title}`,
+                        status: "APPROVED", // Auto-approved for Institute Owner
+                        roomBookingId: roomBooking.id
+                    }
+                });
+            }
 
             // Create explicitly linked sessions using createMany
             await prisma.session.createMany({
@@ -1476,16 +1526,11 @@ class InstituteService {
             });
         }
 
-        // If hall is selected, handling room booking would go here
-        // For now, we return the course and let the frontend/user manage bookings separately
-        // or we could implement it if data.hallId is present.
-        // Given complexity, let's keep it simple: Course created.
-
         return course;
     }
 
     /**
-     * Get all sessions taking place in this institute's halls
+     * Get all sessions taking place in this institute's halls OR for courses owned by this institute
      */
     async getSchedule(userId: string) {
         const institute = await prisma.institute.findUnique({ where: { userId } });
@@ -1498,14 +1543,13 @@ class InstituteService {
         });
         const roomIds = rooms.map(r => r.id);
 
-        if (roomIds.length === 0) return [];
-
-        // Get all sessions linked to these rooms (directly or via room booking)
+        // Get all sessions linked to these rooms OR courses owned by this institute
         const sessions = await prisma.session.findMany({
             where: {
                 OR: [
                     { roomId: { in: roomIds } },
-                    { roomBooking: { roomId: { in: roomIds } } }
+                    { roomBooking: { roomId: { in: roomIds } } },
+                    { course: { instituteId: institute.id } }
                 ]
             },
             include: {
@@ -1532,7 +1576,7 @@ class InstituteService {
             type: s.type.toLowerCase(),
             status: s.status.toLowerCase(),
             meetingLink: s.meetingLink ?? null,
-            location: s.room?.name || s.location || 'غير محدد',
+            location: s.room?.name || s.location || (s.type === 'ONLINE' ? 'أونلاين' : 'غير محدد'),
             enrolledStudents: s.course?.enrollments.length ?? 0,
             roomId: s.roomId ?? null
         }));
@@ -1541,7 +1585,7 @@ class InstituteService {
     /**
      * Reschedule or cancel a session in one of this institute's halls
      */
-    async updateSession(userId: string, sessionId: string, data: { startTime?: Date; endTime?: Date; status?: string }) {
+    async updateSession(userId: string, sessionId: string, data: { startTime?: Date; endTime?: Date; status?: string; meetingLink?: string; updateAll?: boolean }) {
         const institute = await prisma.institute.findUnique({ where: { userId } });
         if (!institute) throw new Error('لم يتم العثور على المعهد');
 
@@ -1556,7 +1600,8 @@ class InstituteService {
                 id: sessionId,
                 OR: [
                     { roomId: { in: roomIds } },
-                    { roomBooking: { roomId: { in: roomIds } } }
+                    { roomBooking: { roomId: { in: roomIds } } },
+                    { course: { instituteId: institute.id } }
                 ]
             }
         });
@@ -1578,13 +1623,157 @@ class InstituteService {
             if (conflict) throw new Error('هذا الوقت محجوز بالفعل في نفس القاعة');
         }
 
+        if (data.updateAll && data.meetingLink !== undefined && session.courseId) {
+            await prisma.session.updateMany({
+                where: { courseId: session.courseId },
+                data: { meetingLink: data.meetingLink }
+            });
+        }
+
         return prisma.session.update({
             where: { id: sessionId },
             data: {
                 ...(data.startTime && { startTime: data.startTime }),
                 ...(data.endTime && { endTime: data.endTime }),
-                ...(data.status && { status: data.status as any })
+                ...(data.status && { status: data.status as any }),
+                ...(data.meetingLink !== undefined && { meetingLink: data.meetingLink })
             }
+        });
+    }
+
+    /**
+     * Get enrollments for courses owned by this institute
+     */
+    async getEnrollments(userId: string) {
+        const institute = await prisma.institute.findUnique({ where: { userId } });
+        if (!institute) throw new Error("لم يتم العثور على المعهد");
+
+        return prisma.enrollment.findMany({
+            where: {
+                course: {
+                    instituteId: institute.id,
+                    trainerId: null
+                },
+                deletedAt: null
+            },
+            include: {
+                student: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                        avatar: true
+                    }
+                },
+                course: {
+                    select: {
+                        id: true,
+                        title: true,
+                        price: true
+                    }
+                },
+                payments: {
+                    orderBy: {
+                        createdAt: 'desc'
+                    },
+                    take: 1
+                }
+            },
+            orderBy: {
+                enrolledAt: 'desc'
+            }
+        });
+    }
+
+    /**
+     * Update enrollment status (Accept/Reject)
+     */
+    async updateEnrollmentStatus(userId: string, enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string) {
+        const institute = await prisma.institute.findUnique({ where: { userId } });
+        if (!institute) throw new Error("لم يتم العثور على المعهد");
+
+        const enrollment = await prisma.enrollment.findFirst({
+            where: {
+                id: enrollmentId,
+                course: {
+                    instituteId: institute.id,
+                    trainerId: null
+                },
+                deletedAt: null
+            },
+            include: {
+                payments: true,
+                course: true
+            }
+        });
+
+        if (!enrollment) {
+            throw new Error('التسجيل غير موجود أو لا تنتمي لدورات المعهد');
+        }
+
+        if (status === 'REJECT_PAYMENT') {
+            const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+            if (!latestPayment || latestPayment.status !== 'PENDING_REVIEW') {
+                throw new Error('لا يوجد دفعة معلقة للمراجعة');
+            }
+
+            await prisma.payment.update({
+                where: { id: latestPayment.id },
+                data: {
+                    status: 'REJECTED',
+                    reviewedBy: userId,
+                    reviewedAt: new Date(),
+                    rejectionReason: reason || 'تم الرفض من قبل المعهد'
+                }
+            });
+
+            return { ...enrollment, status: enrollment.status, paymentStatus: 'REJECTED' };
+        }
+
+        return prisma.$transaction(async (tx) => {
+            if (status === 'CANCELLED') {
+                // Delete associated payments for this enrollment when cancelling/rejecting
+                await tx.payment.deleteMany({
+                    where: { enrollmentId: enrollmentId }
+                });
+            }
+
+            let targetStatus: EnrollmentStatus = status;
+            if (status === 'ACTIVE' && enrollment.status === 'PRELIMINARY') {
+                const price = Number(enrollment.course.price);
+                if (price > 0) {
+                    targetStatus = 'PENDING_PAYMENT';
+                }
+            }
+
+            const updateData: any = { status: targetStatus };
+            if (reason) {
+                updateData.cancellationReason = reason;
+            }
+
+            const updatedEnrollment = await tx.enrollment.update({
+                where: { id: enrollmentId },
+                data: updateData
+            });
+
+            if (status === 'ACTIVE' && enrollment.payments.length > 0) {
+                const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+                if (latestPayment && latestPayment.status === 'PENDING_REVIEW') {
+                    await tx.payment.update({
+                        where: { id: latestPayment.id },
+                        data: {
+                            status: 'APPROVED',
+                            reviewedBy: userId,
+                            reviewedAt: new Date(),
+                            notes: 'تم القبول من قبل المعهد'
+                        }
+                    });
+                }
+            }
+
+            return updatedEnrollment;
         });
     }
 }

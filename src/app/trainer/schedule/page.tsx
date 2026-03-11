@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Globe } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,8 +35,9 @@ export default function TrainerSchedulePage() {
     // ── Manage Modal ──────────────────────────────────────────────────────────
     const [selectedSession, setSelectedSession] = useState<Session | null>(null)
     const [isManageOpen, setIsManageOpen] = useState(false)
-    const [actionType, setActionType] = useState<'reschedule' | 'cancel'>('reschedule')
+    const [actionType, setActionType] = useState<'reschedule' | 'cancel' | 'update_link'>('reschedule')
     const [reason, setReason] = useState("")
+    const [updateAll, setUpdateAll] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
 
     // ── Calendar (hall reschedule) ─────────────────────────────────────────────
@@ -125,6 +126,7 @@ export default function TrainerSchedulePage() {
         setSelectedSlot(null)
         setAvailableSlots([])
         setCalendarOffset(0)
+        setUpdateAll(false)
         const d = new Date(session.startTime)
         setNewDate(formatDateKey(d))
         setNewStartTime(d.toTimeString().slice(0, 5))
@@ -151,6 +153,17 @@ export default function TrainerSchedulePage() {
                 await trainerService.updateSession(selectedSession.id, { status: 'CANCELLED' })
                 setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, status: 'cancelled' } : s))
                 toast.error("تم إلغاء الجلسة")
+            } else if (actionType === 'update_link') {
+                await trainerService.updateSession(selectedSession.id, {
+                    meetingLink: selectedSession.meetingLink ?? undefined,
+                    updateAll: updateAll
+                })
+                if (updateAll) {
+                    setSessions(prev => prev.map(s => s.courseTitle === selectedSession.courseTitle ? { ...s, meetingLink: selectedSession.meetingLink } : s))
+                } else {
+                    setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, meetingLink: selectedSession.meetingLink } : s))
+                }
+                toast.success("تم تحديث الرابط بنجاح")
             } else {
                 let startTime: string, endTime: string
                 if (selectedSession.roomId && selectedDate && selectedSlot) {
@@ -161,8 +174,17 @@ export default function TrainerSchedulePage() {
                     startTime = new Date(`${newDate}T${newStartTime}:00`).toISOString()
                     endTime = new Date(`${newDate}T${newEndTime}:00`).toISOString()
                 }
-                await trainerService.updateSession(selectedSession.id, { startTime, endTime })
-                setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, startTime, endTime } : s))
+                await trainerService.updateSession(selectedSession.id, {
+                    startTime,
+                    endTime,
+                    meetingLink: selectedSession.meetingLink ?? undefined,
+                    updateAll: updateAll
+                })
+                if (updateAll && (selectedSession.type === 'online' || selectedSession.type === 'hybrid')) {
+                    setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, startTime, endTime, meetingLink: selectedSession.meetingLink } : (s.courseTitle === selectedSession.courseTitle ? { ...s, meetingLink: selectedSession.meetingLink } : s)))
+                } else {
+                    setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, startTime, endTime, meetingLink: selectedSession.meetingLink } : s))
+                }
                 toast.success("تم تغيير موعد الجلسة بنجاح")
             }
             setIsManageOpen(false)
@@ -312,20 +334,49 @@ export default function TrainerSchedulePage() {
 
                     <div className="grid gap-6 py-4">
                         {/* Action selector */}
-                        <RadioGroup value={actionType} onValueChange={v => setActionType(v as any)} className="grid grid-cols-2 gap-4">
+                        <RadioGroup value={actionType} onValueChange={v => setActionType(v as any)} className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <RadioGroupItem value="reschedule" id="r-reschedule" className="peer sr-only" />
-                                <Label htmlFor="r-reschedule" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer">
+                                <Label htmlFor="r-reschedule" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer h-full">
                                     <Clock className="mb-3 h-6 w-6" />تغيير الموعد
                                 </Label>
                             </div>
+                            {(selectedSession?.type === 'online' || selectedSession?.type === 'hybrid') && (
+                                <div>
+                                    <RadioGroupItem value="update_link" id="r-link" className="peer sr-only" />
+                                    <Label htmlFor="r-link" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-blue-50 hover:text-blue-900 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:text-blue-600 cursor-pointer h-full text-center">
+                                        <Globe className="mb-3 h-6 w-6" />تحديث الرابط
+                                    </Label>
+                                </div>
+                            )}
                             <div>
                                 <RadioGroupItem value="cancel" id="r-cancel" className="peer sr-only" />
-                                <Label htmlFor="r-cancel" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-red-50 hover:text-red-900 peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer">
+                                <Label htmlFor="r-cancel" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-red-50 hover:text-red-900 peer-data-[state=checked]:border-red-600 peer-data-[state=checked]:text-red-600 cursor-pointer h-full">
                                     <AlertTriangle className="mb-3 h-6 w-6" />إلغاء الجلسة
                                 </Label>
                             </div>
                         </RadioGroup>
+
+                        {actionType === 'update_link' && (
+                            <div className="space-y-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                                <div className="grid gap-2">
+                                    <Label>رابط الاجتماع الجديد (Zoom, Google Meet, etc.)</Label>
+                                    <div className="relative">
+                                        <Video className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                        <Input
+                                            placeholder="https://..."
+                                            value={selectedSession?.meetingLink || ""}
+                                            onChange={e => setSelectedSession(s => s ? { ...s, meetingLink: e.target.value } : null)}
+                                            className="bg-white pl-10"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-2 space-x-reverse">
+                                    <input type="checkbox" id="manage-update-all" checked={updateAll} onChange={e => setUpdateAll(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <Label htmlFor="manage-update-all" className="text-sm font-medium leading-none cursor-pointer">تطبيق على جميع جلسات هذه الدورة</Label>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Reschedule content */}
                         {actionType === 'reschedule' && (
@@ -401,6 +452,26 @@ export default function TrainerSchedulePage() {
                                             <Input type="time" value={newEndTime} onChange={e => setNewEndTime(e.target.value)} className="bg-white" />
                                         </div>
                                     </div>
+                                    {(selectedSession?.type === 'online' || selectedSession?.type === 'hybrid') && (
+                                        <div className="grid gap-4 mt-2 border-t pt-4">
+                                            <div className="grid gap-2">
+                                                <Label>رابط الاجتماع (Zoom, Google Meet, etc.)</Label>
+                                                <div className="relative">
+                                                    <Video className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                                    <Input
+                                                        placeholder="https://..."
+                                                        value={selectedSession.meetingLink || ""}
+                                                        onChange={e => setSelectedSession({ ...selectedSession, meetingLink: e.target.value })}
+                                                        className="bg-white pl-10"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center space-x-2 space-x-reverse">
+                                                <input type="checkbox" id="resched-update-all" checked={updateAll} onChange={e => setUpdateAll(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                <Label htmlFor="resched-update-all" className="text-sm font-medium leading-none cursor-pointer">تطبيق الرابط على جميع جلسات الدورة</Label>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )
                         )}
@@ -431,12 +502,12 @@ export default function TrainerSchedulePage() {
                     <DialogFooter className="gap-2">
                         <Button variant="outline" onClick={() => setIsManageOpen(false)}>إغلاق</Button>
                         <Button
-                            className={actionType === 'reschedule' ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"}
+                            className={actionType === 'reschedule' ? "bg-blue-600 hover:bg-blue-700" : (actionType === 'update_link' ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700")}
                             onClick={handleConfirm}
                             disabled={isSaving}
                         >
                             {isSaving && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
-                            {actionType === 'reschedule' ? "تأكيد تغيير الموعد" : "تأكيد إلغاء الجلسة"}
+                            {actionType === 'reschedule' ? "تأكيد تغيير الموعد" : (actionType === 'update_link' ? "تأكيد تحديث الرابط" : "تأكيد إلغاء الجلسة")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

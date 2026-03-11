@@ -55,8 +55,10 @@ router.put('/courses/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name
 router.get('/categories', instituteController.getCategories);
 router.post('/categories', instituteController.createCategory);
 
-// Students
+// Students & Enrollments
 router.get('/students', instituteController.getStudents);
+router.get('/enrollments', instituteController.getEnrollments);
+router.patch('/enrollments/:enrollmentId/status', instituteController.updateEnrollmentStatus);
 
 // Staff (institute-scoped, uses InstituteStaff model)
 router.get('/staff', instituteController.getStaff);

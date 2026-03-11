@@ -127,13 +127,23 @@ export default function StudentSchedulePage() {
                                                     </div>
 
                                                     {/* Join Section */}
-                                                    <div className="flex flex-col gap-2 min-w-[140px]">
+                                                    <div className="flex flex-col gap-2 min-w-[160px]">
                                                         {['scheduled', 'postponed'].includes(eff) && (
                                                             <>
-                                                                {session.type === 'online' && session.meetingLink ? (
-                                                                    <Button asChild className="w-full bg-blue-600 hover:bg-blue-700">
-                                                                        <a href={session.meetingLink} target="_blank" rel="noopener noreferrer">بدء الدرس</a>
-                                                                    </Button>
+                                                                {(session.type === 'online' || session.type === 'hybrid') ? (
+                                                                    session.meetingLink ? (
+                                                                        <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 font-bold">
+                                                                            <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                                                                <Video className="h-4 w-4" />
+                                                                                انضم للدرس
+                                                                            </a>
+                                                                        </Button>
+                                                                    ) : (
+                                                                        <div className="text-amber-600 bg-amber-50 px-3 py-2 rounded-md border border-amber-100 text-center text-xs flex items-center gap-1 justify-center">
+                                                                            <AlertTriangle className="h-3 w-3" />
+                                                                            <span>رابط الاجتماع لم يتوفر بعد</span>
+                                                                        </div>
+                                                                    )
                                                                 ) : session.type === 'in_person' ? (
                                                                     <div className="flex items-center gap-2 text-gray-500 bg-gray-50 px-3 py-2 rounded-md justify-center border text-sm">
                                                                         <MapPin className="h-4 w-4" />

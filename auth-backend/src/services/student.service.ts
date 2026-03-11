@@ -220,35 +220,29 @@ class StudentService {
             }
         });
 
-        if (!enrollment || enrollment.deletedAt) {
-            return { status: 'NONE' };
+        if (!enrollment || enrollment.deletedAt || enrollment.status === 'CANCELLED') {
+            return { status: 'NONE', id: enrollment?.id };
         }
 
         // Map database status to frontend expected status
+        let status = 'NONE';
         if (enrollment.status === 'PRELIMINARY') {
-            return { status: 'PENDING_APPROVAL' };
-        }
-
-        if (enrollment.status === 'PENDING_PAYMENT') {
+            status = 'PENDING_APPROVAL';
+        } else if (enrollment.status === 'PENDING_PAYMENT') {
             // Check if there is a payment under review
             const latestPayment = enrollment.payments[0];
             if (latestPayment && latestPayment.status === 'PENDING_REVIEW') {
-                return { status: 'PAYMENT_CONFIRMED' }; // Meaning they submitted the receipt, waiting for trainer
+                status = 'PAYMENT_CONFIRMED'; // Meaning they submitted the receipt, waiting for trainer
             } else if (latestPayment && latestPayment.status === 'REJECTED') {
-                return { status: 'PAYMENT_REJECTED' };
+                status = 'PAYMENT_REJECTED';
+            } else {
+                status = 'APPROVED'; // Wait for payment upload
             }
-            return { status: 'APPROVED' }; // Wait for payment upload (frontend expects 'APPROVED' to show payment step)
+        } else if (enrollment.status === 'ACTIVE' || enrollment.status === 'COMPLETED') {
+            status = 'ENROLLED';
         }
 
-        if (enrollment.status === 'ACTIVE' || enrollment.status === 'COMPLETED') {
-            return { status: 'ENROLLED' };
-        }
-
-        if (enrollment.status === 'CANCELLED') {
-            return { status: 'REJECTED' };
-        }
-
-        return { status: 'NONE' };
+        return { status, id: enrollment.id };
     }
 
     /**
@@ -271,7 +265,7 @@ class StudentService {
             }
         });
 
-        if (existingEnrollment && !existingEnrollment.deletedAt) {
+        if (existingEnrollment && !existingEnrollment.deletedAt && existingEnrollment.status !== 'CANCELLED') {
             throw new Error("أنت مسجل بالفعل في هذه الدورة");
         }
 
@@ -283,6 +277,13 @@ class StudentService {
                     name: fullName || user.name,
                     phone: phone || user.phone
                 }
+            });
+        }
+
+        // If re-enrolling, clear old payments to start fresh
+        if (existingEnrollment) {
+            await prisma.payment.deleteMany({
+                where: { enrollmentId: existingEnrollment.id }
             });
         }
 

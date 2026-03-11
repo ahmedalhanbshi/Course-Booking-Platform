@@ -60,7 +60,7 @@ export const studentService = {
     /**
      * Get the student's enrollment status for a specific course
      */
-    async getEnrollmentStatus(courseId: string): Promise<{ status: string }> {
+    async getEnrollmentStatus(courseId: string): Promise<{ status: string; id?: string }> {
         const response = await apiClient.get(`/api/student/courses/${courseId}/enrollment-status`);
         return response.data.data;
     },

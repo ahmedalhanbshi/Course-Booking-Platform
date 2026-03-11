@@ -505,12 +505,20 @@ class TrainerService {
         });
         if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
 
-        return prisma.enrollment.update({
-            where: { id: enrollmentId },
-            data: {
-                status: 'CANCELLED',
-                cancellationReason: reason,
-            },
+        return prisma.$transaction(async (tx) => {
+            // Delete associated payments
+            await tx.payment.deleteMany({
+                where: { enrollmentId: enrollmentId }
+            });
+
+            // Update enrollment status
+            return tx.enrollment.update({
+                where: { id: enrollmentId },
+                data: {
+                    status: 'CANCELLED',
+                    cancellationReason: reason,
+                },
+            });
         });
     }
 
@@ -826,6 +834,7 @@ class TrainerService {
             type: sessionType,
             status: "SCHEDULED" as const,
             location: session.location,
+            meetingLink: session.meetingLink || data.meetingLink || null,
             topic: session.topic || "",
         }));
 
@@ -1035,9 +1044,13 @@ class TrainerService {
      * Get all unique students enrolled in any of this trainer's courses
      */
     async getAllStudents(userId: string) {
-        // Get all trainer course IDs
+        // Get all trainer course IDs (only those owned by an active institute)
         const courses = await prisma.course.findMany({
-            where: { trainerId: userId },
+            where: {
+                trainerId: userId,
+                instituteId: { not: null },
+                status: { notIn: ["CANCELLED", "REJECTED"] }
+            },
             select: { id: true, title: true },
         });
         const courseIds = courses.map(c => c.id);
@@ -1045,11 +1058,12 @@ class TrainerService {
 
         if (courseIds.length === 0) return { students: [], totalStudents: 0, totalEnrollments: 0 };
 
-        // Get all active enrollments for these courses
+        // Get all active enrollments for these courses (excluding deleted ones)
         const enrollments = await prisma.enrollment.findMany({
             where: {
                 courseId: { in: courseIds },
                 status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT', 'COMPLETED'] },
+                deletedAt: null,
             },
             select: {
                 id: true,
@@ -1063,6 +1077,7 @@ class TrainerService {
                         email: true,
                         phone: true,
                         avatar: true,
+                        deletedAt: true,
                     },
                 },
             },
@@ -1078,6 +1093,9 @@ class TrainerService {
 
         for (const e of enrollments) {
             const s = e.student;
+            // Skip soft-deleted students
+            if (s.deletedAt) continue;
+
             if (!studentMap.has(s.id)) {
                 studentMap.set(s.id, {
                     id: s.id,
@@ -1254,17 +1272,8 @@ class TrainerService {
         // If status is ACTIVE, approve the latest payment as well if it's pending review
         if (status === 'ACTIVE' && enrollment.payments.length > 0) {
             const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-            if (enrollment.status === 'PENDING_PAYMENT') {
-                // Check if there is a payment under review
-                const latestPayment = enrollment.payments[0];
-                if (latestPayment && latestPayment.status === 'PENDING_REVIEW') {
-                    return { status: 'PAYMENT_CONFIRMED' }; // Meaning they submitted the receipt, waiting for trainer
-                } else if (latestPayment && latestPayment.status === 'REJECTED') {
-                    return { status: 'PAYMENT_REJECTED' };
-                }
-                return { status: 'APPROVED' }; // Wait for payment upload (frontend expected 'APPROVED' to show payment step)
-            }
-            if (latestPayment.status === 'PENDING_REVIEW') {
+
+            if (latestPayment && latestPayment.status === 'PENDING_REVIEW') {
                 await prisma.payment.update({
                     where: { id: latestPayment.id },
                     data: {
@@ -1417,7 +1426,7 @@ class TrainerService {
     /**
      * Reschedule or cancel a session belonging to this trainer
      */
-    async updateSession(userId: string, sessionId: string, data: { startTime?: Date; endTime?: Date; status?: string }) {
+    async updateSession(userId: string, sessionId: string, data: { startTime?: Date; endTime?: Date; status?: string; meetingLink?: string; updateAll?: boolean }) {
         // Get all course IDs for this trainer
         const courses = await prisma.course.findMany({
             where: { trainerId: userId },
@@ -1446,12 +1455,20 @@ class TrainerService {
             if (conflict) throw new Error('هذا الوقت محجوز بالفعل في نفس القاعة');
         }
 
+        if (data.updateAll && data.meetingLink !== undefined && session.courseId) {
+            await prisma.session.updateMany({
+                where: { courseId: session.courseId },
+                data: { meetingLink: data.meetingLink }
+            });
+        }
+
         return prisma.session.update({
             where: { id: sessionId },
             data: {
                 ...(data.startTime && { startTime: data.startTime }),
                 ...(data.endTime && { endTime: data.endTime }),
-                ...(data.status && { status: data.status as any })
+                ...(data.status && { status: data.status as any }),
+                ...(data.meetingLink !== undefined && { meetingLink: data.meetingLink })
             }
         });
     }

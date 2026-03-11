@@ -190,6 +190,33 @@ class InstituteController {
         }
     }
 
+    async getEnrollments(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.getEnrollments(req.user.userId);
+            return sendSuccess(res, 'تم جلب طلبات التسجيل بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateEnrollmentStatus(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { enrollmentId } = req.params;
+            const { status, reason } = req.body;
+
+            if (!['ACTIVE', 'CANCELLED', 'REJECT_PAYMENT'].includes(status)) {
+                return sendError(res, 'حالة غير صالحة. يجب أن تكون ACTIVE أو CANCELLED أو REJECT_PAYMENT', 400);
+            }
+
+            const updated = await instituteService.updateEnrollmentStatus(req.user.userId, enrollmentId, status, reason);
+            return sendSuccess(res, status === 'ACTIVE' ? 'تم قبول طلب التسجيل بنجاح' : 'تم رفض طلب التسجيل بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
     async getCourseById(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') {
@@ -430,10 +457,19 @@ class InstituteController {
             if (payload.isFree === 'true') payload.isFree = true;
             if (payload.isFree === 'false') payload.isFree = false;
 
-            if (req.file) {
-                payload.image = `/uploads/${req.file.filename}`;
+            // Handle file uploads (multer .fields() sets req.files)
+            const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+            if (files?.image?.[0]) {
+                payload.image = `/uploads/${files.image[0].filename}`;
             }
-            const course = await instituteService.createCourse(req.user.userId, payload);
+
+            let paymentReceiptPath: string | undefined;
+            if (files?.paymentReceipt?.[0]) {
+                paymentReceiptPath = `/uploads/${files.paymentReceipt[0].filename}`;
+            }
+
+            const course = await instituteService.createCourse(req.user.userId, payload, paymentReceiptPath);
             return sendSuccess(res, 'تم إنشاء الدورة بنجاح', course);
         } catch (error: any) {
             console.error('Course Creation Error:', error);
@@ -513,11 +549,12 @@ class InstituteController {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
             const { sessionId } = req.params;
-            const { startTime, endTime, status } = req.body;
+            const { startTime, endTime, status, meetingLink } = req.body;
             const data = {
                 ...(startTime && { startTime: new Date(startTime) }),
                 ...(endTime && { endTime: new Date(endTime) }),
-                ...(status && { status })
+                ...(status && { status }),
+                ...(meetingLink !== undefined && { meetingLink })
             };
             const updated = await instituteService.updateSession(req.user.userId, sessionId, data);
             return sendSuccess(res, 'تم تحديث الجلسة بنجاح', updated);

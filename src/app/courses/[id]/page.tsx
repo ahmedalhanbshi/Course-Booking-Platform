@@ -225,6 +225,12 @@ export default function CourseDetailsPage() {
     setIsDialogOpen(true)
     if (mode === "create") {
       setRegistrationId(null)
+      // Pre-fill with user info if available
+      setFormData({
+        name: user?.name || "",
+        email: user?.email || "",
+        phone: user?.phone || ""
+      })
     }
     if (mode === "edit") {
       setIsLoadingRegistration(true)
@@ -547,6 +553,30 @@ export default function CourseDetailsPage() {
     }
   }
 
+  const handleCancelEnrollment = async () => {
+    if (!registrationId) {
+      toast.error("لا يمكن العثور على معلومات التسجيل لإلغائها.")
+      return
+    }
+
+    if (!confirm("هل أنت متأكد من رغبتك في إلغاء التسجيل في هذه الدورة؟")) {
+      return
+    }
+
+    setIsUpdatingStatus(true)
+    try {
+      await studentService.cancelEnrollment(registrationId)
+      setRegistrationStatus("NONE")
+      persistRegistrationStatus("NONE")
+      setRegistrationId(null)
+      toast.success("تم إلغاء التسجيل بنجاح")
+    } catch (error: any) {
+      toast.error(error.message || "فشل إلغاء التسجيل. حاول مرة أخرى.")
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     const loadStatus = async () => {
@@ -571,6 +601,9 @@ export default function CourseDetailsPage() {
         if (enrollmentData?.status) {
           setRegistrationStatus(enrollmentData.status as RegistrationStatus)
           persistRegistrationStatus(enrollmentData.status as RegistrationStatus)
+          if (enrollmentData.id) {
+            setRegistrationId(enrollmentData.id)
+          }
         } else {
           setRegistrationStatus("NONE")
         }

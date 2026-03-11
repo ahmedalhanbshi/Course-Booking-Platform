@@ -116,6 +116,16 @@ class InstituteService {
         return response.data.data;
     }
 
+    async getEnrollments(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/enrollments');
+        return response.data.data;
+    }
+
+    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string): Promise<any> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/enrollments/${enrollmentId}/status`, { status, reason });
+        return response.data.data;
+    }
+
     async getStaff(): Promise<any[]> {
         const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/staff');
         return response.data.data;
@@ -217,7 +227,7 @@ class InstituteService {
         return response.data.data;
     }
 
-    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string }): Promise<any> {
+    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string; meetingLink?: string; updateAll?: boolean }): Promise<any> {
         const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(
             `/api/institute/sessions/${sessionId}`, data
         );
