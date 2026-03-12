@@ -265,6 +265,7 @@ export class AdminService {
                         phone: true,
                         status: true,
                         createdAt: true,
+                        avatar: true,
                     },
                 },
             },
@@ -276,15 +277,19 @@ export class AdminService {
         });
 
         // Map to flat structure for easier consumption
-        return trainers.map(trainer => ({
-            ...trainer,
-            verificationStatus: trainer.verificationStatus.toLowerCase(),
-            status: trainer.user.status === 'SUSPENDED' ? 'suspended' : trainer.verificationStatus.toLowerCase(),
-            email: trainer.user.email,
-            phone: trainer.user.phone,
-            name: trainer.user.name,
-            createdAt: trainer.user.createdAt
-        }));
+        return trainers.map(trainer => {
+            const t = trainer as any;
+            return {
+                ...t,
+                verificationStatus: t.verificationStatus.toLowerCase(),
+                status: t.user.status === 'SUSPENDED' ? 'suspended' : t.verificationStatus.toLowerCase(),
+                email: t.user.email,
+                phone: t.user.phone,
+                name: t.user.name,
+                createdAt: t.user.createdAt,
+                avatar: t.user.avatar,
+            };
+        });
     }
 
     /**
@@ -781,6 +786,7 @@ export class AdminService {
         if (data.maxStudents !== undefined) updateData.maxStudents = data.maxStudents;
         if (data.status !== undefined) updateData.status = statusMap[data.status] || data.status;
         if (data.trainerId !== undefined) updateData.trainerId = data.trainerId;
+        if (data.image !== undefined) updateData.image = data.image;
 
         await prisma.course.update({
             where: { id: courseId },
@@ -809,6 +815,178 @@ export class AdminService {
             data: { status: 'CANCELLED' },
         });
         return { message: 'تم تعليق الدورة بنجاح' };
+    }
+
+    // =====================================================
+    // ANNOUNCEMENT MANAGEMENT
+    // =====================================================
+
+    /**
+     * Get all announcements (newest first)
+     */
+    async getAnnouncements() {
+        const announcements = await prisma.announcement.findMany({
+            include: {
+                sender: { select: { id: true, name: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        return announcements.map(a => {
+            const ann = a as any;
+            return {
+                id: ann.id,
+                title: ann.title,
+                content: ann.message,
+                targetAudience: (ann.targetAudience as string).toLowerCase(),
+                category: (ann.category as string).toLowerCase(),
+                status: (ann.status as string).toLowerCase(),
+                scheduledDate: ann.scheduledAt,
+                sentDate: ann.sentAt,
+                createdAt: ann.createdAt,
+                sender: ann.sender,
+            };
+        });
+    }
+
+    /**
+     * Create a new announcement (DRAFT or SCHEDULED)
+     */
+    async createAnnouncement(data: {
+        title: string;
+        content: string;
+        targetAudience?: string;
+        category?: string;
+        scheduledDate?: string;
+        scheduledTime?: string;
+    }, senderId: string) {
+        const audienceMap: Record<string, any> = {
+            all: 'ALL', students: 'STUDENTS', trainers: 'TRAINERS', institutes: 'INSTITUTES',
+        };
+        const categoryMap: Record<string, any> = {
+            general: 'GENERAL', event: 'EVENT', maintenance: 'MAINTENANCE', urgent: 'URGENT',
+        };
+
+        let scheduledAt: Date | undefined;
+        if (data.scheduledDate) {
+            scheduledAt = new Date(data.scheduledDate);
+            if (data.scheduledTime) {
+                const [h, m] = data.scheduledTime.split(':').map(Number);
+                scheduledAt.setHours(h, m);
+            }
+        }
+
+        const announcement = await (prisma.announcement.create as any)({
+            data: {
+                title: data.title,
+                message: data.content,
+                targetAudience: audienceMap[data.targetAudience ?? 'all'] ?? 'ALL',
+                category: categoryMap[data.category ?? 'general'] ?? 'GENERAL',
+                status: scheduledAt ? 'SCHEDULED' : 'DRAFT',
+                scheduledAt,
+                senderId,
+            },
+        });
+
+        return { id: announcement.id, message: 'تم إنشاء الإعلان بنجاح' };
+    }
+
+    /**
+     * Update an existing announcement
+     */
+    async updateAnnouncement(id: string, data: {
+        title?: string;
+        content?: string;
+        targetAudience?: string;
+        category?: string;
+        status?: string;
+        scheduledDate?: string;
+        scheduledTime?: string;
+    }) {
+        const audienceMap: Record<string, any> = {
+            all: 'ALL', students: 'STUDENTS', trainers: 'TRAINERS', institutes: 'INSTITUTES',
+        };
+        const categoryMap: Record<string, any> = {
+            general: 'GENERAL', event: 'EVENT', maintenance: 'MAINTENANCE', urgent: 'URGENT',
+        };
+        const statusMap: Record<string, any> = {
+            draft: 'DRAFT', scheduled: 'SCHEDULED', sent: 'SENT',
+        };
+
+        let scheduledAt: Date | null | undefined;
+        if (data.scheduledDate) {
+            scheduledAt = new Date(data.scheduledDate);
+            if (data.scheduledTime) {
+                const [h, m] = data.scheduledTime.split(':').map(Number);
+                scheduledAt.setHours(h, m);
+            }
+        } else if (data.scheduledDate === '') {
+            scheduledAt = null;
+        }
+
+        const updateData: any = {};
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.content !== undefined) updateData.message = data.content;
+        if (data.targetAudience !== undefined) updateData.targetAudience = audienceMap[data.targetAudience] ?? 'ALL';
+        if (data.category !== undefined) updateData.category = categoryMap[data.category] ?? 'GENERAL';
+        if (data.status !== undefined) updateData.status = statusMap[data.status] ?? 'DRAFT';
+        if (scheduledAt !== undefined) updateData.scheduledAt = scheduledAt;
+
+        await (prisma.announcement.update as any)({ where: { id }, data: updateData });
+        return { message: 'تم تحديث الإعلان بنجاح' };
+    }
+
+    /**
+     * Delete an announcement
+     */
+    async deleteAnnouncement(id: string) {
+        await prisma.announcement.delete({ where: { id } });
+        return { message: 'تم حذف الإعلان بنجاح' };
+    }
+
+    /**
+     * Send an announcement: mark as SENT and create Notification rows for targeted users
+     */
+    async sendAnnouncement(id: string) {
+        const announcement = await (prisma.announcement.findUnique as any)({ where: { id } });
+        if (!announcement) throw new Error('الإعلان غير موجود');
+        if ((announcement as any).status === 'SENT') throw new Error('تم إرسال هذا الإعلان مسبقاً');
+
+        // Resolve target users
+        const roleMap: Record<string, string[]> = {
+            ALL: ['STUDENT', 'TRAINER', 'INSTITUTE_ADMIN'],
+            STUDENTS: ['STUDENT'],
+            TRAINERS: ['TRAINER'],
+            INSTITUTES: ['INSTITUTE_ADMIN'],
+        };
+        const roles = roleMap[(announcement as any).targetAudience] ?? ['STUDENT', 'TRAINER', 'INSTITUTE_ADMIN'];
+
+        const users = await prisma.user.findMany({
+            where: { role: { in: roles as any }, status: 'ACTIVE' },
+            select: { id: true },
+        });
+
+        // Mark announcement as SENT
+        await (prisma.announcement.update as any)({
+            where: { id },
+            data: { status: 'SENT', sentAt: new Date() },
+        });
+
+        // Create one Notification per user (batch)
+        if (users.length > 0) {
+            await prisma.notification.createMany({
+                data: users.map(u => ({
+                    userId: u.id,
+                    type: 'NEW_ANNOUNCEMENT' as any,
+                    title: announcement.title,
+                    message: announcement.message,
+                    relatedEntityId: announcement.id,
+                })),
+                skipDuplicates: true,
+            });
+        }
+
+        return { message: 'تم إرسال الإعلان بنجاح', recipientCount: users.length };
     }
 }
 

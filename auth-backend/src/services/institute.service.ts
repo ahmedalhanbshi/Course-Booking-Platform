@@ -317,11 +317,12 @@ class InstituteService {
             throw new Error("لم يتم العثور على المعهد");
         }
 
-        // Fetch all enrollments for institute courses
+        // Fetch all enrollments for institute-managed courses only (trainerId: null = not an external trainer's own course)
         const enrollments = (await prisma.enrollment.findMany({
             where: {
                 course: {
                     instituteId: institute.id,
+                    trainerId: null,
                     status: { notIn: ["CANCELLED", "REJECTED"] }
                 },
                 status: { in: ["ACTIVE", "COMPLETED", "PRELIMINARY", "PENDING_PAYMENT"] },

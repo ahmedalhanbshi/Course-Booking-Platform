@@ -570,6 +570,59 @@ export class AuthService {
 
         return user;
     }
+
+    async changePassword(userId: string, data: { currentPassword: string; newPassword: string }) {
+        const { currentPassword, newPassword } = data;
+
+        // Find user
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        // Verify current password
+        const isPasswordValid = await comparePassword(currentPassword, user.password);
+
+        if (!isPasswordValid) {
+            throw new Error('كلمة المرور الحالية غير صحيحة');
+        }
+
+        // Hash new password
+        const hashedPassword = await hashPassword(newPassword);
+
+        // Update password
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: hashedPassword,
+                failedLoginAttempts: 0,
+                lockUntil: null,
+            },
+        });
+
+        // Invalidate all refresh tokens
+        await prisma.token.deleteMany({
+            where: {
+                userId,
+                type: 'REFRESH',
+            },
+        });
+
+        // Clear Redis
+        try {
+            const keys = await redis.keys(`refresh:${userId}:*`);
+            if (keys.length > 0) {
+                await redis.del(...keys);
+            }
+        } catch (error) {
+            console.warn('Redis error during password change (non-fatal):', error);
+        }
+
+        return { message: 'تم تغيير كلمة المرور بنجاح' };
+    }
 }
 
 export default new AuthService();

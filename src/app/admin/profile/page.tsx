@@ -10,19 +10,53 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User, Mail, Phone, Shield, Lock, Save } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { useAuth } from "@/contexts/auth-context"
+import { authService } from "@/lib/auth-service"
 import { toast } from "sonner"
+import { useEffect, useRef } from "react"
+import { Camera } from "lucide-react"
 
 export default function AdminProfilePage() {
-    const { user } = useAuth()
+    const { user, updateUser } = useAuth()
     const [isLoading, setIsLoading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string>("")
 
-    // Mock state for profile form
+    // state for profile form
     const [profileForm, setProfileForm] = useState({
-        name: user?.name || "مدير النظام",
-        email: user?.email || "admin@example.com",
-        phone: user?.phone || "0500000000",
-        avatar: user?.avatar || ""
+        name: "",
+        email: "",
+        phone: "",
+        avatar: ""
     })
+
+    // Initialize form when user data is available
+    useEffect(() => {
+        if (user) {
+            setProfileForm({
+                name: user.name || "",
+                email: user.email || "",
+                phone: user.phone || "",
+                avatar: user.avatar || ""
+            })
+            // Reset preview when user data changes (e.g. after update)
+            setPreviewUrl("")
+            setSelectedFile(null)
+        }
+    }, [user])
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            setSelectedFile(file)
+            const url = URL.createObjectURL(file)
+            setPreviewUrl(url)
+        }
+    }
+
+    const triggerFileInput = () => {
+        fileInputRef.current?.click()
+    }
 
     // Mock state for password form
     const [passwordForm, setPasswordForm] = useState({
@@ -34,10 +68,23 @@ export default function AdminProfilePage() {
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setIsLoading(false)
-        toast.success("تم تحديث الملف الشخصي بنجاح")
+        try {
+            const formData = new FormData()
+            formData.append('name', profileForm.name)
+            formData.append('phone', profileForm.phone)
+            
+            if (selectedFile) {
+                formData.append('avatar', selectedFile)
+            }
+
+            const updatedUser = await authService.updateProfile(formData)
+            updateUser(updatedUser)
+            toast.success("تم تحديث الملف الشخصي بنجاح")
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "فشل تحديث الملف الشخصي")
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
@@ -47,11 +94,18 @@ export default function AdminProfilePage() {
             return
         }
         setIsLoading(true)
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setIsLoading(false)
-        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-        toast.success("تم تغيير كلمة المرور بنجاح")
+        try {
+            await authService.changePassword({
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword
+            })
+            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+            toast.success("تم تغيير كلمة المرور بنجاح")
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "فشل تغيير كلمة المرور")
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -64,28 +118,50 @@ export default function AdminProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Profile Summary Card */}
                 <Card className="md:col-span-1">
-                    <CardHeader className="text-center">
-                        <div className="mx-auto mb-4">
+                    <CardHeader className="text-center relative">
+                        <div className="mx-auto mb-4 relative group">
                             <Avatar className="h-24 w-24">
-                                <AvatarImage src={profileForm.avatar} />
+                                <AvatarImage src={previewUrl || (profileForm.avatar ? (profileForm.avatar.startsWith('http') ? profileForm.avatar : `http://localhost:5000${profileForm.avatar}`) : "")} />
                                 <AvatarFallback className="text-2xl">{profileForm.name.charAt(0)}</AvatarFallback>
                             </Avatar>
+                            <button 
+                                onClick={triggerFileInput}
+                                className="absolute bottom-0 right-0 p-1.5 bg-primary text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="تغيير الصورة"
+                            >
+                                <Camera className="h-4 w-4" />
+                            </button>
+                            <input 
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                            />
                         </div>
                         <CardTitle>{profileForm.name}</CardTitle>
                         <CardDescription className="flex items-center justify-center gap-1 mt-1">
                             <Shield className="h-3 w-3" />
                             مسؤول النظام
                         </CardDescription>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-4"
+                            onClick={triggerFileInput}
+                        >
+                            تغيير الصورة الشخصية
+                        </Button>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4 text-sm">
-                            <div className="flex items-center gap-2 text-gray-600">
-                                <Mail className="h-4 w-4" />
+                        <div className="space-y-4 text-sm text-right" dir="rtl">
+                            <div className="flex items-center gap-2 text-gray-600 justify-end">
                                 <span>{profileForm.email}</span>
+                                <Mail className="h-4 w-4" />
                             </div>
-                            <div className="flex items-center gap-2 text-gray-600">
-                                <Phone className="h-4 w-4" />
+                            <div className="flex items-center gap-2 text-gray-600 justify-end">
                                 <span>{profileForm.phone}</span>
+                                <Phone className="h-4 w-4" />
                             </div>
                         </div>
                     </CardContent>
@@ -143,16 +219,6 @@ export default function AdminProfilePage() {
                                                 onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                                             />
                                         </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="avatar">رابط الصورة الشخصية</Label>
-                                        <Input
-                                            id="avatar"
-                                            value={profileForm.avatar}
-                                            onChange={(e) => setProfileForm({ ...profileForm, avatar: e.target.value })}
-                                            placeholder="https://example.com/avatar.jpg"
-                                        />
                                     </div>
 
                                     <Button type="submit" disabled={isLoading}>

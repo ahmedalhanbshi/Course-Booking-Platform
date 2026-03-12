@@ -118,7 +118,7 @@ class AdminService {
      * Get all trainers
      */
     async getAllTrainers(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/admin/trainers');
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>(`/api/admin/trainers?t=${Date.now()}`);
         return response.data.data;
     }
 
@@ -133,7 +133,7 @@ class AdminService {
      * Get all institutes
      */
     async getAllInstitutes(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/admin/institutes');
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>(`/api/admin/institutes?t=${Date.now()}`);
         return response.data.data;
     }
 
@@ -157,7 +157,7 @@ class AdminService {
      * Get all students
      */
     async getAllStudents(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/admin/students');
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>(`/api/admin/students?t=${Date.now()}`);
         return response.data.data;
     }
 
@@ -190,7 +190,7 @@ class AdminService {
      * Get all courses
      */
     async getAllCourses(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/admin/courses');
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>(`/api/admin/courses?t=${Date.now()}`);
         return response.data.data;
     }
 
@@ -214,6 +214,63 @@ class AdminService {
     async suspendCourse(id: string): Promise<void> {
         await apiClient.post(`/api/admin/courses/${id}/suspend`);
     }
+
+    // =====================================================
+    // ANNOUNCEMENT MANAGEMENT
+    // =====================================================
+
+    /**
+     * Get all announcements
+     */
+    async getAnnouncements(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>(
+            `/api/admin/announcements?t=${Date.now()}`
+        );
+        return response.data.data;
+    }
+
+    /**
+     * Create a new announcement
+     */
+    async createAnnouncement(data: {
+        title: string;
+        content: string;
+        targetAudience?: string;
+        category?: string;
+        scheduledDate?: string;
+        scheduledTime?: string;
+    }): Promise<{ id: string }> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: { id: string } }>(
+            '/api/admin/announcements',
+            data
+        );
+        return response.data.data;
+    }
+
+    /**
+     * Update an announcement
+     */
+    async updateAnnouncement(id: string, data: any): Promise<void> {
+        await apiClient.put(`/api/admin/announcements/${id}`, data);
+    }
+
+    /**
+     * Delete an announcement
+     */
+    async deleteAnnouncement(id: string): Promise<void> {
+        await apiClient.delete(`/api/admin/announcements/${id}`);
+    }
+
+    /**
+     * Send an announcement (marks as SENT and creates notifications)
+     */
+    async sendAnnouncement(id: string): Promise<{ recipientCount: number }> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: { recipientCount: number } }>(
+            `/api/admin/announcements/${id}/send`
+        );
+        return response.data.data;
+    }
 }
 
 export const adminService = new AdminService();
+

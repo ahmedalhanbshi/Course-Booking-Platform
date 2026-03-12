@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cairo, Noto_Sans_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
+import { NotificationProvider } from "@/contexts/notification-context";
 import { ThemeProvider } from "@/components/theme-provider";
 import { NavbarWrapper } from "@/components/layout/navbar-wrapper";
 import { Toaster } from "sonner";
@@ -33,16 +34,18 @@ export default function RootLayout({
         className={`${cairo.variable} ${notoSansMono.variable} antialiased font-sans`}
       >
         <AuthProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem={false}
-            disableTransitionOnChange
-          >
-            <NavbarWrapper />
-            {children}
-            <Toaster />
-          </ThemeProvider>
+          <NotificationProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem={false}
+              disableTransitionOnChange
+            >
+              <NavbarWrapper />
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>

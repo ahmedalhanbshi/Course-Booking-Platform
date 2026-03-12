@@ -111,8 +111,8 @@ class InstituteService {
         return response.data.data;
     }
 
-    async getStudents(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/students');
+    async getStudents(): Promise<{ students: any[]; totalStudents: number; totalEnrollments: number }> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: { students: any[]; totalStudents: number; totalEnrollments: number } }>('/api/institute/students');
         return response.data.data;
     }
 

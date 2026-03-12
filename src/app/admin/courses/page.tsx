@@ -15,6 +15,7 @@ import { Course } from "@/types"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { adminService } from "@/lib/admin-service"
 import { format } from "date-fns"
+import { getFileUrl } from "@/lib/utils"
 
 export default function AdminCourses() {
   const [courses, setCourses] = useState<Course[]>([])
@@ -40,7 +41,8 @@ export default function AdminCourses() {
     endDate: "",
     maxStudents: 0,
     status: "active",
-    trainerId: ""
+    trainerId: "",
+    image: ""
   })
 
   const fetchCourses = async () => {
@@ -94,7 +96,8 @@ export default function AdminCourses() {
       endDate: format(new Date(course.endDate), "yyyy-MM-dd"),
       maxStudents: course.maxStudents,
       status: course.status,
-      trainerId: course.trainerId
+      trainerId: course.trainerId,
+      image: course.image || ""
     })
     setActionDialog({ open: true, type: 'edit' })
   }
@@ -256,9 +259,22 @@ export default function AdminCourses() {
                 {filteredCourses.map((course) => (
                   <TableRow key={course.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{course.title}</div>
-                        <div className="text-sm text-gray-500">{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</div>
+                      <div className="flex items-center gap-3">
+                        {course.image ? (
+                          <img
+                            src={getFileUrl(course.image)}
+                            alt={course.title}
+                            className="w-10 h-10 rounded object-cover border"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border">
+                            <BookOpen className="h-5 w-5 text-gray-400" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium">{course.title}</div>
+                          <div className="text-sm text-gray-500">{new Intl.NumberFormat('en-US').format(course.price)} ريال يمني</div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>{course.trainer?.name || '-'}</TableCell>
@@ -320,6 +336,15 @@ export default function AdminCourses() {
           </DialogHeader>
           {selectedCourse && (
             <div className="space-y-4">
+              {selectedCourse.image && (
+                <div className="w-full h-48 rounded-lg overflow-hidden border">
+                  <img
+                    src={getFileUrl(selectedCourse.image)}
+                    alt={selectedCourse.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold">{selectedCourse.title}</h3>
                 {getStatusBadge(selectedCourse.status)}
@@ -433,6 +458,15 @@ export default function AdminCourses() {
                   id="edit-title"
                   value={editForm.title}
                   onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="edit-image">رابط الصورة</Label>
+                <Input
+                  id="edit-image"
+                  value={editForm.image}
+                  onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
+                  placeholder="images/courses/example.jpg"
                 />
               </div>
               <div>

@@ -48,4 +48,12 @@ router.put('/courses/:id', adminController.updateCourse);
 router.delete('/courses/:id', adminController.deleteCourse);
 router.post('/courses/:id/suspend', adminController.suspendCourse);
 
+// Announcement management
+router.get('/announcements', adminController.getAnnouncements.bind(adminController));
+router.post('/announcements', adminController.createAnnouncement.bind(adminController));
+router.put('/announcements/:id', adminController.updateAnnouncement.bind(adminController));
+router.delete('/announcements/:id', adminController.deleteAnnouncement.bind(adminController));
+router.post('/announcements/:id/send', adminController.sendAnnouncement.bind(adminController));
+
 export default router;
+

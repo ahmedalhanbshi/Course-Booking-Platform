@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, Search, Mail, Phone, BookOpen, MoreHorizontal, Loader2, Eye, Trash2 } from "lucide-react"
+import { Users, Search, Mail, Phone, BookOpen, MoreHorizontal, Loader2, Eye } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { instituteService } from "@/lib/institute-service"
 import { toast } from "sonner"
@@ -44,7 +44,7 @@ type StudentsData = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "warning" }> = {
+const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     active: { label: "نشط", variant: "default" },
     completed: { label: "مكتمل", variant: "outline" },
     preliminary: { label: "أولي", variant: "secondary" },
@@ -63,11 +63,8 @@ export default function InstituteStudentsPage() {
     const [courseFilter, setCourseFilter] = useState("all")
     const [sortBy, setSortBy] = useState("name")
 
-    // Institute specific dialogs
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
     const [isDetailsOpen, setIsDetailsOpen] = useState(false)
-    const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-    const [studentToDelete, setStudentToDelete] = useState<Student | null>(null)
 
     const loadData = async () => {
         try {
@@ -123,17 +120,6 @@ export default function InstituteStudentsPage() {
     const handleViewDetails = (student: Student) => {
         setSelectedStudent(student)
         setIsDetailsOpen(true)
-    }
-
-    const handleDeleteClick = (student: Student) => {
-        setStudentToDelete(student)
-        setIsDeleteOpen(true)
-    }
-
-    const handleConfirmDelete = async () => {
-        // TODO: wire up delete API in instituteService
-        setIsDeleteOpen(false)
-        setStudentToDelete(null)
     }
 
     if (loading) {
@@ -317,13 +303,7 @@ export default function InstituteStudentsPage() {
                                                             إرسال بريد
                                                         </Link>
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                                                        onClick={() => handleDeleteClick(student)}
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        حذف الطالب
-                                                    </DropdownMenuItem>
+
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -385,24 +365,6 @@ export default function InstituteStudentsPage() {
                             </div>
                         </div>
                     )}
-                </DialogContent>
-            </Dialog>
-
-            {/* Delete Confirmation Dialog */}
-            <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                <DialogContent className="sm:max-w-[425px]" dir="rtl">
-                    <DialogHeader>
-                        <DialogTitle className="text-red-600">تأكيد الحذف</DialogTitle>
-                        <DialogDescription>
-                            هل أنت متأكد من رغبتك في حذف الطالب {studentToDelete?.name} من نظام المعهد؟
-                            <br />
-                            هذا الإجراء سيؤدي إلى إلغاء كافة تسجيلاته المرتبطة بالمعهد.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-end gap-3 mt-4">
-                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>إلغاء</Button>
-                        <Button variant="destructive" onClick={handleConfirmDelete}>نعم، حذف الطالب</Button>
-                    </div>
                 </DialogContent>
             </Dialog>
         </div>

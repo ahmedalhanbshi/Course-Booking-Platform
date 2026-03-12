@@ -28,12 +28,14 @@ interface TrainerData {
   email: string
   phone: string | null
   createdAt: string
+  avatar: string | null
   user: {
     id: string
     name: string
     email: string
     phone: string | null
     createdAt: string
+    avatar: string | null
   }
 }
 
@@ -213,7 +215,7 @@ export default function AdminTrainers() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {trainers.filter(t => t.verificationStatus === 'approved').length}
+              {trainers.filter(t => t.status === 'approved').length}
             </div>
             <p className="text-xs text-muted-foreground">حساب معتمد</p>
           </CardContent>
@@ -226,7 +228,7 @@ export default function AdminTrainers() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {trainers.filter(t => t.verificationStatus === 'pending').length}
+              {trainers.filter(t => t.status === 'pending').length}
             </div>
             <p className="text-xs text-muted-foreground">في انتظار الاعتماد</p>
           </CardContent>
@@ -258,9 +260,24 @@ export default function AdminTrainers() {
                 {trainers.map((trainer) => (
                   <TableRow key={trainer.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{trainer.name || trainer.user?.name}</div>
-                        <div className="text-sm text-gray-500">{trainer.email || trainer.user?.email}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-gray-100 flex-shrink-0 overflow-hidden">
+                          {trainer.avatar ? (
+                            <img 
+                              src={getFileUrl(trainer.avatar)} 
+                              alt={trainer.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center text-gray-400 font-bold">
+                              {(trainer.name || '?').charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium">{trainer.name}</div>
+                          <div className="text-sm text-gray-500">{trainer.email}</div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -270,7 +287,7 @@ export default function AdminTrainers() {
                       {formatDate(new Date(trainer.createdAt || trainer.user?.createdAt))}
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(trainer.verificationStatus)}
+                      {getStatusBadge(trainer.status)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -321,12 +338,22 @@ export default function AdminTrainers() {
           {selectedTrainer && (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                  <UserCheck className="h-8 w-8 text-gray-600" />
+                <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
+                  {selectedTrainer.avatar ? (
+                    <img 
+                      src={getFileUrl(selectedTrainer.avatar)} 
+                      alt={selectedTrainer.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-gray-400 text-2xl font-bold">
+                      {(selectedTrainer.name || '?').charAt(0)}
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold">{selectedTrainer.name || selectedTrainer.user.name}</h3>
-                  <p className="text-gray-600">{selectedTrainer.email || selectedTrainer.user.email}</p>
+                  <h3 className="text-lg font-semibold">{selectedTrainer.name}</h3>
+                  <p className="text-gray-600">{selectedTrainer.email}</p>
                   <p className="text-sm text-gray-500">
                     {selectedTrainer.phone || selectedTrainer.user.phone || 'لا يوجد رقم هاتف'}
                   </p>
@@ -334,7 +361,7 @@ export default function AdminTrainers() {
                     انضم في {formatDate(new Date(selectedTrainer.createdAt || selectedTrainer.user.createdAt))}
                   </p>
                   <div className="flex gap-2 mt-2">
-                    {getStatusBadge(selectedTrainer.verificationStatus)}
+                    {getStatusBadge(selectedTrainer.status)}
                   </div>
                 </div>
               </div>

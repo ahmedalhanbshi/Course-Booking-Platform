@@ -159,6 +159,26 @@ export class AuthController {
             return sendError(res, error.message, 400);
         }
     }
+
+    async changePassword(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            const userId = req.user!.userId;
+            const { currentPassword, newPassword } = req.body;
+
+            if (!currentPassword || !newPassword) {
+                return sendError(res, 'يجب تزويد كلمة المرور الحالية والجديدة', 400);
+            }
+
+            const result = await authService.changePassword(userId, { currentPassword, newPassword });
+            
+            // Clear refresh token cookie on password change
+            res.clearCookie('refreshToken');
+            
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
 }
 
 export default new AuthController();

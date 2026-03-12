@@ -156,6 +156,17 @@ class AuthService {
         );
         return response.data.data;
     }
+
+    /**
+     * Change user password
+     */
+    async changePassword(data: any): Promise<{ message: string }> {
+        const response = await apiClient.patch<{ success: boolean; message: string }>(
+            '/api/auth/change-password',
+            data
+        );
+        return response.data;
+    }
 }
 
 // Export singleton instance

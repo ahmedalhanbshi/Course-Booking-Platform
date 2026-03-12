@@ -228,7 +228,7 @@ export default function AdminInstitutes() {
                       <div className="flex items-center gap-3">
                         {institute.logo ? (
                           <img
-                            src={institute.logo}
+                            src={getFileUrl(institute.logo)}
                             alt={institute.name}
                             className="w-8 h-8 rounded-full object-cover"
                           />

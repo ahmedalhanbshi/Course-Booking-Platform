@@ -54,6 +54,7 @@ app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+import notificationRoutes from './routes/notification.routes';
 import publicRoutes from './routes/public.routes';
 
 // Routes
@@ -62,7 +63,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/institute', instituteRoutes);
 app.use('/api/trainer', trainerRoutes);
 app.use('/api/student', studentRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/public', publicRoutes);
+
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

@@ -18,15 +18,16 @@ import { Badge } from "@/components/ui/badge"
 import { UserRole } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "next-themes"
+import { useNotifications } from "@/contexts/notification-context"
 
 interface NavbarProps {
-  unreadNotifications?: number
   onMenuClick?: () => void
 }
 
-export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
+export function Navbar({ onMenuClick }: NavbarProps) {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { unreadCount } = useNotifications()
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
@@ -188,8 +189,8 @@ export function Navbar({ unreadNotifications = 0, onMenuClick }: NavbarProps) {
               <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" asChild>
                 <Link href={getNotificationsLink(user.role)}>
                   <Bell className="h-5 w-5 text-slate-600 dark:text-slate-300" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950 animate-pulse" />
                   )}
                 </Link>
               </Button>

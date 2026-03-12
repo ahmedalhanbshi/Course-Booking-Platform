@@ -372,6 +372,81 @@ export class AdminController {
             return sendError(res, error.message, 400);
         }
     }
+
+    // =====================================================
+    // ANNOUNCEMENT MANAGEMENT
+    // =====================================================
+
+    async getAnnouncements(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'PLATFORM_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const result = await adminService.getAnnouncements();
+            return sendSuccess(res, 'تم جلب الإعلانات بنجاح', result);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async createAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'PLATFORM_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { title, content, targetAudience, category, scheduledDate, scheduledTime } = req.body;
+            if (!title || !content) {
+                return sendError(res, 'العنوان والمحتوى مطلوبان', 400);
+            }
+            const result = await adminService.createAnnouncement(
+                { title, content, targetAudience, category, scheduledDate, scheduledTime },
+                req.user!.userId
+            );
+            return sendSuccess(res, result.message, { id: result.id });
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'PLATFORM_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const result = await adminService.updateAnnouncement(id, req.body);
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async deleteAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'PLATFORM_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const result = await adminService.deleteAnnouncement(id);
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async sendAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'PLATFORM_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { id } = req.params;
+            const result = await adminService.sendAnnouncement(id);
+            return sendSuccess(res, result.message, { recipientCount: result.recipientCount });
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
 }
 
 export default new AdminController();
+

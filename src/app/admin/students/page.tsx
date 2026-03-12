@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, UserX, Users, BookOpen, Trash2, Edit } from "lucide-react"
 import { User } from "@/types"
-import { formatDate } from "@/lib/utils"
+import { formatDate, getFileUrl } from "@/lib/utils"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { adminService } from "@/lib/admin-service"
 
@@ -48,6 +48,8 @@ export default function AdminStudents() {
     try {
       setLoading(true)
       const data = await adminService.getAllStudents()
+      // Note: If adminService.getAllStudents doesn't support params, 
+      // we might need to update it or add ?t=... here if it uses apiClient directly.
       setStudents(data)
     } catch (err: any) {
       setError(err?.response?.data?.message || "فشل تحميل بيانات الطلاب")
@@ -248,7 +250,7 @@ export default function AdminStudents() {
                     <div className="flex items-center gap-3">
                       {student.avatar ? (
                         <img
-                          src={student.avatar}
+                          src={getFileUrl(student.avatar)}
                           alt={student.name}
                           className="w-8 h-8 rounded-full object-cover"
                         />
@@ -319,7 +321,7 @@ export default function AdminStudents() {
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                   {selectedStudent.avatar ? (
-                    <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" />
+                    <img src={getFileUrl(selectedStudent.avatar)} alt={selectedStudent.name} className="w-full h-full object-cover" />
                   ) : (
                     <Users className="h-8 w-8 text-gray-600" />
                   )}

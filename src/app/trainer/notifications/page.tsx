@@ -1,68 +1,52 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bell, CheckCircle, UserPlus, FileCheck, Star, Megaphone, Clock } from "lucide-react"
-import { Notification } from "@/types"
+import { Bell, CheckCircle, UserPlus, FileCheck, Star, Megaphone, Clock, Loader2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
-
-// Mock trainer notifications data
-const mockNotifications: Notification[] = [
-    {
-        id: "1",
-        userId: "2",
-        title: "طلب تسجيل جديد",
-        message: "قام الطالب 'سعيد محمد' بطلب التسجيل في دورة 'تعلم React من الصفر'",
-        type: "enrollment",
-        isRead: false,
-        createdAt: new Date("2025-01-25T10:30:00"),
-    },
-    {
-        id: "2",
-        userId: "2",
-        title: "تم اعتماد الدورة",
-        message: "تم اعتماد دورتك 'تصميم واجهات المستخدم' من قبل إدارة المنصة",
-        type: "system",
-        isRead: false,
-        createdAt: new Date("2025-01-24T14:00:00"),
-    },
-    {
-        id: "3",
-        userId: "2",
-        title: "تقييم جديد",
-        message: "حصلت على تقييم 5 نجوم من الطالب 'أحمد علي' في دورة 'إدارة المشاريع'",
-        type: "review",
-        isRead: true,
-        createdAt: new Date("2025-01-23T09:15:00"),
-    },
-    {
-        id: "4",
-        userId: "2",
-        title: "تذكير بموعد الدرس",
-        message: "لديك درس مباشر في دورة 'تعلم React من الصفر' بعد ساعة واحدة",
-        type: "session",
-        isRead: true,
-        createdAt: new Date("2025-01-22T16:00:00"),
-    },
-    {
-        id: "5",
-        userId: "2",
-        title: "إعلان للمدربين",
-        message: "تم تحديث سياسات الدفع للمدربين. يرجى الاطلاع على التفاصيل في لوحة التحكم",
-        type: "announcement",
-        isRead: false,
-        createdAt: new Date("2025-01-20T11:30:00"),
-    }
-]
+import { notificationService, NotificationItem } from "@/lib/notification-service"
+import { useNotifications } from "@/contexts/notification-context"
+import { toast } from "sonner"
 
 export default function TrainerNotificationsPage() {
-    const [notifications, setNotifications] = useState(mockNotifications)
+    const [notifications, setNotifications] = useState<NotificationItem[]>([])
+    const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<string>("all")
+    const [selected, setSelected] = useState<NotificationItem | null>(null)
+    const { refreshUnreadCount, clearUnread } = useNotifications()
 
-    const getNotificationIcon = (type: Notification['type'] | 'review' | 'system') => {
+    const fetchNotifications = useCallback(async () => {
+        try {
+            setLoading(true)
+            const data = await notificationService.getNotifications()
+            setNotifications(data)
+        } catch {
+            toast.error("تعذّر تحميل الإشعارات")
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    useEffect(() => { fetchNotifications() }, [fetchNotifications])
+
+    const openNotification = async (notification: NotificationItem) => {
+        setSelected(notification)
+        if (!notification.isRead) {
+            try {
+                await notificationService.markAsRead(notification.id)
+                setNotifications(prev =>
+                    prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+                )
+                refreshUnreadCount()
+            } catch { /* silent */ }
+        }
+    }
+
+    const getNotificationIcon = (type: string) => {
         switch (type) {
             case 'enrollment': return <UserPlus className="h-5 w-5" />
             case 'system': return <FileCheck className="h-5 w-5" />
@@ -73,18 +57,18 @@ export default function TrainerNotificationsPage() {
         }
     }
 
-    const getNotificationColor = (type: Notification['type'] | 'review' | 'system') => {
+    const getNotificationColor = (type: string) => {
         switch (type) {
-            case 'enrollment': return 'text-blue-600'
-            case 'system': return 'text-green-600'
-            case 'review': return 'text-yellow-600'
-            case 'session': return 'text-orange-600'
-            case 'announcement': return 'text-purple-600'
-            default: return 'text-gray-600'
+            case 'enrollment': return 'text-blue-600 bg-blue-100'
+            case 'system': return 'text-green-600 bg-green-100'
+            case 'review': return 'text-yellow-600 bg-yellow-100'
+            case 'session': return 'text-orange-600 bg-orange-100'
+            case 'announcement': return 'text-purple-600 bg-purple-100'
+            default: return 'text-gray-600 bg-gray-100'
         }
     }
 
-    const getTypeLabel = (type: Notification['type'] | 'review' | 'system') => {
+    const getTypeLabel = (type: string) => {
         switch (type) {
             case 'enrollment': return 'تسجيل جديد'
             case 'system': return 'النظام'
@@ -95,20 +79,16 @@ export default function TrainerNotificationsPage() {
         }
     }
 
-    const filteredNotifications = notifications.filter(notification => {
-        if (filter === "all") return true
-        if (filter === "unread") return !notification.isRead
-        return notification.type === filter
-    })
+    const filteredNotifications = notifications.filter(n =>
+        filter === "all" ? true : filter === "unread" ? !n.isRead : n.type === filter
+    )
 
-    const markAsRead = (id: string) => {
-        setNotifications(notifications.map(notif =>
-            notif.id === id ? { ...notif, isRead: true } : notif
-        ))
-    }
-
-    const markAllAsRead = () => {
-        setNotifications(notifications.map(notif => ({ ...notif, isRead: true })))
+    const markAllAsRead = async () => {
+        try {
+            await notificationService.markAllAsRead()
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+            clearUnread()
+        } catch { toast.error("تعذّر تحديث الإشعارات") }
     }
 
     const unreadCount = notifications.filter(n => !n.isRead).length
@@ -120,7 +100,6 @@ export default function TrainerNotificationsPage() {
                     <h1 className="text-3xl font-bold">إشعارات المدرب</h1>
                     <p className="text-gray-600 mt-2">متابعة طلبات التسجيل وتقييمات الطلاب وتحديثات النظام</p>
                 </div>
-
                 {unreadCount > 0 && (
                     <Button onClick={markAllAsRead}>
                         <CheckCircle className="mr-2 h-4 w-4" />
@@ -129,7 +108,6 @@ export default function TrainerNotificationsPage() {
                 )}
             </div>
 
-            {/* Filters */}
             <Card className="mb-6">
                 <CardContent className="pt-6">
                     <div className="flex items-center gap-4">
@@ -138,15 +116,12 @@ export default function TrainerNotificationsPage() {
                             <span className="font-medium">تصفية الإشعارات:</span>
                         </div>
                         <Select value={filter} onValueChange={setFilter}>
-                            <SelectTrigger className="w-48">
-                                <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">جميع الإشعارات</SelectItem>
                                 <SelectItem value="unread">غير المقروءة</SelectItem>
                                 <SelectItem value="enrollment">طلبات التسجيل</SelectItem>
-                                <SelectItem value="system">النظام</SelectItem>
-                                <SelectItem value="review">التقييمات</SelectItem>
+                                <SelectItem value="session">الدروس</SelectItem>
                                 <SelectItem value="announcement">الإعلانات</SelectItem>
                             </SelectContent>
                         </Select>
@@ -154,77 +129,81 @@ export default function TrainerNotificationsPage() {
                 </CardContent>
             </Card>
 
-            {/* Notifications List */}
-            <div className="space-y-4">
-                {filteredNotifications.length === 0 ? (
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="text-center py-8">
-                                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    لا توجد إشعارات
-                                </h3>
-                                <p className="text-gray-500">
-                                    {filter === "unread"
-                                        ? "جميع الإشعارات مقروءة"
-                                        : "لا توجد إشعارات في هذه الفئة"
-                                    }
-                                </p>
+            <div className="space-y-3">
+                {loading ? (
+                    <Card><CardContent className="pt-6 flex justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    </CardContent></Card>
+                ) : filteredNotifications.length === 0 ? (
+                    <Card><CardContent className="pt-6 text-center py-8">
+                        <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد إشعارات</h3>
+                        <p className="text-gray-500">{filter === "unread" ? "جميع الإشعارات مقروءة" : "لا توجد إشعارات في هذه الفئة"}</p>
+                    </CardContent></Card>
+                ) : filteredNotifications.map((notification) => (
+                    <Card
+                        key={notification.id}
+                        className={`cursor-pointer transition-all hover:shadow-md hover:border-blue-300 ${!notification.isRead ? 'bg-blue-50 border-blue-200' : ''}`}
+                        onClick={() => openNotification(notification)}
+                    >
+                        <CardContent className="pt-4 pb-4">
+                            <div className="flex items-start gap-4">
+                                <div className={`p-2 rounded-full ${getNotificationColor(notification.type)}`}>
+                                    {getNotificationIcon(notification.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className={`font-semibold ${!notification.isRead ? 'text-gray-900' : 'text-gray-600'}`}>
+                                            {notification.title}
+                                        </h3>
+                                        <Badge variant="outline" className="text-xs">{getTypeLabel(notification.type)}</Badge>
+                                        {!notification.isRead && <div className="w-2 h-2 bg-blue-500 rounded-full ml-auto" />}
+                                    </div>
+                                    <p className="text-sm text-gray-500 truncate">{notification.message}</p>
+                                    <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                                        <Clock className="h-3 w-3" />
+                                        {formatDate(new Date(notification.createdAt))}
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
-                ) : (
-                    filteredNotifications.map((notification) => (
-                        <Card
-                            key={notification.id}
-                            className={`transition-colors ${!notification.isRead ? 'bg-blue-50 border-blue-200' : ''}`}
-                        >
-                            <CardContent className="pt-6">
-                                <div className="flex items-start gap-4">
-                                    <div className={`p-2 rounded-full bg-gray-100 ${getNotificationColor(notification.type as any)}`}>
-                                        {getNotificationIcon(notification.type as any)}
+                ))}
+            </div>
+
+            {/* Notification Detail Dialog */}
+            <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+                <DialogContent className="sm:max-w-[500px]">
+                    {selected && (
+                        <>
+                            <DialogHeader>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className={`p-2 rounded-full ${getNotificationColor(selected.type)}`}>
+                                        {getNotificationIcon(selected.type)}
                                     </div>
-
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="font-semibold text-gray-900">
-                                                        {notification.title}
-                                                    </h3>
-                                                    <Badge variant="outline" className="text-xs">
-                                                        {getTypeLabel(notification.type as any)}
-                                                    </Badge>
-                                                    {!notification.isRead && (
-                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                    )}
-                                                </div>
-                                                <p className="text-gray-600 mb-2">
-                                                    {notification.message}
-                                                </p>
-                                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                                    <Clock className="h-4 w-4" />
-                                                    {formatDate(notification.createdAt)}
-                                                </div>
-                                            </div>
-
-                                            {!notification.isRead && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => markAsRead(notification.id)}
-                                                >
-                                                    <CheckCircle className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
+                                    <div>
+                                        <DialogTitle className="text-right">{selected.title}</DialogTitle>
+                                        <Badge variant="outline" className="text-xs mt-1">{getTypeLabel(selected.type)}</Badge>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
-            </div>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                <p className="text-gray-700 leading-relaxed">{selected.message}</p>
+                                <div className="flex items-center gap-2 text-sm text-gray-500 border-t pt-3">
+                                    <Clock className="h-4 w-4" />
+                                    {formatDate(new Date(selected.createdAt))}
+                                    <span className="mr-auto">
+                                        <Badge className="bg-green-100 text-green-700">
+                                            <CheckCircle className="h-3 w-3 ml-1" />
+                                            مقروء
+                                        </Badge>
+                                    </span>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/contexts/notification-context"
 
 interface TrainerHeaderProps {
   isSidebarOpen: boolean
@@ -22,7 +23,7 @@ interface TrainerHeaderProps {
 
 export function TrainerHeader({ isSidebarOpen, onMenuClick }: TrainerHeaderProps) {
   const { user, logout } = useAuth()
-
+  const { unreadCount } = useNotifications()
   const avatarSrc = user?.avatar
     ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${user.avatar}?t=${Date.now()}`
     : undefined
@@ -53,9 +54,12 @@ export function TrainerHeader({ isSidebarOpen, onMenuClick }: TrainerHeaderProps
         </Button>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" asChild className="rounded-full text-gray-500 hover:text-primary hover:bg-primary/10">
+        <Button variant="ghost" size="icon" asChild className="relative rounded-full text-gray-500 hover:text-primary hover:bg-primary/10">
           <Link href="/trainer/notifications" title="الإشعارات">
             <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950 animate-pulse" />
+            )}
             <span className="sr-only">الإشعارات</span>
           </Link>
         </Button>

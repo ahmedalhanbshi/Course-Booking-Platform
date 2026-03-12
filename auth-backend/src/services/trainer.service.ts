@@ -109,6 +109,14 @@ class TrainerService {
             orderBy: { createdAt: 'desc' },
             include: {
                 trainer: { select: { name: true, avatar: true } },
+                staffTrainer: { select: { name: true } },
+                institute: { 
+                    select: { 
+                        name: true, 
+                        logo: true,
+                        user: { select: { avatar: true } }
+                    } 
+                },
                 category: { select: { name: true } },
                 enrollments: {
                     where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
@@ -134,8 +142,8 @@ class TrainerService {
                 sessionsCount: c.sessions.length,
                 duration: `${c.duration} ساعة`,
                 trainer: {
-                    name: c.trainer?.name ?? '—',
-                    avatar: c.trainer?.avatar ?? null,
+                    name: c.trainer?.name ?? c.staffTrainer?.name ?? c.institute?.name ?? '—',
+                    avatar: c.trainer?.avatar ?? c.institute?.logo ?? c.institute?.user?.avatar ?? null,
                 },
                 price: Number(c.price),
                 deliveryType: c.sessions[0]?.type === 'ONLINE' ? 'online'
@@ -549,6 +557,34 @@ class TrainerService {
                         }
                     }
                 },
+                staffTrainer: {
+                    select: {
+                        name: true,
+                        bio: true,
+                        email: true,
+                        specialties: true
+                    }
+                },
+                institute: {
+                    select: {
+                        name: true,
+                        logo: true,
+                        email: true,
+                        description: true,
+                        user: { select: { avatar: true } },
+                        bankAccounts: {
+                            where: { isActive: true },
+                            select: {
+                                id: true,
+                                bankName: true,
+                                accountName: true,
+                                accountNumber: true,
+                                iban: true,
+                                isActive: true,
+                            }
+                        }
+                    }
+                },
                 category: { select: { name: true } },
                 sessions: {
                     where: { status: { not: 'CANCELLED' } },
@@ -597,12 +633,12 @@ class TrainerService {
                 room: s.room ? { id: s.room.id, name: s.room.name, location: s.room.location ?? null } : null,
             })),
             instructor: {
-                name: course.trainer?.name ?? 'مدرب',
-                avatar: course.trainer?.avatar ?? null,
-                email: course.trainer?.email ?? null,
-                bio: course.trainer?.trainerProfile?.bio ?? null,
-                specialties: course.trainer?.trainerProfile?.specialties ?? [],
-                bankAccounts: course.trainer?.bankAccounts ?? [],
+                name: course.trainer?.name ?? course.staffTrainer?.name ?? course.institute?.name ?? 'مدرب',
+                avatar: course.trainer?.avatar ?? course.institute?.logo ?? course.institute?.user?.avatar ?? null,
+                email: course.trainer?.email ?? course.staffTrainer?.email ?? course.institute?.email ?? null,
+                bio: course.trainer?.trainerProfile?.bio ?? course.staffTrainer?.bio ?? course.institute?.description ?? null,
+                specialties: course.trainer?.trainerProfile?.specialties ?? course.staffTrainer?.specialties ?? [],
+                bankAccounts: course.trainer?.bankAccounts ?? course.institute?.bankAccounts ?? [],
             },
         };
     }

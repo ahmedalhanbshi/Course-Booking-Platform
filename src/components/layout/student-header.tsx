@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 import { getFileUrl } from "@/lib/utils"
+import { useNotifications } from "@/contexts/notification-context"
 
 interface StudentHeaderProps {
   onMenuClick: () => void
@@ -22,7 +23,7 @@ interface StudentHeaderProps {
 
 export function StudentHeader({ onMenuClick }: StudentHeaderProps) {
   const { user, logout } = useAuth()
-
+  const { unreadCount } = useNotifications()
   const avatarSrc = getFileUrl(user?.avatar) || "/images/placeholder.png"
 
   return (
@@ -51,9 +52,12 @@ export function StudentHeader({ onMenuClick }: StudentHeaderProps) {
         </Button>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" asChild className="rounded-full text-gray-500 hover:text-primary hover:bg-primary/10">
+        <Button variant="ghost" size="icon" asChild className="relative rounded-full text-gray-500 hover:text-primary hover:bg-primary/10">
           <Link href="/student/notifications" title="الإشعارات">
             <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950 animate-pulse" />
+            )}
             <span className="sr-only">الإشعارات</span>
           </Link>
         </Button>
