@@ -21,6 +21,9 @@ router.post('/verifications/institute/:id/reject', adminController.rejectInstitu
 // Dashboard stats
 router.get('/dashboard/stats', adminController.getDashboardStats);
 
+// Audit logs
+router.get('/audit-logs', adminController.getAuditLogs);
+
 // Get all trainers
 router.get('/trainers', adminController.getAllTrainers);
 

@@ -6,67 +6,32 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Search, MapPin, Users, BookOpen, Star, Building2, ArrowLeft } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Navbar } from "@/components/layout/navbar"
-
-// Mock data for institutes
-const institutes = [
-    {
-        id: "1",
-        name: "معهد المستقبل للتقنية",
-        description: "معهد رائد في مجال التكنولوجيا والبرمجة، يقدم دورات متقدمة في تطوير الويب والذكاء الاصطناعي.",
-        logo: "/logos/future-tech.png", // Placeholder
-        location: "الرياض، المملكة العربية السعودية",
-        rating: 4.8,
-        studentsCount: 1200,
-        coursesCount: 25,
-        categories: ["برمجة", "ذكاء اصطناعي", "أمن سيبراني"],
-        coverImage: "https://placehold.co/600x200/2563eb/ffffff?text=Future+Tech"
-    },
-    {
-        id: "2",
-        name: "أكاديمية الإبداع للتصميم",
-        description: "وجهتك الأولى لتعلم فنون التصميم الجرافيكي وتجربة المستخدم، مع مدربين عالميين.",
-        logo: "/logos/creative-design.png", // Placeholder
-        location: "جدة، المملكة العربية السعودية",
-        rating: 4.6,
-        studentsCount: 850,
-        coursesCount: 18,
-        categories: ["تصميم جرافيك", "UI/UX", "موشن جرافيك"],
-        coverImage: "https://placehold.co/600x200/16a34a/ffffff?text=Creative+Design"
-    },
-    {
-        id: "3",
-        name: "معهد اللغات الحديثة",
-        description: "تعلم اللغات الحية بأساليب مبتكرة وتفاعلية. دورات في الإنجليزية، الفرنسية، والإسبانية.",
-        logo: "/logos/languages.png", // Placeholder
-        location: "الدمام، المملكة العربية السعودية",
-        rating: 4.5,
-        studentsCount: 2000,
-        coursesCount: 30,
-        categories: ["لغات", "تطوير ذات", "مهارات تواصل"],
-        coverImage: "https://placehold.co/600x200/ca8a04/ffffff?text=Modern+Languages"
-    },
-    {
-        id: "4",
-        name: "مركز رواد الأعمال",
-        description: "برامج تدريبية متخصصة في إدارة الأعمال، التسويق، والقيادة لرواد الأعمال الطموحين.",
-        logo: "/logos/business.png", // Placeholder
-        location: "الرياض، المملكة العربية السعودية",
-        rating: 4.9,
-        studentsCount: 500,
-        coursesCount: 12,
-        categories: ["إدارة أعمال", "تسويق", "قيادة"],
-        coverImage: "https://placehold.co/600x200/9333ea/ffffff?text=Business+Leaders"
-    }
-]
-
+import { instituteService } from "@/lib/institute-service"
+import { getFileUrl } from "@/lib/utils"
 export default function InstitutesPage() {
     const [searchQuery, setSearchQuery] = useState("")
+    const [institutes, setInstitutes] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchInstitutes = async () => {
+            try {
+                const data = await instituteService.getPublicInstitutes()
+                setInstitutes(data)
+            } catch (error) {
+                console.error("Failed to fetch institutes:", error)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchInstitutes()
+    }, [])
 
     const filteredInstitutes = institutes.filter(institute =>
-        institute.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        institute.description.toLowerCase().includes(searchQuery.toLowerCase())
+        institute.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        institute.description?.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     return (
@@ -96,46 +61,48 @@ export default function InstitutesPage() {
                 </div>
 
                 {/* Institutes Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredInstitutes.length > 0 ? (
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {[1, 2, 3].map((n) => (
+                            <Card key={n} className="overflow-hidden border-gray-100 flex flex-col h-[400px] animate-pulse">
+                                <div className="h-32 bg-gray-200"></div>
+                                <div className="mt-12 px-6 flex-1 space-y-4">
+                                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                                    <div className="space-y-2 mt-4">
+                                        <div className="h-3 bg-gray-200 rounded w-full"></div>
+                                        <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {filteredInstitutes.length > 0 ? (
                         filteredInstitutes.map((institute) => (
                             <Card key={institute.id} className="group overflow-hidden border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col h-full">
                                 {/* Cover Image */}
                                 <div className="h-32 bg-gray-100 relative overflow-hidden">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                        src={institute.coverImage}
+                                        src={institute.logo ? getFileUrl(institute.logo) : institute.coverImage}
                                         alt={institute.name}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                                 </div>
 
-                                <CardHeader className="relative pt-0 pb-4 px-6">
-                                    {/* Logo */}
-                                    <div className="absolute -top-10 right-6">
-                                        <div className="h-20 w-20 rounded-xl bg-white p-1 shadow-md border border-gray-100">
-                                            <div className="h-full w-full bg-gray-50 rounded-lg flex items-center justify-center text-primary">
-                                                <Building2 className="h-8 w-8" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-12">
+                                <CardHeader className="relative pt-6 pb-4 px-6">
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="text-xl font-bold text-gray-900 group-hover:text-primary transition-colors">
                                                 {institute.name}
                                             </h3>
-                                            <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-full border border-yellow-100">
-                                                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                                                <span className="text-xs font-bold text-yellow-700">{institute.rating}</span>
-                                            </div>
                                         </div>
                                         <div className="flex items-center gap-1 text-sm text-gray-500 mb-3">
                                             <MapPin className="h-3.5 w-3.5" />
                                             {institute.location}
                                         </div>
-                                    </div>
                                 </CardHeader>
 
                                 <CardContent className="px-6 flex-1">
@@ -144,7 +111,7 @@ export default function InstitutesPage() {
                                     </p>
 
                                     <div className="flex flex-wrap gap-2 mb-4">
-                                        {institute.categories.slice(0, 3).map((cat) => (
+                                        {institute.categories.slice(0, 3).map((cat: string) => (
                                             <Badge key={cat} variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 font-normal">
                                                 {cat}
                                             </Badge>
@@ -179,10 +146,13 @@ export default function InstitutesPage() {
                                 <Search className="h-8 w-8 text-gray-400" />
                             </div>
                             <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد نتائج</h3>
-                            <p className="text-gray-500">جرب البحث بكلمات مختلفة</p>
+                            <p className="text-gray-500">
+                                {searchQuery ? "جرب البحث بكلمات مختلفة" : "لا توجد معاهد مقبولة حالياً."}
+                            </p>
                         </div>
                     )}
                 </div>
+                )}
             </main>
         </div>
     )

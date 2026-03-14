@@ -240,10 +240,7 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                 </SelectContent>
               </Select>
             </div>
-
-          </div>
-
-          {loading && (
+            {loading && (
             <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
               <Loader2 className="h-7 w-7 animate-spin" />
               <span className="text-lg">جاري تحميل الدورات...</span>
@@ -291,7 +288,8 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                 />
               ))}
             </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

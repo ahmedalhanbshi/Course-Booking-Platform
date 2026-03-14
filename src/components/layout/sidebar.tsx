@@ -80,6 +80,7 @@ const platformAdminMenuItems = [
   { href: "/admin/students", label: "إدارة الطلاب", icon: Users },
   { href: "/admin/courses", label: "إدارة الدورات", icon: BookOpen },
   { href: "/admin/announcements", label: "الإعلانات العامة", icon: Megaphone },
+  { href: "/admin/logs", label: "سجلات النظام", icon: FileText },
   { href: "/admin/system", label: "إعدادات النظام", icon: Settings },
 ]
 

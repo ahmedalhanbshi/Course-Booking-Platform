@@ -32,7 +32,7 @@ export class AdminController {
             }
 
             const { id } = req.params;
-            const result = await adminService.approveTrainer(id);
+            const result = await adminService.approveTrainer(id, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -56,7 +56,7 @@ export class AdminController {
                 return sendError(res, 'يجب تحديد سبب الرفض', 400);
             }
 
-            const result = await adminService.rejectTrainer(id, reason);
+            const result = await adminService.rejectTrainer(id, reason, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -74,7 +74,7 @@ export class AdminController {
             }
 
             const { id } = req.params;
-            const result = await adminService.approveInstitute(id);
+            const result = await adminService.approveInstitute(id, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -98,7 +98,7 @@ export class AdminController {
                 return sendError(res, 'يجب تحديد سبب الرفض', 400);
             }
 
-            const result = await adminService.rejectInstitute(id, reason);
+            const result = await adminService.rejectInstitute(id, reason, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -167,7 +167,7 @@ export class AdminController {
             const { reason } = req.body;
             if (!reason) return sendError(res, 'يجب ذكر سبب التعليق', 400);
 
-            const result = await adminService.suspendInstitute(id, reason);
+            const result = await adminService.suspendInstitute(id, reason, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -183,7 +183,7 @@ export class AdminController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const result = await adminService.reactivateInstitute(id);
+            const result = await adminService.reactivateInstitute(id, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -199,7 +199,7 @@ export class AdminController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const result = await adminService.deleteInstitute(id);
+            const result = await adminService.deleteInstitute(id, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -216,7 +216,7 @@ export class AdminController {
             }
             const { id } = req.params;
             const data = req.body;
-            const result = await adminService.updateInstitute(id, data);
+            const result = await adminService.updateInstitute(id, data, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -233,7 +233,7 @@ export class AdminController {
             }
             const { id } = req.params;
             const data = req.body;
-            const result = await adminService.updateTrainer(id, data);
+            const result = await adminService.updateTrainer(id, data, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -265,7 +265,7 @@ export class AdminController {
             }
             const { id } = req.params;
             const data = req.body;
-            const result = await adminService.updateStudent(id, data);
+            const result = await adminService.updateStudent(id, data, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -282,7 +282,7 @@ export class AdminController {
             }
             const { id } = req.params;
             const { reason } = req.body;
-            const result = await adminService.suspendStudent(id, reason);
+            const result = await adminService.suspendStudent(id, reason, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -298,8 +298,25 @@ export class AdminController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const result = await adminService.deleteStudent(id);
+            const result = await adminService.deleteStudent(id, req.user!.userId);
             return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
+     * Get all audit logs
+     */
+    async getAuditLogs(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            // Check if user is platform admin
+            if (req.user?.role !== 'PLATFORM_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+
+            const result = await adminService.getAuditLogs();
+            return sendSuccess(res, 'تم جلب سجلات النظام بنجاح', result);
         } catch (error: any) {
             return sendError(res, error.message, 400);
         }
@@ -334,7 +351,7 @@ export class AdminController {
             }
             const { id } = req.params;
             const data = req.body;
-            const result = await adminService.updateCourse(id, data);
+            const result = await adminService.updateCourse(id, data, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -350,7 +367,7 @@ export class AdminController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const result = await adminService.deleteCourse(id);
+            const result = await adminService.deleteCourse(id, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);
@@ -366,7 +383,7 @@ export class AdminController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const result = await adminService.suspendCourse(id);
+            const result = await adminService.suspendCourse(id, req.user!.userId);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);

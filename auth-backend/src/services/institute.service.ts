@@ -1777,6 +1777,158 @@ class InstituteService {
             return updatedEnrollment;
         });
     }
+    /**
+     * Get all public approved institutes
+     */
+    async getPublicInstitutes() {
+        const institutes = await prisma.institute.findMany({
+            where: {
+                verificationStatus: 'APPROVED',
+                deletedAt: null
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                logo: true,
+                address: true,
+                courses: {
+                    where: { status: 'ACTIVE' },
+                    select: {
+                        categoryId: true,
+                        category: { select: { name: true } },
+                        enrollments: { select: { id: true } }
+                    }
+                },
+                _count: {
+                    select: {
+                        courses: { where: { status: 'ACTIVE' } },
+                        staff: { where: { status: 'ACTIVE' } }
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        return institutes.map(inst => {
+            const categories = Array.from(new Set(inst.courses.map(c => c.category?.name).filter(Boolean)));
+            const studentsCount = inst.courses.reduce((acc, course) => acc + course.enrollments.length, 0);
+
+            return {
+                id: inst.id,
+                name: inst.name,
+                description: inst.description || '',
+                logo: inst.logo,
+                location: inst.address || 'غير محدد',
+                rating: 5.0, // Default rating for now
+                studentsCount,
+                coursesCount: inst._count.courses,
+                staffCount: inst._count.staff,
+                categories,
+                coverImage: `https://placehold.co/600x200/2563eb/ffffff?text=${encodeURIComponent(inst.name)}`
+            };
+        });
+    }
+
+    /**
+     * Get a single public approved institute by ID
+     */
+    async getPublicInstituteById(id: string) {
+        const institute = await prisma.institute.findFirst({
+            where: {
+                id,
+                verificationStatus: 'APPROVED',
+                deletedAt: null
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                logo: true,
+                address: true,
+                email: true,
+                phone: true,
+                website: true,
+                courses: {
+                    where: { status: 'ACTIVE' },
+                    select: {
+                        id: true,
+                        title: true,
+                        price: true,
+                        image: true,
+                        categoryId: true,
+                        category: { select: { name: true } },
+                        enrollments: { select: { id: true } }
+                    }
+                },
+                staff: {
+                    where: { status: 'ACTIVE' },
+                    select: {
+                        id: true,
+                        name: true,
+                        specialties: true,
+                        instituteId: true
+                    }
+                },
+                _count: {
+                    select: {
+                        courses: { where: { status: 'ACTIVE' } },
+                        staff: { where: { status: 'ACTIVE' } }
+                    }
+                }
+            }
+        });
+
+        if (!institute) {
+            throw new Error('المعهد غير موجود أو غير مصرح له');
+        }
+
+        const studentsCount = institute.courses.reduce((acc, course) => acc + course.enrollments.length, 0);
+
+        // Fetch user avatars for staff if applicable. 
+        // This is a bit complex in SQL because staff is a separate model without user relation directly in staff (it's often text).
+        // For simplicity, we just map what we have.
+        
+        return {
+            id: institute.id,
+            name: institute.name,
+            description: institute.description || '',
+            logo: institute.logo,
+            email: institute.email,
+            phone: institute.phone,
+            website: institute.website,
+            location: institute.address || 'غير محدد',
+            rating: 5.0, // Default rating for now
+            reviewCount: 0, // Mock for now
+            studentsCount,
+            coursesCount: institute._count.courses,
+            staffCount: institute._count.staff,
+            courses: institute.courses.map(c => ({
+                id: c.id,
+                title: c.title,
+                price: Number(c.price),
+                image: c.image,
+                category: c.category?.name || 'عام',
+                students: c.enrollments.length,
+                rating: 5.0 // Mock string
+            })),
+            trainers: institute.staff.map(s => ({
+                id: s.id,
+                name: s.name,
+                role: s.specialties[0] || 'مدرب',
+                avatar: null // Default null for now since avatar isn't in staff model
+            })),
+            features: [
+                "شهادات معتمدة محلياً ودولياً",
+                "مدربين خبراء من كبرى الشركات",
+                "معامل حاسوب مجهزة بأحدث التقنيات",
+                "دعم وظيفي بعد التخرج"
+            ],
+            coverImage: `https://placehold.co/1200x300/2563eb/ffffff?text=${encodeURIComponent(institute.name)}`
+        };
+    }
 }
 
 export default new InstituteService();

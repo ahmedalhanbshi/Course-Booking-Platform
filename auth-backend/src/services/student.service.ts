@@ -28,7 +28,8 @@ class StudentService {
                         shortDescription: true,
                         image: true,
                         category: { select: { name: true } },
-                        trainer: { select: { name: true } }
+                        trainer: { select: { name: true } },
+                        staffTrainer: { select: { name: true } }
                     }
                 }
             },
@@ -40,7 +41,7 @@ class StudentService {
             id: e.course.id,
             title: e.course.title,
             shortDescription: e.course.shortDescription || '',
-            trainer: e.course.trainer?.name || 'مدرب',
+            trainer: e.course.trainer?.name || e.course.staffTrainer?.name || 'مدرب',
             image: e.course.image,
             category: e.course.category?.name || 'عام',
         }));
@@ -149,6 +150,7 @@ class StudentService {
                         image: true,
                         category: { select: { name: true } },
                         trainer: { select: { id: true, name: true, avatar: true } },
+                        staffTrainer: { select: { id: true, name: true, institute: { select: { logo: true } } } },
                         startDate: true,
                         endDate: true,
                         price: true,
@@ -178,7 +180,11 @@ class StudentService {
                 title: e.course.title,
                 shortDescription: e.course.shortDescription || '',
                 description: e.course.description || '',
-                trainer: {
+                trainer: e.course.staffTrainer ? {
+                    id: e.course.staffTrainer.id,
+                    name: e.course.staffTrainer.name,
+                    avatar: e.course.staffTrainer.institute?.logo || null
+                } : {
                     id: e.course.trainer?.id || 'unknown',
                     name: e.course.trainer?.name || 'مدرب الخبير',
                     avatar: e.course.trainer?.avatar || null
@@ -387,12 +393,22 @@ class StudentService {
                                 phone: true
                             }
                         },
+                        staffTrainer: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                                phone: true,
+                                institute: { select: { logo: true } }
+                            }
+                        },
                         category: true,
                         sessions: {
                             orderBy: { startTime: 'asc' },
                             include: { room: true }
                         },
                         announcements: {
+                            where: { status: 'SENT' },
                             orderBy: { createdAt: 'desc' }
                         }
                     }
@@ -441,7 +457,14 @@ class StudentService {
                 type: nextSession.type,
                 meetingLink: nextSession.meetingLink
             } : null,
-            instructor: {
+            instructor: course.staffTrainer ? {
+                id: course.staffTrainer.id,
+                name: course.staffTrainer.name,
+                role: 'مدرب معهد',
+                avatar: course.staffTrainer.institute?.logo,
+                email: course.staffTrainer.email,
+                phone: course.staffTrainer.phone
+            } : {
                 id: course.trainer?.id,
                 name: course.trainer?.name || 'مدرب',
                 role: 'مدرب الدورة',
@@ -484,6 +507,7 @@ class StudentService {
                         price: true,
                         category: { select: { name: true } },
                         trainer: { select: { id: true, name: true, avatar: true } },
+                        staffTrainer: { select: { id: true, name: true } },
                         sessions: { select: { id: true, type: true } }
                     }
                 }
@@ -501,7 +525,7 @@ class StudentService {
                 price: Number(course.price),
                 category: course.category?.name || 'عام',
                 trainer: {
-                    name: course.trainer?.name || 'مدرب',
+                    name: course.trainer?.name || course.staffTrainer?.name || 'مدرب',
                 },
                 type: course.sessions[0]?.type === 'ONLINE' ? 'أونلاين' : (course.sessions.length > 0 ? 'حضوري' : 'أونلاين')
             };
@@ -613,7 +637,8 @@ class StudentService {
                 course: {
                     select: {
                         title: true,
-                        trainer: { select: { name: true } }
+                        trainer: { select: { name: true } },
+                        staffTrainer: { select: { name: true } }
                     }
                 }
             },
@@ -623,8 +648,8 @@ class StudentService {
         return sessions.map(s => ({
             id: s.id,
             topic: s.topic || 'جلسة تدريبية',
-            courseTitle: s.course.title,
-            trainerName: s.course.trainer?.name || 'مدرب',
+            courseTitle: s.course?.title || '',
+            trainerName: s.course?.trainer?.name || s.course?.staffTrainer?.name || 'مدرب',
             startTime: s.startTime,
             endTime: s.endTime,
             type: s.type.toLowerCase(),

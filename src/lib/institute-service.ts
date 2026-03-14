@@ -233,6 +233,16 @@ class InstituteService {
         );
         return response.data.data;
     }
+
+    async getPublicInstitutes(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/public/institutes');
+        return response.data.data;
+    }
+
+    async getPublicInstituteById(id: string): Promise<any> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/public/institutes/${id}`);
+        return response.data.data;
+    }
 }
 
 export const instituteService = new InstituteService();

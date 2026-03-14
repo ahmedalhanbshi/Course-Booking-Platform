@@ -6,12 +6,66 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, EyeOff, Lock, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Lock, CheckCircle, Loader2 } from "lucide-react"
+import { authService } from "@/lib/auth-service"
+import { toast } from "sonner"
 
 export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [step, setStep] = useState<'verify' | 'success'>('verify')
+  const [code, setCode] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!code || code.length < 4) {
+      toast.error("خطأ", {
+        description: "يرجى إدخال رمز التحقق بشكل صحيح"
+      })
+      return
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("خطأ", {
+        description: "كلمات المرور غير متطابقة"
+      })
+      return
+    }
+
+    if (password.length < 8) {
+      toast.error("خطأ", {
+        description: "يجب أن تكون كلمة المرور 8 أحرف على الأقل"
+      })
+      return
+    }
+
+    const hasUppercase = /[A-Z]/.test(password)
+    const hasLowercase = /[a-z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      toast.error("خطأ", {
+        description: "يجب أن تحتوي كلمة المرور على حرف كبير، حرف صغير، ورقم واحد على الأقل"
+      })
+      return
+    }
+
+    setLoading(true)
+    try {
+      await authService.resetPassword(code, password)
+      setStep('success')
+    } catch (error: any) {
+      toast.error("فشل إعادة التعيين", {
+        description: error.response?.data?.message || "الرمز غير صحيح أو منتهي الصلاحية"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (step === 'success') {
     return (
@@ -48,19 +102,22 @@ export default function ResetPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
-            <div className="space-y-2">
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2 text-right">
               <Label htmlFor="code">رمز التحقق</Label>
               <Input
                 id="code"
                 type="text"
-                placeholder="أدخل رمز التحقق المكون من 6 أرقام"
+                placeholder="أدخل رمز التحقق"
                 className="text-center text-lg tracking-widest"
-                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                dir="ltr"
+                required
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 text-right">
               <Label htmlFor="password">كلمة المرور الجديدة</Label>
               <div className="relative">
                 <Lock className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
@@ -69,6 +126,10 @@ export default function ResetPasswordPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="أدخل كلمة المرور الجديدة"
                   className="pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  dir="ltr"
+                  required
                 />
                 <Button
                   type="button"
@@ -86,7 +147,7 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 text-right">
               <Label htmlFor="confirmPassword">تأكيد كلمة المرور</Label>
               <div className="relative">
                 <Lock className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
@@ -95,6 +156,10 @@ export default function ResetPasswordPage() {
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="أعد إدخال كلمة المرور"
                   className="pr-10"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  dir="ltr"
+                  required
                 />
                 <Button
                   type="button"
@@ -115,9 +180,17 @@ export default function ResetPasswordPage() {
             <Button
               className="w-full"
               size="lg"
-              onClick={() => setStep('success')}
+              type="submit"
+              disabled={loading}
             >
-              إعادة تعيين كلمة المرور
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  جاري إعادة التعيين...
+                </>
+              ) : (
+                "إعادة تعيين كلمة المرور"
+              )}
             </Button>
           </form>
 

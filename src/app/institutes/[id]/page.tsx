@@ -9,64 +9,53 @@ import { MapPin, Users, BookOpen, Star, Building2, Globe, Mail, Phone, Calendar,
 import { Navbar } from "@/components/layout/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-// Mock data for a specific institute
-const instituteData = {
-    id: "1",
-    name: "معهد المستقبل للتقنية",
-    description: "معهد رائد في مجال التكنولوجيا والبرمجة، تأسس عام 2015 بهدف تمكين الشباب العربي من مهارات المستقبل. نقدم بيئة تعليمية متكاملة تجمع بين النظرية والتطبيق العملي.",
-    logo: "/logos/future-tech.png",
-    coverImage: "https://placehold.co/1200x300/2563eb/ffffff?text=Future+Tech+Institute",
-    location: "الرياض، حي العليا، طريق الملك فهد",
-    rating: 4.8,
-    reviewCount: 156,
-    studentsCount: 1200,
-    coursesCount: 25,
-    website: "www.future-tech.edu.sa",
-    email: "info@future-tech.edu.sa",
-    phone: "+966 11 123 4567",
-    features: [
-        "شهادات معتمدة محلياً ودولياً",
-        "مدربين خبراء من كبرى الشركات",
-        "معامل حاسوب مجهزة بأحدث التقنيات",
-        "دعم وظيفي بعد التخرج"
-    ],
-    trainers: [
-        { id: 1, name: "أحمد محمد", role: "كبير مدربي React", avatar: null },
-        { id: 2, name: "سارة علي", role: "خبيرة UI/UX", avatar: null },
-        { id: 3, name: "خالد عمر", role: "مهندس برمجيات", avatar: null },
-    ],
-    courses: [
-        {
-            id: "1",
-            title: "تعلم React من الصفر",
-            price: 500,
-            rating: 4.9,
-            students: 120,
-            image: "https://placehold.co/600x400/2563eb/ffffff?text=React",
-            category: "برمجة"
-        },
-        {
-            id: "2",
-            title: "تصميم واجهات المستخدم UI/UX",
-            price: 450,
-            rating: 4.7,
-            students: 85,
-            image: "https://placehold.co/600x400/16a34a/ffffff?text=UI/UX",
-            category: "تصميم"
-        },
-        {
-            id: "3",
-            title: "أساسيات بايثون وتحليل البيانات",
-            price: 600,
-            rating: 4.8,
-            students: 200,
-            image: "https://placehold.co/600x400/ca8a04/ffffff?text=Python",
-            category: "بيانات"
-        }
-    ]
-}
+import { useEffect, useState, use } from "react"
+import { instituteService } from "@/lib/institute-service"
+import { getFileUrl } from "@/lib/utils"
 
-export default function InstituteDetailsPage({ params }: { params: { id: string } }) {
+export default function InstituteDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params)
+    const [instituteData, setInstituteData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+        const fetchInstitute = async () => {
+            try {
+                const data = await instituteService.getPublicInstituteById(id)
+                setInstituteData(data)
+            } catch (err: any) {
+                console.error("Failed to fetch institute:", err)
+                setError("لم يتم العثور على المعهد")
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchInstitute()
+    }, [id])
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        )
+    }
+
+    if (error || !instituteData) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8 text-center" dir="rtl">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">عذراً</h2>
+                    <p className="text-gray-500 mb-6">{error || "هذا المعهد غير موجود"}</p>
+                    <Button asChild>
+                        <Link href="/institutes">العودة لقائمة المعاهد</Link>
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen bg-gray-50" dir="rtl">
             <Navbar />
@@ -75,7 +64,7 @@ export default function InstituteDetailsPage({ params }: { params: { id: string 
             <div className="relative h-64 md:h-80 bg-gray-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                    src={instituteData.coverImage}
+                    src={instituteData.logo ? getFileUrl(instituteData.logo) : instituteData.coverImage}
                     alt={instituteData.name}
                     className="w-full h-full object-cover opacity-60"
                 />
@@ -83,10 +72,18 @@ export default function InstituteDetailsPage({ params }: { params: { id: string 
 
                 <div className="absolute bottom-0 left-0 right-0 container mx-auto max-w-7xl px-4 pb-8">
                     <div className="flex flex-col md:flex-row items-end gap-6">
-                        <div className="h-24 w-24 md:h-32 md:w-32 rounded-2xl bg-white p-1 shadow-xl -mb-12 md:-mb-16 relative z-10">
-                            <div className="h-full w-full bg-gray-50 rounded-xl flex items-center justify-center text-primary">
-                                <Building2 className="h-12 w-12" />
-                            </div>
+                        <div className="h-24 w-24 md:h-32 md:w-32 rounded-2xl bg-white p-1 shadow-xl -mb-12 md:-mb-16 relative z-10 overflow-hidden flex items-center justify-center">
+                            {instituteData.logo ? (
+                                <img 
+                                    src={getFileUrl(instituteData.logo)} 
+                                    alt={`${instituteData.name} logo`} 
+                                    className="w-full h-full object-contain rounded-xl"
+                                />
+                            ) : (
+                                <div className="h-full w-full bg-gray-50 rounded-xl flex items-center justify-center text-primary">
+                                    <Building2 className="h-12 w-12" />
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex-1 text-white mb-2">
@@ -97,9 +94,8 @@ export default function InstituteDetailsPage({ params }: { params: { id: string 
                                     {instituteData.location}
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                                    <span className="font-bold text-white">{instituteData.rating}</span>
-                                    <span className="text-gray-400">({instituteData.reviewCount} تقييم)</span>
+                                    {/* Without rating in backend API for now. Hiding rating for consistency with institutes index page request */}
+                                    <span className="text-gray-400">({instituteData.coursesCount} دورة متاحة)</span>
                                 </div>
                             </div>
                         </div>
@@ -129,7 +125,7 @@ export default function InstituteDetailsPage({ params }: { params: { id: string 
                                 </p>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                                    {instituteData.features.map((feature, index) => (
+                                    {instituteData.features.map((feature: string, index: number) => (
                                         <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
                                             <CheckCircle2 className="h-5 w-5 text-green-500" />
                                             {feature}
@@ -148,12 +144,12 @@ export default function InstituteDetailsPage({ params }: { params: { id: string 
                             </TabsList>
 
                             <TabsContent value="courses" className="space-y-4">
-                                {instituteData.courses.map((course) => (
+                                {instituteData.courses.map((course: any) => (
                                     <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
                                         <div className="flex flex-col md:flex-row">
                                             <div className="w-full md:w-48 h-40 bg-gray-100 relative">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
+                                                <img src={course.image ? getFileUrl(course.image) : `https://placehold.co/600x400/2563eb/ffffff?text=${encodeURIComponent(course.title)}`} alt={course.title} className="w-full h-full object-cover" />
                                                 <Badge className="absolute top-2 right-2 bg-white/90 text-gray-800 hover:bg-white">{course.category}</Badge>
                                             </div>
                                             <div className="flex-1 p-5 flex flex-col justify-between">
@@ -190,7 +186,7 @@ export default function InstituteDetailsPage({ params }: { params: { id: string 
 
                             <TabsContent value="trainers">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {instituteData.trainers.map((trainer) => (
+                                    {instituteData.trainers.map((trainer: any) => (
                                         <Card key={trainer.id}>
                                             <CardContent className="p-4 flex items-center gap-4">
                                                 <Avatar className="h-14 w-14 border border-gray-100">

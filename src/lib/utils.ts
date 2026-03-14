@@ -7,6 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(date: Date | string | number, options?: Intl.DateTimeFormatOptions) {
   const d = new Date(date)
+  if (isNaN(d.getTime())) return 'تاريخ غير صالح'
+
   const formatter = new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
     day: 'numeric',
     month: 'long',

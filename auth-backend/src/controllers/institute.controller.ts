@@ -560,6 +560,25 @@ class InstituteController {
             return sendSuccess(res, 'تم تحديث الجلسة بنجاح', updated);
         } catch (error: any) { return sendError(res, error.message, 400); }
     }
+
+    async getPublicInstitutes(req: any, res: Response, _next: NextFunction) {
+        try {
+            const data = await instituteService.getPublicInstitutes();
+            return sendSuccess(res, 'تم جلب المعاهد بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getPublicInstituteById(req: any, res: Response, _next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = await instituteService.getPublicInstituteById(id);
+            return sendSuccess(res, 'تم جلب بيانات المعهد بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 404); // Using 404 for not found
+        }
+    }
 }
 
 export default new InstituteController();

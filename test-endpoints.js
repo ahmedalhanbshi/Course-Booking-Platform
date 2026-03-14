@@ -1,7 +1,7 @@
 const axios = require('axios');
 
-// Using 127.0.0.1 explicitly to avoid IPv6 issues
-const API_URL = 'http://127.0.0.1:5000/api/auth';
+// Using localhost to test resolution
+const API_URL = 'http://localhost:5000/api/auth';
 const TEST_USER = {
     name: 'Test Verify User',
     email: `verify-${Date.now()}@example.com`,

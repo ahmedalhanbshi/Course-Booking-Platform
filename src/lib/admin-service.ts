@@ -270,6 +270,16 @@ class AdminService {
         );
         return response.data.data;
     }
+
+    /**
+     * Get all system audit logs
+     */
+    async getAuditLogs(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>(
+            `/api/admin/audit-logs?t=${Date.now()}`
+        );
+        return response.data.data;
+    }
 }
 
 export const adminService = new AdminService();

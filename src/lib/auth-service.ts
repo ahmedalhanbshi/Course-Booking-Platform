@@ -133,10 +133,10 @@ class AuthService {
     /**
      * Reset password with token
      */
-    async resetPassword(token: string, password: string): Promise<{ message: string }> {
+    async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
         const response = await apiClient.post<{ message: string }>('/api/auth/reset-password', {
             token,
-            password,
+            newPassword,
         });
         return response.data;
     }

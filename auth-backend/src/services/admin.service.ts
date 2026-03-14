@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { hashPassword } from '../utils/password';
+import { AuditAction } from '@prisma/client';
 
 export class AdminService {
     /**
@@ -51,7 +52,7 @@ export class AdminService {
     /**
      * Approve trainer verification
      */
-    async approveTrainer(trainerId: string) {
+    async approveTrainer(trainerId: string, adminId: string) {
         const trainerProfile = await prisma.trainerProfile.findUnique({
             where: { id: trainerId },
             include: { user: true },
@@ -78,13 +79,24 @@ export class AdminService {
             },
         });
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.APPROVE,
+                entityName: 'TrainerProfile',
+                entityId: trainerId,
+                description: `Approve trainer: ${trainerProfile.user.name}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم قبول المدرب بنجاح' };
     }
 
     /**
      * Reject trainer verification
      */
-    async rejectTrainer(trainerId: string, reason: string) {
+    async rejectTrainer(trainerId: string, reason: string, adminId: string) {
         const trainerProfile = await prisma.trainerProfile.findUnique({
             where: { id: trainerId },
             include: { user: true },
@@ -106,13 +118,24 @@ export class AdminService {
         // Keep user status as PENDING_VERIFICATION (they can re-apply)
         // Or optionally suspend the account
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.REJECT,
+                entityName: 'TrainerProfile',
+                entityId: trainerId,
+                description: `Reject trainer: ${trainerProfile.user.name}. Reason: ${reason}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم رفض المدرب' };
     }
 
     /**
      * Approve institute verification
      */
-    async approveInstitute(instituteId: string) {
+    async approveInstitute(instituteId: string, adminId: string) {
         const institute = await prisma.institute.findUnique({
             where: { id: instituteId },
             include: { user: true },
@@ -139,13 +162,24 @@ export class AdminService {
             },
         });
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.APPROVE,
+                entityName: 'Institute',
+                entityId: instituteId,
+                description: `Approve institute: ${institute.name}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم قبول الجهة التدريبية بنجاح' };
     }
 
     /**
      * Reject institute verification
      */
-    async rejectInstitute(instituteId: string, reason: string) {
+    async rejectInstitute(instituteId: string, reason: string, adminId: string) {
         const institute = await prisma.institute.findUnique({
             where: { id: instituteId },
             include: { user: true },
@@ -166,6 +200,17 @@ export class AdminService {
 
         // Keep user status as PENDING_VERIFICATION (they can re-apply)
         // Or optionally suspend the account
+
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.REJECT,
+                entityName: 'Institute',
+                entityId: instituteId,
+                description: `Reject institute: ${institute.name}. Reason: ${reason}`,
+                performedBy: adminId,
+            },
+        });
 
         return { message: 'تم رفض الجهة التدريبية' };
     }
@@ -327,7 +372,7 @@ export class AdminService {
     /**
      * Suspend institute
      */
-    async suspendInstitute(instituteId: string, reason: string) {
+    async suspendInstitute(instituteId: string, reason: string, adminId: string) {
         const institute = await prisma.institute.findUnique({
             where: { id: instituteId },
             include: { user: true },
@@ -352,6 +397,17 @@ export class AdminService {
                 status: 'SUSPENDED',
             },
         });
+        
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'Institute',
+                entityId: instituteId,
+                description: `Suspend institute: ${institute.name}. Reason: ${reason}`,
+                performedBy: adminId,
+            },
+        });
 
         return { message: 'تم تعليق المعهد بنجاح' };
     }
@@ -359,7 +415,7 @@ export class AdminService {
     /**
      * Reactivate institute
      */
-    async reactivateInstitute(instituteId: string) {
+    async reactivateInstitute(instituteId: string, adminId: string) {
         const institute = await prisma.institute.findUnique({
             where: { id: instituteId },
             include: { user: true },
@@ -385,13 +441,24 @@ export class AdminService {
             },
         });
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'Institute',
+                entityId: instituteId,
+                description: `Reactivate institute: ${institute.name}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم إعادة تفعيل المعهد بنجاح' };
     }
 
     /**
      * Delete institute
      */
-    async deleteInstitute(instituteId: string) {
+    async deleteInstitute(instituteId: string, adminId: string) {
         const institute = await prisma.institute.findUnique({
             where: { id: instituteId },
         });
@@ -404,9 +471,19 @@ export class AdminService {
         // otherwise we might need to delete related data manually)
         // Ideally we should soft delete, but for now specific hard delete
 
-        // Also delete the user
         await prisma.user.delete({
             where: { id: institute.userId },
+        });
+
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.DELETE,
+                entityName: 'Institute',
+                entityId: instituteId,
+                description: `Delete institute: ${institute.name}`,
+                performedBy: adminId,
+            },
         });
 
         return { message: 'تم حذف المعهد بنجاح' };
@@ -415,7 +492,7 @@ export class AdminService {
     /**
      * Update institute
      */
-    async updateInstitute(instituteId: string, data: any) {
+    async updateInstitute(instituteId: string, data: any, adminId: string) {
         const institute = await prisma.institute.findUnique({
             where: { id: instituteId },
             include: { user: true }
@@ -487,6 +564,17 @@ export class AdminService {
                 data: { password: hashedPassword }
             });
         }
+        
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'Institute',
+                entityId: instituteId,
+                description: `Update institute: ${institute.name}`,
+                performedBy: adminId,
+            },
+        });
 
         return { message: 'تم تحديث بيانات المعهد بنجاح' };
     }
@@ -494,7 +582,7 @@ export class AdminService {
     /**
      * Update trainer
      */
-    async updateTrainer(trainerId: string, data: any) {
+    async updateTrainer(trainerId: string, data: any, adminId: string) {
         const trainer = await prisma.trainerProfile.findUnique({
             where: { id: trainerId },
             include: { user: true }
@@ -566,6 +654,17 @@ export class AdminService {
             });
         }
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'TrainerProfile',
+                entityId: trainerId,
+                description: `Update trainer: ${trainer.user.name}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم تحديث بيانات المدرب بنجاح' };
     }
 
@@ -602,7 +701,7 @@ export class AdminService {
     /**
      * Update student
      */
-    async updateStudent(studentId: string, data: any) {
+    async updateStudent(studentId: string, data: any, adminId: string) {
         const student = await prisma.user.findUnique({
             where: { id: studentId },
         });
@@ -643,30 +742,71 @@ export class AdminService {
             data: updateData,
         });
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'User',
+                entityId: studentId,
+                description: `Update student: ${student.name}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم تحديث بيانات الطالب بنجاح' };
     }
 
     /**
      * Suspend student
      */
-    async suspendStudent(studentId: string, reason: string) {
+    async suspendStudent(studentId: string, reason: string, adminId: string) {
+        const student = await prisma.user.findUnique({ where: { id: studentId } });
+        if (!student) throw new Error('الطالب غير موجود');
+
         // reason can be logged or stored if there's a suspension log table
         await prisma.user.update({
             where: { id: studentId },
             data: { status: 'SUSPENDED' },
         });
+
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'User',
+                entityId: studentId,
+                description: `Suspend student: ${student.name}. Reason: ${reason}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم تعليق حساب الطالب بنجاح' };
     }
 
     /**
      * Delete student
      */
-    async deleteStudent(studentId: string) {
+    async deleteStudent(studentId: string, adminId: string) {
+        const student = await prisma.user.findUnique({ where: { id: studentId } });
+        if (!student) throw new Error('الطالب غير موجود');
+
         // Check for related data (enrollments, etc.) before hard deleting
         // For now, we'll assume cascading delete or manual cleanup is handled by DB constraints or we just delete the user
         await prisma.user.delete({
             where: { id: studentId },
         });
+
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.DELETE,
+                entityName: 'User',
+                entityId: studentId,
+                description: `Delete student: ${student.name}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم حذف حساب الطالب بنجاح' };
     }
 
@@ -767,7 +907,7 @@ export class AdminService {
     /**
      * Update course
      */
-    async updateCourse(courseId: string, data: any) {
+    async updateCourse(courseId: string, data: any, adminId: string) {
         const statusMap: Record<string, string> = {
             draft: 'DRAFT',
             active: 'ACTIVE',
@@ -793,27 +933,68 @@ export class AdminService {
             data: updateData,
         });
 
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.UPDATE,
+                entityName: 'Course',
+                entityId: courseId,
+                description: `Update course: ${updateData.title || courseId}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم تحديث الدورة بنجاح' };
     }
 
     /**
      * Delete course
      */
-    async deleteCourse(courseId: string) {
+    async deleteCourse(courseId: string, adminId: string) {
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course) throw new Error('الدورة غير موجودة');
+
         await prisma.course.delete({
             where: { id: courseId },
         });
+
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.DELETE,
+                entityName: 'Course',
+                entityId: courseId,
+                description: `Delete course: ${course.title}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم حذف الدورة بنجاح' };
     }
 
     /**
      * Suspend (cancel) course
      */
-    async suspendCourse(courseId: string) {
+    async suspendCourse(courseId: string, adminId: string) {
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course) throw new Error('الدورة غير موجودة');
+
         await prisma.course.update({
             where: { id: courseId },
             data: { status: 'CANCELLED' },
         });
+
+        // Log action
+        await prisma.auditLog.create({
+            data: {
+                action: AuditAction.CANCEL,
+                entityName: 'Course',
+                entityId: courseId,
+                description: `Suspend course: ${course.title}`,
+                performedBy: adminId,
+            },
+        });
+
         return { message: 'تم تعليق الدورة بنجاح' };
     }
 
@@ -987,6 +1168,26 @@ export class AdminService {
         }
 
         return { message: 'تم إرسال الإعلان بنجاح', recipientCount: users.length };
+    }
+
+    /**
+     * Get all system audit logs
+     */
+    async getAuditLogs() {
+        return await prisma.auditLog.findMany({
+            include: {
+                performer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+            orderBy: {
+                performedAt: 'desc',
+            },
+        });
     }
 }
 

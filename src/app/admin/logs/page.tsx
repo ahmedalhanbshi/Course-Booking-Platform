@@ -1,90 +1,70 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Activity, DollarSign, Bell, Search, Filter, Download } from "lucide-react"
+import { Activity, DollarSign, Bell, Search, Filter, Download, Loader2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { AdminPageHeader } from "@/components/admin/page-header"
+import { adminService } from "@/lib/admin-service"
+import { toast } from "sonner"
 
-// Mock data
+// Audit log structure from backend
 interface Log {
   id: string
-  type: 'activity' | 'payment' | 'notification'
+  type: string
   action: string
   details: string
   user: string
-  ip?: string
+  createdAt: string | Date
+  status?: string
   amount?: number
-  status?: 'success' | 'failed' | 'pending'
-  createdAt: Date
+  ip?: string
 }
 
-const mockLogs: Log[] = [
-  {
-    id: "log1",
-    type: "activity",
-    action: "تسجيل دخول",
-    details: "تم تسجيل الدخول بنجاح",
-    user: "فاطمة علي",
-    ip: "192.168.1.1",
-    createdAt: new Date("2024-01-28T10:30:00")
-  },
-  {
-    id: "log2",
-    type: "payment",
-    action: "دفع رسوم دورة",
-    details: "دورة البرمجة الأساسية",
-    user: "علي أحمد",
-    amount: 50000,
-    status: "success",
-    createdAt: new Date("2024-01-28T09:15:00")
-  },
-  {
-    id: "log3",
-    type: "notification",
-    action: "إرسال إعلان",
-    details: "صيانة مجدولة للمنصة",
-    user: "أحمد المدير",
-    status: "success",
-    createdAt: new Date("2024-01-27T15:00:00")
-  },
-  {
-    id: "log4",
-    type: "payment",
-    action: "محاولة دفع فاشلة",
-    details: "رصيد غير كافي",
-    user: "سارة خالد",
-    amount: 80000,
-    status: "failed",
-    createdAt: new Date("2024-01-27T14:30:00")
-  },
-  {
-    id: "log5",
-    type: "activity",
-    action: "تحديث ملف شخصي",
-    details: "تغيير الصورة الشخصية",
-    user: "محمد أحمد",
-    ip: "192.168.1.5",
-    createdAt: new Date("2024-01-26T11:20:00")
-  }
-]
-
 export default function AdminLogs() {
-  const [logs, setLogs] = useState<Log[]>(mockLogs)
+  const [logs, setLogs] = useState<Log[]>([])
+  const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
 
-  const filteredLogs = logs.filter(log => {
+  useEffect(() => {
+    fetchLogs()
+  }, [])
+
+  const fetchLogs = async () => {
+    setLoading(true)
+    try {
+      const data = await adminService.getAuditLogs()
+      // Map backend AuditLog to frontend Log structure
+      const mappedLogs: Log[] = data.map((item: any) => ({
+        id: item.id,
+        type: 'activity', // Default to activity as backend AuditLog is generic
+        action: item.action,
+        details: item.description || '',
+        user: item.performer?.name || 'النظام',
+        createdAt: item.performedAt,
+        status: 'success'
+      }))
+      setLogs(mappedLogs)
+    } catch (error) {
+      console.error("Error fetching logs:", error)
+      toast.error("فشل تحميل السجلات")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredLogs = logs.filter((log: Log) => {
     const matchesType = typeFilter === "all" || log.type === typeFilter
     const matchesSearch =
       log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchQuery.toLowerCase())
+      (log.details && log.details.toLowerCase().includes(searchQuery.toLowerCase()))
     return matchesType && matchesSearch
   })
 
@@ -142,7 +122,7 @@ export default function AdminLogs() {
               <Input
                 placeholder="البحث في السجلات..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pr-9"
               />
             </div>
