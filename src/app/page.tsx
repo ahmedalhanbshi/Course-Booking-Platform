@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -14,77 +14,22 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { UserRole } from "@/types"
 import { Footer } from "@/components/layout/footer"
+import { PublicService, PlatformStats, CategoryData, FeaturedCourse } from "@/lib/public-service"
+import { getFileUrl } from "@/lib/utils"
 
 // --- Real Data with Unsplash Images ---
 
-const stats = [
-    { label: "طالب نشط", value: "+10k" },
-    { label: "دورة تدريبية", value: "+1,250" },
-    { label: "مدرب خبير", value: "+500" },
-    { label: "معهد معتمد", value: "+50" },
-]
-
-const categories = [
-    { id: 1, name: "البرمجة والتطوير", icon: Code, color: "text-blue-600 bg-blue-50" },
-    { id: 2, name: "التصميم والإبداع", icon: Palette, color: "text-pink-600 bg-pink-50" },
-    { id: 3, name: "إدارة الأعمال", icon: Banknote, color: "text-emerald-600 bg-emerald-50" },
-    { id: 4, name: "التسويق الرقمي", icon: Globe, color: "text-orange-600 bg-orange-50" },
-    { id: 5, name: "علوم البيانات", icon: Layers, color: "text-purple-600 bg-purple-50" },
-    { id: 6, name: "اللغات", icon: BookOpen, color: "text-cyan-600 bg-cyan-50" },
-    { id: 7, name: "التكنولوجيا", icon: Laptop, color: "text-indigo-600 bg-indigo-50" },
-    { id: 8, name: "الأمن السيبراني", icon: ShieldCheck, color: "text-red-600 bg-red-50" },
-]
-
-const featuredCourses = [
-  {
-    id: "1",
-    title: "دبلوم تطوير الويب المتكامل Full Stack 2024",
-    instructor: { name: "أحمد محمد", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&q=80" }, // Real Person
-    rating: 4.8,
-    reviewCount: 3420,
-    price: 2990,
-    originalPrice: 5990,
-    tag: "دبلوم معتمد",
-    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80", // Coding screen
-    category: "برمجة",
-  },
-  {
-    id: "2",
-    title: "احتراف تصميم تجربة المستخدم UI/UX من الصفر",
-    instructor: { name: "سارة علي", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&q=80" }, // Real Person
-    rating: 4.9,
-    reviewCount: 1850,
-    price: 3990,
-    originalPrice: 4990,
-    tag: "الأكثر مبيعاً",
-    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80", // Design/Art
-    category: "تصميم",
-  },
-  {
-    id: "3",
-    title: "الماجستير المصغر في إدارة الأعمال MBA",
-    instructor: { name: "د. محمد حسن", avatar: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop&q=80" }, // Real Person Business
-    rating: 4.7,
-    reviewCount: 520,
-    price: 4990,
-    originalPrice: 8990,
-    tag: "مباشر",
-    image: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80", // Meeting/Business
-    category: "إدارة الأعمال",
-  },
-   {
-    id: "4",
-    title: "أساسيات الأمن السيبراني والهاكر الأخلاقي",
-    instructor: { name: "م. فهد الغامدي", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop&q=80" }, // Real Person
-    rating: 4.9,
-    reviewCount: 2100,
-    price: 1990,
-    originalPrice: 2990,
-    tag: "جديد",
-    image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80", // Cyber/Tech
-    category: "تقنية",
-  }
-]
+const categoryStyleMap: Record<string, { icon: any, color: string }> = {
+  'programming': { icon: Code, color: "text-blue-600 bg-blue-50" },
+  'design': { icon: Palette, color: "text-pink-600 bg-pink-50" },
+  'business': { icon: Banknote, color: "text-emerald-600 bg-emerald-50" },
+  'marketing': { icon: Globe, color: "text-orange-600 bg-orange-50" },
+  'data-science': { icon: Layers, color: "text-purple-600 bg-purple-50" },
+  'languages': { icon: BookOpen, color: "text-cyan-600 bg-cyan-50" },
+  'technology': { icon: Laptop, color: "text-indigo-600 bg-indigo-50" },
+  'cybersecurity': { icon: ShieldCheck, color: "text-red-600 bg-red-50" },
+  'default': { icon: Sparkles, color: "text-slate-600 bg-slate-50" }
+}
 
 const testimonials = [
     {
@@ -105,8 +50,39 @@ const testimonials = [
 
 export default function HomePage() {
   const { user } = useAuth()
-  const currentView: UserRole = user?.role || 'student'
+  const currentView: UserRole = user?.role || 'STUDENT' as UserRole
   const [activeTab, setActiveTab] = useState("bestselling")
+  const [statsData, setStatsData] = useState<PlatformStats | null>(null)
+  const [categoriesData, setCategoriesData] = useState<CategoryData[]>([])
+  const [coursesData, setCoursesData] = useState<FeaturedCourse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [stats, cats, courses] = await Promise.all([
+          PublicService.getStats(),
+          PublicService.getCategories(),
+          PublicService.getFeaturedCourses()
+        ])
+        setStatsData(stats)
+        setCategoriesData(cats)
+        setCoursesData(courses)
+      } catch (err) {
+        console.error("Failed to load homepage data", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchInitialData()
+  }, [])
+
+  const statsList = [
+      { label: "طالب نشط", value: statsData ? `+${statsData.students}` : '...' },
+      { label: "دورة تدريبية", value: statsData ? `+${statsData.courses}` : '...' },
+      { label: "مدرب خبير", value: statsData ? `+${statsData.trainers}` : '...' },
+      { label: "معهد معتمد", value: statsData ? `+${statsData.institutes}` : '...' },
+  ]
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden" dir="rtl">
@@ -162,6 +138,7 @@ export default function HomePage() {
                                 src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1000&auto=format&fit=crop" 
                                 alt="Student learning"
                                 fill
+                                sizes="(max-width: 768px) 100vw, 50vw"
                                 className="object-cover"
                                 priority
                              />
@@ -188,7 +165,7 @@ export default function HomePage() {
       {/* Floating Stats Bar */}
       <section className="container px-4 mx-auto -mt-10 relative z-20">
           <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 p-10 flex flex-wrap justify-around items-center gap-8 text-center">
-                {stats.map((stat, i) => (
+                {statsList.map((stat, i) => (
                     <div key={i} className="flex-1 min-w-[150px]">
                             <h3 className="text-4xl font-extrabold text-blue-600 mb-2">{stat.value}</h3>
                             <p className="text-slate-500 font-bold">{stat.label}</p>
@@ -206,14 +183,20 @@ export default function HomePage() {
                </div>
                
                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                   {categories.map((cat) => (
+                   {isLoading ? (
+                       <div className="col-span-full text-center text-slate-500 py-8">جاري التحميل...</div>
+                   ) : categoriesData.map((cat) => {
+                       const style = categoryStyleMap[cat.slug] || categoryStyleMap['default'];
+                       const Icon = style.icon;
+                       return (
                        <Link href={`/courses?category=${cat.id}`} key={cat.id} className="group bg-white p-8 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-2 transition-all duration-300 border border-slate-100 flex flex-col items-center text-center gap-5">
-                           <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${cat.color} group-hover:scale-110 transition-transform duration-300`}>
-                               <cat.icon className="w-9 h-9" />
+                           <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${style.color} group-hover:scale-110 transition-transform duration-300`}>
+                               <Icon className="w-9 h-9" />
                            </div>
                            <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{cat.name}</h3>
+                           <p className="text-sm text-slate-500">{cat._count?.courses || 0} دورات</p>
                        </Link>
-                   ))}
+                   )})}
                </div>
            </div>
       </section>
@@ -231,35 +214,55 @@ export default function HomePage() {
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {featuredCourses.map((course) => (
-                        <div key={course.id} className="group bg-white border border-slate-100 rounded-[2rem] overflow-hidden hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-2 transition-all duration-300">
+                    {isLoading ? (
+                        <div className="col-span-full text-center text-slate-500 py-8">جاري التحميل...</div>
+                    ) : coursesData.map((course) => {
+                        // Strict database image rendering with a simple local fallback
+                        const fallBackImage = '/images/course-abstract.svg';
+                        const courseImage = course.image ? getFileUrl(course.image) || fallBackImage : fallBackImage;
+                        const instructorName = course.trainer?.name || course.staffTrainer?.name || course.institute?.name || 'غير محدد';
+                        
+                        let instructorAvatar = '/images/avatar-1.png'; // local fallback
+                        if (course.trainer?.avatar) {
+                           instructorAvatar = getFileUrl(course.trainer.avatar) || instructorAvatar;
+                        } else if (course.institute?.logo) {
+                           instructorAvatar = getFileUrl(course.institute.logo) || instructorAvatar;
+                        }
+
+                        return (
+                        <Link href={`/courses/${course.id}`} key={course.id} className="block group bg-white border border-slate-100 rounded-[2rem] overflow-hidden hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-2 transition-all duration-300">
                              <div className="relative h-56 w-full">
                                  <Image 
-                                    src={course.image} 
+                                    src={courseImage} 
                                     alt={course.title} 
                                     fill 
+                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                                     className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                                    unoptimized={courseImage.includes('localhost:5000')}
                                  />
                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                 <Badge className="absolute top-4 right-4 bg-white/90 text-slate-900 hover:bg-white font-bold backdrop-blur-sm border-none shadow-lg">
-                                     {course.tag}
-                                 </Badge>
                              </div>
                              
                              <div className="p-6">
                                  <div className="flex items-center justify-between mb-4">
-                                     <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{course.category}</span>
-                                     {/* Rating removed as requested */}
+                                     <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{course.category?.name || 'غير مصنف'}</span>
                                  </div>
                                  
                                  <h3 className="font-bold text-xl text-slate-900 mb-3 leading-snug line-clamp-2 min-h-[3.5rem] group-hover:text-blue-600 transition-colors">{course.title}</h3>
                                  
                                  <div className="flex items-center gap-3 mb-6">
                                      <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100">
-                                          <Image src={course.instructor.avatar} alt={course.instructor.name} fill className="object-cover" />
+                                          <Image 
+                                              src={instructorAvatar} 
+                                              alt={instructorName} 
+                                              fill 
+                                              sizes="40px"
+                                              className="object-cover" 
+                                              unoptimized={instructorAvatar.includes('localhost:5000')}
+                                          />
                                      </div>
                                      <div className="flex-1">
-                                         <p className="text-sm font-bold text-slate-700">{course.instructor.name}</p>
+                                         <p className="text-sm font-bold text-slate-700">{instructorName}</p>
                                      </div>
                                  </div>
                                  
@@ -268,13 +271,13 @@ export default function HomePage() {
                                           <span className="text-2xl font-bold text-slate-900">{course.price}</span>
                                           <span className="text-sm font-medium text-slate-400 mr-1">ر.ي</span>
                                      </div>
-                                     <Button size="icon" className="rounded-full bg-slate-900 text-white hover:bg-blue-600 transition-colors shadow-lg shadow-slate-900/20">
+                                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white hover:bg-blue-600 transition-colors shadow-lg shadow-slate-900/20">
                                          <ArrowLeft className="w-5 h-5" />
-                                     </Button>
+                                     </div>
                                  </div>
                              </div>
-                        </div>
-                    ))}
+                        </Link>
+                    )})}
                </div>
           </div>
       </section>
