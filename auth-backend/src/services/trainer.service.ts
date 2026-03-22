@@ -1,6 +1,9 @@
 import { EnrollmentStatus } from '@prisma/client';
 import prisma from '../config/database';
 import { hashPassword, comparePassword } from '../utils/password';
+import notificationService from './notification.service';
+import { mailerService } from './mailer.service';
+import { whatsAppService } from './whatsapp.service';
 
 class TrainerService {
     /**
@@ -796,7 +799,7 @@ class TrainerService {
         const totalHours = sessions.length;
         const totalAmount = Number(room.pricePerHour) * totalHours;
 
-        return prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             // 1. Create Room Booking
             const roomBooking = await tx.roomBooking.create({
                 data: {
@@ -849,6 +852,29 @@ class TrainerService {
                 sessions: createdSessions
             };
         });
+
+        // ── Notify Institute of new booking request ──
+        const institute = await prisma.institute.findUnique({
+            where: { id: room.instituteId },
+            include: { user: { select: { id: true, name: true, email: true, phone: true } } }
+        });
+        const trainer = await prisma.user.findUnique({ where: { id: trainerId }, select: { name: true } });
+
+        if (institute && trainer && result.roomBooking) {
+            await notificationService.createNotification({
+                userId: institute.user.id,
+                type: 'NEW_BOOKING_REQUEST',
+                title: 'طلب حجز قاعة جديد',
+                message: `طلب المدرب ${trainer.name} حجز قاعة "${room.name}"`,
+                relatedEntityId: result.roomBooking.id,
+                actionUrl: '/institute/bookings',
+                emailFn: institute.user.email ? () => mailerService.sendNewBookingRequest(institute.user.email!, institute.user.name, trainer.name, room.name) : undefined,
+                whaFn: institute.user.phone ? () => whatsAppService.notifyNewBookingRequest(institute.user.phone!, institute.user.name, trainer.name, room.name) : undefined
+            });
+        }
+
+        return result;
+
     }
 
     /**
@@ -972,6 +998,25 @@ class TrainerService {
                         roomBookingId: roomBooking.id,
                         roomId: room.id
                     }))
+                });
+            }
+
+            // ── Notify Institute of new booking request ──
+            const institute = await prisma.institute.findUnique({
+                where: { id: room.instituteId },
+                include: { user: { select: { id: true, name: true, email: true, phone: true } } }
+            });
+
+            if (institute && trainer && roomBooking) {
+                await notificationService.createNotification({
+                    userId: institute.user.id,
+                    type: 'NEW_BOOKING_REQUEST',
+                    title: 'طلب حجز قاعة جديد',
+                    message: `طلب المدرب ${trainer.name} حجز قاعة "${room.name}" لدورة "${course.title}"`,
+                    relatedEntityId: roomBooking.id,
+                    actionUrl: '/institute/bookings',
+                    emailFn: institute.user.email ? () => mailerService.sendNewBookingRequest(institute.user.email!, institute.user.name, trainer.name, room.name) : undefined,
+                    whaFn: institute.user.phone ? () => whatsAppService.notifyNewBookingRequest(institute.user.phone!, institute.user.name, trainer.name, room.name) : undefined
                 });
             }
         }
@@ -1320,6 +1365,77 @@ class TrainerService {
                     }
                 });
             }
+        }
+
+        // ── Notify student about the enrollment status change ──────────────
+        const student = await prisma.user.findUnique({ where: { id: enrollment.studentId }, select: { name: true, email: true, phone: true } });
+        const courseTitle = enrollment.course.title;
+
+        if (student) {
+            if (targetStatus === 'PENDING_PAYMENT') {
+                // Preliminary acceptance
+                await notificationService.createNotification({
+                    userId: enrollment.studentId,
+                    type: 'ENROLLMENT_PRELIMINARY_ACCEPTED',
+                    title: 'تم قبولك مبدئياً',
+                    message: `تم قبول طلبك مبدئياً في دورة "${courseTitle}". يرجى إكمال عملية الدفع.`,
+                    relatedEntityId: enrollmentId,
+                    actionUrl: '/student/my-courses',
+                    emailFn: student.email ? () => mailerService.sendEnrollmentPreliminaryAccepted(student.email!, student.name, courseTitle) : undefined,
+                    whaFn: student.phone ? () => whatsAppService.notifyEnrollmentPreliminaryAccepted(student.phone!, student.name, courseTitle) : undefined,
+                });
+            } else if (targetStatus === 'ACTIVE') {
+                // Final acceptance (free course direct)
+                await notificationService.createNotification({
+                    userId: enrollment.studentId,
+                    type: 'ENROLLMENT_FINAL_ACCEPTED',
+                    title: 'تم قبولك نهائياً',
+                    message: `تهانينا! تم تأكيد تسجيلك في دورة "${courseTitle}".`,
+                    relatedEntityId: enrollmentId,
+                    actionUrl: '/student/my-courses',
+                    emailFn: student.email ? () => mailerService.sendEnrollmentFinalAccepted(student.email!, student.name, courseTitle) : undefined,
+                    whaFn: student.phone ? () => whatsAppService.notifyEnrollmentFinalAccepted(student.phone!, student.name, courseTitle) : undefined,
+                });
+                // Also notify payment approval if there was a payment
+                if (enrollment.payments.length > 0) {
+                    await notificationService.createNotification({
+                        userId: enrollment.studentId,
+                        type: 'PAYMENT_APPROVED',
+                        title: 'تم قبول دفعتك',
+                        message: `تم التحقق من دفعتك لدورة "${courseTitle}" والموافقة عليها.`,
+                        relatedEntityId: enrollmentId,
+                        actionUrl: '/student/my-courses',
+                        emailFn: student.email ? () => mailerService.sendPaymentApproved(student.email!, student.name, courseTitle) : undefined,
+                        whaFn: student.phone ? () => whatsAppService.notifyPaymentApproved(student.phone!, student.name, courseTitle) : undefined,
+                    });
+                }
+            } else if (targetStatus === 'CANCELLED') {
+                // Enrollment rejected/cancelled
+                await notificationService.createNotification({
+                    userId: enrollment.studentId,
+                    type: 'ENROLLMENT_REJECTED',
+                    title: 'تم رفض تسجيلك',
+                    message: `نأسف، تم رفض تسجيلك في دورة "${courseTitle}".${reason ? ` السبب: ${reason}` : ''}`,
+                    relatedEntityId: enrollmentId,
+                    actionUrl: '/student/my-courses',
+                    emailFn: student.email ? () => mailerService.sendEnrollmentRejected(student.email!, student.name, courseTitle, reason) : undefined,
+                    whaFn: student.phone ? () => whatsAppService.notifyEnrollmentRejected(student.phone!, student.name, courseTitle, reason) : undefined,
+                });
+            }
+        }
+
+        // Handle payment rejection notification
+        if ((status as string) === 'REJECT_PAYMENT' && student) {
+            await notificationService.createNotification({
+                userId: enrollment.studentId,
+                type: 'PAYMENT_REJECTED',
+                title: 'تم رفض إيصال الدفع',
+                message: `تم رفض سند الدفع لدورة "${courseTitle}".${reason ? ` السبب: ${reason}` : ''} يرجى إعادة الرفع.`,
+                relatedEntityId: enrollmentId,
+                actionUrl: '/student/my-courses',
+                emailFn: student.email ? () => mailerService.sendPaymentRejected(student.email!, student.name, courseTitle, reason) : undefined,
+                whaFn: student.phone ? () => whatsAppService.notifyPaymentRejected(student.phone!, student.name, courseTitle, reason) : undefined,
+            });
         }
 
         return updatedEnrollment;

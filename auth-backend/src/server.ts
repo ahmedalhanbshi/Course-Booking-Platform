@@ -13,6 +13,7 @@ import { generalLimiter } from './middleware/rateLimiter';
 import prisma from './config/database';
 import redis from './config/redis';
 import { startSessionScheduler } from './utils/sessionScheduler';
+import { startSessionReminderJob } from './jobs/session-reminder.job';
 
 const app: Application = express();
 
@@ -98,6 +99,7 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 Environment: ${config.nodeEnv}`);
     startSessionScheduler();
+    startSessionReminderJob();
 });
 
 export default app;

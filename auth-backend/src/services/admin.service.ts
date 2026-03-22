@@ -1,6 +1,10 @@
 import prisma from '../config/database';
 import { hashPassword } from '../utils/password';
 import { AuditAction } from '@prisma/client';
+import notificationService from './notification.service';
+import { mailerService } from './mailer.service';
+import { whatsAppService } from './whatsapp.service';
+
 
 export class AdminService {
     /**
@@ -90,6 +94,17 @@ export class AdminService {
             },
         });
 
+        // Notify trainer
+        await notificationService.createNotification({
+            userId: trainerProfile.userId,
+            type: 'ACCOUNT_APPROVED',
+            title: 'تم قبول حسابك كمدرب',
+            message: 'تهانينا! تمت مراجعة ملفك الشخصي والموافقة عليه. يمكنك الآن البدء في إنشاء دوراتك.',
+            actionUrl: '/trainer/dashboard',
+            emailFn: trainerProfile.user.email ? () => mailerService.sendAccountApproved(trainerProfile.user.email, trainerProfile.user.name, 'مدرب') : undefined,
+            whaFn: trainerProfile.user.phone ? () => whatsAppService.notifyAccountApproved(trainerProfile.user.phone!, trainerProfile.user.name, 'مدرب') : undefined,
+        });
+
         return { message: 'تم قبول المدرب بنجاح' };
     }
 
@@ -127,6 +142,17 @@ export class AdminService {
                 description: `Reject trainer: ${trainerProfile.user.name}. Reason: ${reason}`,
                 performedBy: adminId,
             },
+        });
+
+        // Notify trainer
+        await notificationService.createNotification({
+            userId: trainerProfile.userId,
+            type: 'ACCOUNT_REJECTED',
+            title: 'تم رفض طلبك كمدرب',
+            message: `نأسف لرفض طلبك. السبب: ${reason}`,
+            actionUrl: '/trainer/profile',
+            emailFn: trainerProfile.user.email ? () => mailerService.sendAccountRejected(trainerProfile.user.email, trainerProfile.user.name, 'مدرب', reason) : undefined,
+            whaFn: trainerProfile.user.phone ? () => whatsAppService.notifyAccountRejected(trainerProfile.user.phone!, trainerProfile.user.name, 'مدرب', reason) : undefined,
         });
 
         return { message: 'تم رفض المدرب' };
@@ -173,6 +199,17 @@ export class AdminService {
             },
         });
 
+        // Notify institute
+        await notificationService.createNotification({
+            userId: institute.userId,
+            type: 'ACCOUNT_APPROVED',
+            title: 'تم قبول المعهد',
+            message: `تهانينا! تمت مراجعة معهد "${institute.name}" والموافقة عليه. يمكنكم الآن البدء في إنشاء الدورات.`,
+            actionUrl: '/institute/dashboard',
+            emailFn: institute.user.email ? () => mailerService.sendAccountApproved(institute.user.email, institute.user.name, 'مسؤول معهد') : undefined,
+            whaFn: institute.user.phone ? () => whatsAppService.notifyAccountApproved(institute.user.phone!, institute.user.name, 'مسؤول معهد') : undefined,
+        });
+
         return { message: 'تم قبول الجهة التدريبية بنجاح' };
     }
 
@@ -210,6 +247,17 @@ export class AdminService {
                 description: `Reject institute: ${institute.name}. Reason: ${reason}`,
                 performedBy: adminId,
             },
+        });
+
+        // Notify institute
+        await notificationService.createNotification({
+            userId: institute.userId,
+            type: 'ACCOUNT_REJECTED',
+            title: 'تم رفض طلب المعهد',
+            message: `نأسف لرفض طلب معهد "${institute.name}". السبب: ${reason}`,
+            actionUrl: '/institute/profile',
+            emailFn: institute.user.email ? () => mailerService.sendAccountRejected(institute.user.email, institute.user.name, 'مسؤول معهد', reason) : undefined,
+            whaFn: institute.user.phone ? () => whatsAppService.notifyAccountRejected(institute.user.phone!, institute.user.name, 'مسؤول معهد', reason) : undefined,
         });
 
         return { message: 'تم رفض الجهة التدريبية' };

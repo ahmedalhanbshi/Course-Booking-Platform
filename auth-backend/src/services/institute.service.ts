@@ -1,5 +1,9 @@
 import { EnrollmentStatus } from "@prisma/client";
 import prisma from "../config/database";
+import notificationService from "../services/notification.service";
+import { mailerService } from "../services/mailer.service";
+import { whatsAppService } from "../services/whatsapp.service";
+
 
 class InstituteService {
     /**
@@ -1013,7 +1017,7 @@ class InstituteService {
             data: updateData,
             include: {
                 room: { select: { id: true, name: true } },
-                requestedBy: { select: { id: true, name: true } },
+                requestedBy: { select: { id: true, name: true, email: true, phone: true } },
                 payments: true
             },
         });
@@ -1064,7 +1068,38 @@ class InstituteService {
             }
         }
 
+        // ── Notify the Requester (Trainer) ──
+        if (updatedBooking.requestedBy) {
+            const requester = updatedBooking.requestedBy;
+            const roomName = updatedBooking.room.name;
+
+            if (data.status === "APPROVED") {
+                await notificationService.createNotification({
+                    userId: requester.id,
+                    type: 'BOOKING_STATUS_CHANGE',
+                    title: 'تم قبول حجز القاعة',
+                    message: `تمت الموافقة على حجزك لقاعة "${roomName}"`,
+                    relatedEntityId: bookingId,
+                    actionUrl: '/trainer/halls', // usually bookings but halls has the list maybe
+                    emailFn: requester.email ? () => mailerService.sendBookingApproved(requester.email!, requester.name, roomName) : undefined,
+                    whaFn: requester.phone ? () => whatsAppService.notifyBookingApproved(requester.phone!, requester.name, roomName) : undefined,
+                });
+            } else if (data.status === "REJECTED") {
+                await notificationService.createNotification({
+                    userId: requester.id,
+                    type: 'BOOKING_REJECTED',
+                    title: 'تم رفض حجز القاعة',
+                    message: `تم رفض حجزك لقاعة "${roomName}".${data.notes ? ` السبب: ${data.notes}` : ''}`,
+                    relatedEntityId: bookingId,
+                    actionUrl: '/trainer/halls',
+                    emailFn: requester.email ? () => mailerService.sendBookingRejected(requester.email!, requester.name, roomName, data.notes) : undefined,
+                    whaFn: requester.phone ? () => whatsAppService.notifyBookingRejected(requester.phone!, requester.name, roomName, data.notes) : undefined,
+                });
+            }
+        }
+
         return updatedBooking;
+
     }
 
     // =====================================================

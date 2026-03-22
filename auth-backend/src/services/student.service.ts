@@ -1,4 +1,7 @@
 import prisma from '../config/database';
+import notificationService from './notification.service';
+import { mailerService } from './mailer.service';
+import { whatsAppService } from './whatsapp.service';
 
 class StudentService {
     /**
@@ -312,15 +315,36 @@ class StudentService {
             }
         });
 
-        // Trigger notification for the trainer (simplified here, you might have a notification service)
+        // Notify trainer/institute with full title and message
         if (course.trainerId) {
-            await prisma.notification.create({
-                data: {
-                    userId: course.trainerId,
+            const trainer = await prisma.user.findUnique({ where: { id: course.trainerId }, select: { name: true, email: true, phone: true } });
+            await notificationService.createNotification({
+                userId: course.trainerId,
+                type: 'COURSE_ENROLLMENT',
+                title: 'طلب تسجيل جديد',
+                message: `طلب الطالب ${user.name} التسجيل في دورتك "${course.title}"`,
+                relatedEntityId: enrollment.id,
+                actionUrl: '/trainer/students',
+                emailFn: trainer?.email ? () => mailerService.sendNewEnrollmentRequest(trainer.email!, trainer!.name, user.name, course.title) : undefined,
+                whaFn: trainer?.phone ? () => whatsAppService.notifyNewEnrollmentRequest(trainer.phone!, trainer!.name, user.name, course.title) : undefined,
+            });
+        }
+
+        // If course belongs to an institute (trainerId is null), notify the institute admin
+        if (!course.trainerId && course.instituteId) {
+            const institute = await prisma.institute.findUnique({ where: { id: course.instituteId }, include: { user: { select: { id: true, name: true, email: true, phone: true } } } });
+            if (institute) {
+                await notificationService.createNotification({
+                    userId: institute.userId,
                     type: 'COURSE_ENROLLMENT',
+                    title: 'طلب تسجيل جديد',
+                    message: `طلب الطالب ${user.name} التسجيل في دورة "${course.title}"`,
                     relatedEntityId: enrollment.id,
-                }
-            })
+                    actionUrl: '/institute/students',
+                    emailFn: institute.user.email ? () => mailerService.sendNewEnrollmentRequest(institute.user.email, institute.user.name, user.name, course.title) : undefined,
+                    whaFn: institute.user.phone ? () => whatsAppService.notifyNewEnrollmentRequest(institute.user.phone!, institute.user.name, user.name, course.title) : undefined,
+                });
+            }
         }
 
         return {
@@ -363,6 +387,42 @@ class StudentService {
                 enrollmentId: enrollment.id
             }
         });
+
+        // Notify trainer/institute about the new payment receipt
+        const trainerOrInstituteId = enrollment.course.trainerId;
+        const instituteId = (enrollment.course as any).instituteId;
+
+        if (trainerOrInstituteId) {
+            const trainer = await prisma.user.findUnique({ where: { id: trainerOrInstituteId }, select: { name: true, email: true, phone: true } });
+            const studentUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+            if (trainer && studentUser) {
+                await notificationService.createNotification({
+                    userId: trainerOrInstituteId,
+                    type: 'PAYMENT_RECEIPT_SUBMITTED',
+                    title: 'إيصال دفع جديد',
+                    message: `أرفق الطالب ${studentUser.name} إيصال دفع لدورة "${enrollment.course.title}"`,
+                    relatedEntityId: enrollment.id,
+                    actionUrl: '/trainer/students',
+                    emailFn: trainer.email ? () => mailerService.sendPaymentReceiptSubmitted(trainer.email!, trainer!.name, studentUser.name, enrollment.course.title) : undefined,
+                    whaFn: trainer.phone ? () => whatsAppService.notifyPaymentReceiptSubmitted(trainer.phone!, trainer!.name, studentUser.name, enrollment.course.title) : undefined,
+                });
+            }
+        } else if (instituteId) {
+            const institute = await prisma.institute.findUnique({ where: { id: instituteId }, include: { user: { select: { id: true, name: true, email: true, phone: true } } } });
+            const studentUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+            if (institute && studentUser) {
+                await notificationService.createNotification({
+                    userId: institute.userId,
+                    type: 'PAYMENT_RECEIPT_SUBMITTED',
+                    title: 'إيصال دفع جديد',
+                    message: `أرفق الطالب ${studentUser.name} إيصال دفع لدورة "${enrollment.course.title}"`,
+                    relatedEntityId: enrollment.id,
+                    actionUrl: '/institute/students',
+                    emailFn: institute.user.email ? () => mailerService.sendPaymentReceiptSubmitted(institute.user.email, institute.user.name, studentUser.name, enrollment.course.title) : undefined,
+                    whaFn: institute.user.phone ? () => whatsAppService.notifyPaymentReceiptSubmitted(institute.user.phone!, institute.user.name, studentUser.name, enrollment.course.title) : undefined,
+                });
+            }
+        }
 
         return {
             status: 'PAYMENT_CONFIRMED'
