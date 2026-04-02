@@ -497,6 +497,25 @@ class InstituteController {
         }
     }
 
+    async createStudentAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { title, message, recipientId } = req.body;
+            if (!title || !message) {
+                return sendError(res, 'عنوان ومحتوى الإعلان مطلوبان', 400);
+            }
+            const announcement = await instituteService.createStudentAnnouncement(
+                req.user.userId, 
+                { title, message, recipientId }
+            );
+            return sendSuccess(res, 'تم إرسال الإعلان بنجاح', announcement);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
     async getStaff(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);

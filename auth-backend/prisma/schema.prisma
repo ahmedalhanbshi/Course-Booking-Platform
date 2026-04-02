@@ -26,6 +26,7 @@ model User {
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
   announcements         Announcement[]
+  receivedAnnouncements Announcement[]  @relation("AnnouncementRecipient")
   auditLogs             AuditLog[]
   bankAccounts          BankAccount[]
   coursesAsTrainer      Course[]        @relation("TrainerCourses")
@@ -303,9 +304,11 @@ model Announcement {
   sentAt         DateTime?            @map("sent_at")
   createdAt      DateTime             @default(now()) @map("created_at")
   senderId       String?              @map("sender_id")
+  recipientId    String?              @map("recipient_id")
   courseId       String?              @map("course_id")
   course         Course?              @relation(fields: [courseId], references: [id])
   sender         User?                @relation(fields: [senderId], references: [id])
+  recipient      User?                @relation("AnnouncementRecipient", fields: [recipientId], references: [id])
 
   @@map("announcements")
 }
@@ -460,6 +463,7 @@ enum AnnouncementAudience {
   STUDENTS
   TRAINERS
   INSTITUTES
+  SINGLE_USER
 }
 
 enum AnnouncementCategory {

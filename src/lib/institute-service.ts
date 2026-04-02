@@ -116,6 +116,11 @@ class InstituteService {
         return response.data.data;
     }
 
+    async sendStudentAnnouncement(data: { title: string; message: string; recipientId?: string }): Promise<any> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/announcements/send', data);
+        return response.data.data;
+    }
+
     async getEnrollments(): Promise<any[]> {
         const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/enrollments');
         return response.data.data;

@@ -5,10 +5,12 @@ import {
     generateAccessToken,
     generateRefreshToken,
     generateRandomToken,
+    generateOTP,
     hashToken,
     verifyRefreshToken,
 } from '../utils/jwt';
 import { config } from '../config';
+import { mailerService } from './mailer.service';
 import {
     RegisterInput,
     LoginInput,
@@ -435,7 +437,7 @@ export class AuthService {
         }
 
         // Generate reset token
-        const resetToken = generateRandomToken();
+        const resetToken = generateOTP(6);
         const tokenHash = hashToken(resetToken);
 
         // Delete any existing reset tokens
@@ -458,8 +460,9 @@ export class AuthService {
 
         // In production, send email with resetToken
         console.log('🔑 Password Reset Token:', resetToken);
+        await mailerService.sendPasswordResetCode(user.email, user.name, resetToken);
 
-        return { message: 'If the email exists, a reset link will be sent.' };
+        return { message: 'If the email exists, a reset code will be sent.' };
     }
 
     // Reset password

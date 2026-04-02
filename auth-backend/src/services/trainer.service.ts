@@ -1,4 +1,4 @@
-import { EnrollmentStatus } from '@prisma/client';
+import { EnrollmentStatus, AnnouncementAudience } from '@prisma/client';
 import prisma from '../config/database';
 import { hashPassword, comparePassword } from '../utils/password';
 import notificationService from './notification.service';

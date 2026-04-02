@@ -1190,9 +1190,10 @@ export class AdminService {
         };
         const roles = roleMap[(announcement as any).targetAudience] ?? ['STUDENT', 'TRAINER', 'INSTITUTE_ADMIN'];
 
+        // Fetch users with email and name for email sending
         const users = await prisma.user.findMany({
             where: { role: { in: roles as any }, status: 'ACTIVE' },
-            select: { id: true },
+            select: { id: true, name: true, email: true },
         });
 
         // Mark announcement as SENT
@@ -1213,6 +1214,18 @@ export class AdminService {
                 })),
                 skipDuplicates: true,
             });
+
+            // Send email to every user (fire-and-forget)
+            for (const user of users) {
+                if (user.email) {
+                    mailerService.sendAnnouncementEmail(
+                        user.email,
+                        user.name,
+                        announcement.title,
+                        announcement.message
+                    ).catch((err: any) => console.error('[Mailer] Admin announcement email failed:', err));
+                }
+            }
         }
 
         return { message: 'تم إرسال الإعلان بنجاح', recipientCount: users.length };

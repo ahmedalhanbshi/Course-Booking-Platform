@@ -44,14 +44,21 @@ class MailerService {
     }
 
     async send(opts: MailOptions): Promise<void> {
-        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return; // silently skip if unconfigured
+        const user = process.env.SMTP_USER;
+        const pass = process.env.SMTP_PASS;
+        console.log(`[Mailer] Attempting to send email to: ${opts.to}, SMTP_USER configured: ${!!user}`);
+        if (!user || !pass) {
+            console.warn('[Mailer] SMTP credentials not configured, skipping email');
+            return;
+        }
         try {
             await this.transporter.sendMail({
-                from: process.env.SMTP_FROM || `"منصة الدورات" <${process.env.SMTP_USER}>`,
+                from: process.env.SMTP_FROM || `"\u0645\u0646\u0635\u0629 \u0627\u0644\u062f\u0648\u0631\u0627\u062a" <${user}>`,
                 to: opts.to,
                 subject: opts.subject,
                 html: opts.html,
             });
+            console.log(`[Mailer] Email sent successfully to: ${opts.to}`);
         } catch (err) {
             console.error('[Mailer] Failed to send email:', err);
         }
@@ -234,6 +241,37 @@ class MailerService {
                 <p>نأسف لإعلامك بأنه تم رفض طلب حجز قاعة <strong>${roomName}</strong>.</p>
                 ${reason ? `<div class="card"><p><strong>السبب:</strong> ${reason}</p></div>` : ''}
                 <a class="btn" href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/trainer/halls">استعراض القاعات</a>
+            `),
+        });
+    }
+
+    // ── Auth ───────────────────────────────────────────────────────
+    async sendPasswordResetCode(to: string, userName: string, code: string) {
+        await this.send({
+            to,
+            subject: `🔐 رمز إعادة تعيين كلمة المرور الخاص بك`,
+            html: this.wrapHtml('إعادة تعيين كلمة المرور', `
+                <p>مرحباً <strong>${userName}</strong>،</p>
+                <p>لقد تلقينا طلباً لإعادة تعيين كلمة المرور لحسابك. استخدم رمز التحقق التالي:</p>
+                <div class="card" style="text-align: center;">
+                    <h2 style="font-size: 32px; letter-spacing: 4px; color: #4f46e5; margin: 0;">${code}</h2>
+                </div>
+                <p>صلاحية هذا الرمز 15 دقيقة. إذا لم تطلب تغيير كلمة المرور، يرجى تجاهل هذه الرسالة.</p>
+            `),
+        });
+    }
+
+    async sendAnnouncementEmail(to: string, userName: string, title: string, message: string) {
+        await this.send({
+            to,
+            subject: `📢 إعلان جديد: ${title}`,
+            html: this.wrapHtml(title, `
+                <p>مرحباً <strong>${userName}</strong>،</p>
+                <div class="card">
+                    <p>${message.replace(/\n/g, '<br/>')}</p>
+                </div>
+                <p>للرد أو للاستفسار، يمكنك تسجيل الدخول إلى حسابك في المنصة.</p>
+                <a class="btn" href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/student/dashboard">الذهاب للمنصة</a>
             `),
         });
     }

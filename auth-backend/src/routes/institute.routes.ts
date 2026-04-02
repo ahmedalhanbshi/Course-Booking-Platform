@@ -57,6 +57,7 @@ router.post('/categories', instituteController.createCategory);
 
 // Students & Enrollments
 router.get('/students', instituteController.getStudents);
+router.post('/announcements/send', instituteController.createStudentAnnouncement);
 router.get('/enrollments', instituteController.getEnrollments);
 router.patch('/enrollments/:enrollmentId/status', instituteController.updateEnrollmentStatus);
 

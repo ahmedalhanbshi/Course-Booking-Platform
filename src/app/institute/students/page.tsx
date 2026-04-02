@@ -13,7 +13,7 @@ import { Users, Search, Mail, Phone, BookOpen, MoreHorizontal, Loader2, Eye } fr
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { instituteService } from "@/lib/institute-service"
 import { toast } from "sonner"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 
 type EnrolledCourse = {
     courseId: string
@@ -44,12 +44,13 @@ type StudentsData = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    active: { label: "نشط", variant: "default" },
-    completed: { label: "مكتمل", variant: "outline" },
-    preliminary: { label: "أولي", variant: "secondary" },
-    pending_payment: { label: "بانتظار الدفع", variant: "secondary" },
-    cancelled: { label: "ملغي", variant: "destructive" },
+const statusBadge: Record<string, { label: string; className: string }> = {
+    active: { label: "مستمر", className: "bg-green-100 text-green-700 hover:bg-green-200 border-transparent shadow-none" },
+    completed: { label: "مكتمل", className: "bg-blue-100 text-blue-700 hover:bg-blue-200 border-transparent shadow-none" },
+    cancelled: { label: "ملغى", className: "bg-red-100 text-red-700 hover:bg-red-200 border-transparent shadow-none" },
+    preliminary: { label: "مبدئي", className: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-transparent shadow-none" },
+    pending_payment: { label: "بانتظار الدفع", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent shadow-none" },
+    reject_payment: { label: "دفع مرفوض", className: "bg-red-100 text-red-700 hover:bg-red-200 border-transparent shadow-none" },
 }
 
 function getInitials(name: string) {
@@ -65,6 +66,12 @@ export default function InstituteStudentsPage() {
 
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
     const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+
+    const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false)
+    const [announcementTarget, setAnnouncementTarget] = useState<Student | null>(null)
+    const [announcementTitle, setAnnouncementTitle] = useState("")
+    const [announcementMessage, setAnnouncementMessage] = useState("")
+    const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false)
 
     const loadData = async () => {
         try {
@@ -122,6 +129,35 @@ export default function InstituteStudentsPage() {
         setIsDetailsOpen(true)
     }
 
+    const handleOpenAnnouncement = (student?: Student) => {
+        setAnnouncementTarget(student || null)
+        setAnnouncementTitle("")
+        setAnnouncementMessage("")
+        setIsAnnouncementOpen(true)
+    }
+
+    const handleSendAnnouncement = async () => {
+        if (!announcementTitle.trim() || !announcementMessage.trim()) {
+            toast.error("يرجى إدخال عنوان ومحتوى الإعلان")
+            return
+        }
+
+        try {
+            setIsSendingAnnouncement(true)
+            await instituteService.sendStudentAnnouncement({
+                title: announcementTitle,
+                message: announcementMessage,
+                recipientId: announcementTarget ? announcementTarget.id : undefined
+            })
+            toast.success("تم إرسال الإعلان بنجاح")
+            setIsAnnouncementOpen(false)
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "فشل إرسال الإعلان")
+        } finally {
+            setIsSendingAnnouncement(false)
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex h-96 items-center justify-center">
@@ -133,9 +169,15 @@ export default function InstituteStudentsPage() {
     return (
         <div className="max-w-7xl mx-auto space-y-8" dir="rtl">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">إدارة الطلاب</h1>
-                <p className="text-gray-600">متابعة وإدارة الطلاب المسجلين في دورات المعهد</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">إدارة الطلاب</h1>
+                    <p className="text-gray-600">متابعة وإدارة الطلاب المسجلين في دورات المعهد</p>
+                </div>
+                <Button onClick={() => handleOpenAnnouncement()} className="flex items-center gap-2 bg-primary text-white">
+                    <Mail className="h-4 w-4" />
+                    إرسال إعلان للجميع
+                </Button>
             </div>
 
             {/* Stats */}
@@ -260,12 +302,12 @@ export default function InstituteStudentsPage() {
                                         <TableCell>
                                             <div className="space-y-2">
                                                 {student.enrolledCourses.slice(0, 2).map(ec => {
-                                                    const s = statusBadge[ec.status] ?? { label: ec.status, variant: "secondary" as const }
+                                                    const s = statusBadge[ec.status.toLowerCase()] ?? { label: ec.status, className: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-transparent shadow-none" }
                                                     return (
                                                         <div key={ec.enrollmentId} className="text-sm border-r-2 border-slate-100 pr-2">
                                                             <div className="font-medium line-clamp-1">{ec.courseTitle}</div>
                                                             <div className="flex items-center gap-2 mt-0.5">
-                                                                <Badge variant={s.variant} className="text-[10px] py-0">{s.label}</Badge>
+                                                                <Badge variant="outline" className={`text-[10px] py-0 px-2 ${s.className}`}>{s.label}</Badge>
                                                                 <span className="text-[11px] text-slate-400">المدرب: {ec.trainerName || "—"}</span>
                                                             </div>
                                                         </div>
@@ -297,11 +339,9 @@ export default function InstituteStudentsPage() {
                                                         <Eye className="mr-2 h-4 w-4" />
                                                         عرض التفاصيل
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`mailto:${student.email}`}>
-                                                            <Mail className="mr-2 h-4 w-4" />
-                                                            إرسال بريد
-                                                        </Link>
+                                                    <DropdownMenuItem onClick={() => handleOpenAnnouncement(student)} className="gap-2 cursor-pointer">
+                                                        <Mail className="h-4 w-4" />
+                                                        إرسال إعلان
                                                     </DropdownMenuItem>
 
                                                 </DropdownMenuContent>
@@ -350,14 +390,14 @@ export default function InstituteStudentsPage() {
                                 </h4>
                                 <div className="grid gap-3">
                                     {selectedStudent.enrolledCourses.map(ec => {
-                                        const s = statusBadge[ec.status] ?? { label: ec.status, variant: "secondary" as const }
+                                        const s = statusBadge[ec.status.toLowerCase()] ?? { label: ec.status, className: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-transparent shadow-none" }
                                         return (
                                             <div key={ec.enrollmentId} className="bg-slate-50 p-3 rounded-lg flex justify-between items-center">
                                                 <div>
                                                     <div className="font-medium text-sm">{ec.courseTitle}</div>
                                                     <div className="text-xs text-slate-400 mt-0.5">المدرب: {ec.trainerName || "—"}</div>
                                                 </div>
-                                                <Badge variant={s.variant}>{s.label}</Badge>
+                                                <Badge variant="outline" className={`px-3 py-1 ${s.className}`}>{s.label}</Badge>
                                             </div>
                                         )
                                     })}
@@ -365,6 +405,51 @@ export default function InstituteStudentsPage() {
                             </div>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Announcement Dialog */}
+            <Dialog open={isAnnouncementOpen} onOpenChange={setIsAnnouncementOpen}>
+                <DialogContent className="sm:max-w-[500px]" dir="rtl">
+                    <DialogHeader>
+                        <DialogTitle>إرسال إعلان {announcementTarget ? "مخصص" : "للجميع"}</DialogTitle>
+                        <DialogDescription>
+                            {announcementTarget 
+                                ? `أنت تقوم بإرسال رسالة خاصة إلى الطالب: ${announcementTarget.name}`
+                                : "سيتم إرسال هذا الإعلان إلى جميع الطلاب المسجلين ضمن دوراتك."
+                            }
+                            <br />
+                            ستصلهم هذه الرسالة أيضاً كبريد إلكتروني.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">عنوان الإعلان</label>
+                            <Input 
+                                placeholder="مثال: تغيير موعد الجلسة، تنبيه هام..." 
+                                value={announcementTitle}
+                                onChange={(e) => setAnnouncementTitle(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">نص الرسالة</label>
+                            <textarea 
+                                className="w-full min-h-[120px] rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="اكتب رسالتك وتفاصيلها هنا..."
+                                value={announcementMessage}
+                                onChange={(e) => setAnnouncementMessage(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsAnnouncementOpen(false)} disabled={isSendingAnnouncement}>
+                            إلغاء
+                        </Button>
+                        <Button onClick={handleSendAnnouncement} disabled={isSendingAnnouncement}>
+                            {isSendingAnnouncement ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Mail className="h-4 w-4 ml-2" />}
+                            إرسال الإعلان
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

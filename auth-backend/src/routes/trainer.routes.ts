@@ -111,6 +111,9 @@ router.patch(
 // All students across all of this trainer's courses
 router.get('/students', trainerController.getAllStudents);
 
+// Announcements
+router.post('/announcements/send', trainerController.createStudentAnnouncement);
+
 // Enrollments management
 router.get('/enrollments', trainerController.getEnrollments);
 router.patch('/enrollments/:enrollmentId/status', trainerController.updateEnrollmentStatus);

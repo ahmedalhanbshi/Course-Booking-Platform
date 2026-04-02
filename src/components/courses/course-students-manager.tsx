@@ -84,22 +84,26 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
   const activeEnrollments = enrollments.filter(e => e.status === 'active')
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'active': return 'مستمر'
       case 'completed': return 'مكتمل'
       case 'cancelled': return 'ملغى'
       case 'preliminary': return 'مبدئي'
+      case 'pending_payment': return 'بانتظار الدفع'
+      case 'reject_payment': return 'دفع مرفوض'
       default: return status
     }
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-green-600'
-      case 'completed': return 'text-blue-600'
-      case 'cancelled': return 'text-red-600'
-      case 'preliminary': return 'text-yellow-600'
-      default: return 'text-gray-600'
+    switch (status.toLowerCase()) {
+      case 'active': return 'bg-green-100 text-green-700 hover:bg-green-200 border-transparent shadow-none'
+      case 'completed': return 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-transparent shadow-none'
+      case 'cancelled': return 'bg-red-100 text-red-700 hover:bg-red-200 border-transparent shadow-none'
+      case 'preliminary': return 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-transparent shadow-none'
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent shadow-none'
+      case 'reject_payment': return 'bg-red-100 text-red-700 hover:bg-red-200 border-transparent shadow-none'
+      default: return 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-transparent shadow-none'
     }
   }
 
@@ -378,7 +382,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
                     )}
                   </div>
                 </div>
-                <Badge className={getStatusColor(viewStudent.status)}>
+                <Badge variant="outline" className={`px-3 py-1 ${getStatusColor(viewStudent.status)}`}>
                   {getStatusLabel(viewStudent.status)}
                 </Badge>
               </div>
@@ -467,7 +471,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(enrollment.status)}>
+                    <Badge variant="outline" className={getStatusColor(enrollment.status)}>
                       {getStatusLabel(enrollment.status)}
                     </Badge>
                   </TableCell>

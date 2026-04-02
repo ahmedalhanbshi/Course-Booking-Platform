@@ -1,4 +1,4 @@
-import { EnrollmentStatus } from "@prisma/client";
+import { EnrollmentStatus, AnnouncementAudience } from "@prisma/client";
 import prisma from "../config/database";
 import notificationService from "../services/notification.service";
 import { mailerService } from "../services/mailer.service";
@@ -419,6 +419,109 @@ class InstituteService {
             totalStudents: students.length,
             totalEnrollments: enrollments.length,
         };
+    }
+
+    // =====================================================
+    // POST ANNOUNCEMENTS
+    // =====================================================
+
+    /**
+     * Create an announcement for students (ALL or SINGLE_USER)
+     */
+    async createStudentAnnouncement(userId: string, data: { title: string; message: string; recipientId?: string }) {
+        const institute = await prisma.institute.findUnique({
+            where: { userId },
+            include: { user: true }
+        });
+
+        if (!institute) throw new Error("لم يتم العثور على المعهد");
+
+        if (data.recipientId) {
+            // Verify student is actually enrolled in this institute's courses
+            const isEnrolled = await prisma.enrollment.findFirst({
+                where: {
+                    studentId: data.recipientId,
+                    course: { instituteId: institute.id }
+                }
+            });
+
+            if (!isEnrolled) throw new Error("الطالب المحدد غير مسجل في أي من دورات المعهد");
+
+            const student = await prisma.user.findUnique({ where: { id: data.recipientId } });
+            if (!student) throw new Error("الطالب غير موجود");
+
+            const announcement = await prisma.announcement.create({
+                data: {
+                    title: data.title,
+                    message: data.message,
+                    targetAudience: AnnouncementAudience.SINGLE_USER,
+                    senderId: userId,
+                    recipientId: data.recipientId,
+                    status: "SENT",
+                    sentAt: new Date()
+                }
+            });
+
+            await prisma.notification.create({
+                data: {
+                    userId: data.recipientId,
+                    type: "NEW_ANNOUNCEMENT",
+                    title: data.title,
+                    message: data.message,
+                    relatedEntityId: announcement.id
+                }
+            });
+
+            // Send Email
+            if (student.email) {
+                await mailerService.sendAnnouncementEmail(student.email, student.name, data.title, data.message);
+            }
+
+            return announcement;
+        } else {
+            // Broadcast to all active students in the institute
+            const announcement = await prisma.announcement.create({
+                data: {
+                    title: data.title,
+                    message: data.message,
+                    targetAudience: AnnouncementAudience.STUDENTS,
+                    senderId: userId,
+                    status: "SENT",
+                    sentAt: new Date()
+                }
+            });
+
+            // Gather all students' emails
+            const students = await prisma.enrollment.findMany({
+                where: {
+                    course: { instituteId: institute.id },
+                    status: { in: ["ACTIVE", "COMPLETED", "PRELIMINARY", "PENDING_PAYMENT"] }
+                },
+                select: { student: { select: { id: true, name: true, email: true } } },
+                distinct: ["studentId"]
+            });
+
+            if (students.length > 0) {
+                await prisma.notification.createMany({
+                    data: students.map((s) => ({
+                        userId: s.student.id,
+                        type: "NEW_ANNOUNCEMENT",
+                        title: data.title,
+                        message: data.message,
+                        relatedEntityId: announcement.id
+                    })),
+                    skipDuplicates: true
+                });
+            }
+
+            for (const { student } of students) {
+                if (student.email) {
+                    mailerService.sendAnnouncementEmail(student.email, student.name, data.title, data.message).catch(() => {});
+                }
+            }
+
+            return announcement;
+        }
     }
 
     // =====================================================

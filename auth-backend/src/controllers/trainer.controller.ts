@@ -471,6 +471,28 @@ class TrainerController {
     }
 
     /**
+     * Create an announcement for students
+     */
+    async createStudentAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { title, message, recipientId } = req.body;
+            if (!title || !message) {
+                return sendError(res, 'عنوان ومحتوى الإعلان مطلوبان', 400);
+            }
+            const announcement = await trainerService.createStudentAnnouncement(
+                req.user.userId, 
+                { title, message, recipientId }
+            );
+            return sendSuccess(res, 'تم إرسال الإعلان بنجاح', announcement);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
      * Get enrollments for courses owned by the authenticated trainer
      */
     async getEnrollments(req: AuthRequest, res: Response, _next: NextFunction) {
