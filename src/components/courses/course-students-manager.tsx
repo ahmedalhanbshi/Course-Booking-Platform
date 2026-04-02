@@ -14,6 +14,7 @@ import { Users, Mail, MessageSquare, Eye, ArrowLeft, Send, UserCheck, Phone, Cal
 import { formatDate } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { instituteService } from "@/lib/institute-service"
+import { trainerService } from "@/lib/trainer-service"
 import { toast } from "sonner"
 
 interface CourseStudentsManagerProps {
@@ -51,6 +52,7 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
     message: "",
     type: "announcement",
   })
+  const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false)
 
   // Delete State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -65,9 +67,11 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
     try {
       setLoading(true)
       setError("")
+      const isTrainer = backLink.includes('/trainer/')
+      const service = isTrainer ? trainerService : instituteService
       const data = fetchStudentsOverride
         ? await fetchStudentsOverride(courseId)
-        : await instituteService.getCourseStudents(courseId)
+        : await service.getCourseStudents(courseId)
       setCourseTitle(data.course?.title || "")
       setEnrollments(data.enrollments || [])
     } catch (err: any) {
@@ -116,10 +120,12 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
   const handleConfirmDelete = async () => {
     if (!studentToDelete) return
     try {
+      const isTrainer = backLink.includes('/trainer/')
+      const service = isTrainer ? trainerService : instituteService
       if (unenrollOverride) {
         await unenrollOverride(courseId, studentToDelete.id, cancellationReason)
       } else {
-        await instituteService.unenrollStudent(courseId, studentToDelete.id, cancellationReason)
+        await service.unenrollStudent(courseId, studentToDelete.id, cancellationReason)
       }
       setEnrollments(enrollments.map(e =>
         e.id === studentToDelete.id ? { ...e, status: 'cancelled' } : e
@@ -133,13 +139,39 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
     setCancellationReason("")
   }
 
-  const handleSendNotification = () => {
-    if (!notificationData.title || !notificationData.message) return
-    console.log('Sending notification to students:', selectedStudents, notificationData)
-    toast.success("تم إرسال الإشعار بنجاح")
-    setShowNotificationDialog(false)
-    setSelectedStudents([])
-    setNotificationData({ title: "", message: "", type: "announcement" })
+  const handleSendNotification = async () => {
+    if (!notificationData.title || !notificationData.message || selectedStudents.length === 0) {
+      toast.error("يرجى التأكد من إدخال البيانات واختيار الطلاب");
+      return;
+    }
+
+    try {
+      setIsSendingAnnouncement(true);
+      const isTrainer = backLink.includes('/trainer/')
+      const service = isTrainer ? trainerService : instituteService
+
+      console.log(`[Notification] Dispatching announcements for ${selectedStudents.length} students using ${isTrainer ? 'Trainer' : 'Institute'} service...`);
+
+      const promises = selectedStudents.map(studentId => 
+        service.sendStudentAnnouncement({
+          title: notificationData.title,
+          message: notificationData.message,
+          recipientId: studentId
+        })
+      );
+
+      await Promise.all(promises);
+
+      toast.success(`تم إرسال الإشعار بنجاح إلى ${selectedStudents.length} طالب`);
+      setShowNotificationDialog(false);
+      setSelectedStudents([]);
+      setNotificationData({ title: "", message: "", type: "announcement" });
+    } catch (err: any) {
+      console.error('[Notification] FAILED:', err);
+      toast.error(err?.response?.data?.message || "فشل إرسال الإشعارات للطلاب");
+    } finally {
+      setIsSendingAnnouncement(false);
+    }
   }
 
   const handleSelectAll = () => {
@@ -337,12 +369,21 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
               </div>
 
               <div className="flex gap-2 justify-end pt-4">
-                <Button variant="outline" onClick={() => setShowNotificationDialog(false)}>
+                <Button variant="outline" onClick={() => setShowNotificationDialog(false)} disabled={isSendingAnnouncement}>
                   إلغاء
                 </Button>
-                <Button onClick={handleSendNotification}>
-                  <Send className="mr-2 h-4 w-4" />
-                  إرسال الإشعار
+                <Button onClick={handleSendNotification} disabled={isSendingAnnouncement}>
+                  {isSendingAnnouncement ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      جاري الإرسال...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      إرسال الإشعار
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

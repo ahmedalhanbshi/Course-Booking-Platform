@@ -507,6 +507,165 @@ class TrainerService {
         };
     }
 
+
+    /**
+     * Create an announcement for students (ALL or SINGLE_USER) from a trainer.
+     * Uses direct courseId lookup to avoid nested Prisma filter issues.
+     */
+    async createStudentAnnouncement(userId: string, data: { title: string; message: string; recipientId?: string }) {
+        console.log(`[Announcement-Trainer] Trainer ${userId} initiating announcement to: ${data.recipientId ?? 'ALL'}`);
+
+        // STRICTLY INDEPENDENT TRAINER LOOKUP: Fetch only courses owned by this specific trainer User ID
+        const trainerCourses = await prisma.course.findMany({ 
+            where: { trainerId: userId }, 
+            select: { id: true } 
+        });
+        const courseIds = trainerCourses.map((c: any) => c.id);
+        console.log(`[Announcement-Trainer] Trainer owns ${courseIds.length} courses`);
+
+        if (data.recipientId) {
+            // Target specific student
+            console.log(`[Announcement-Trainer] Verifying enrollment for target student ${data.recipientId}`);
+            const isEnrolled = courseIds.length > 0
+                ? await prisma.enrollment.findFirst({ 
+                    where: { 
+                        studentId: data.recipientId, 
+                        courseId: { in: courseIds },
+                        deletedAt: null
+                    } 
+                })
+                : null;
+            
+            if (!isEnrolled) {
+                console.warn(`[Announcement-Trainer] TARGET_ERROR: Student ${data.recipientId} is NOT enrolled in any of trainer ${userId}'s courses`);
+                throw new Error('الطالب المحدد غير مسجل في أي من دوراتك المستقلة');
+            }
+
+            const student = await prisma.user.findUnique({ where: { id: data.recipientId } });
+            if (!student) throw new Error('الطالب المستهدف غير موجود في النظام');
+
+            const trainer = await prisma.user.findUnique({ 
+                where: { id: userId },
+                select: { name: true, phone: true, email: true }
+            });
+
+            const contactFooter = `\n\n---\n👤 المرسل: ${trainer?.name || 'المدرب'}\n${trainer?.phone ? `📞 الجوال: ${trainer.phone}\n` : ''}${trainer?.email ? `✉️ البريد: ${trainer.email}` : ''}`;
+            const fullMessage = data.message + contactFooter;
+
+            // 1. Create Announcement Record
+            const announcement = await (prisma.announcement.create as any)({
+                data: { 
+                    title: data.title, 
+                    message: fullMessage, 
+                    targetAudience: 'SINGLE_USER', 
+                    senderId: userId, 
+                    recipientId: data.recipientId, 
+                    status: 'SENT', 
+                    sentAt: new Date() 
+                }
+            });
+
+            // 2. Create Platform Notification
+            await prisma.notification.create({
+                data: { 
+                    userId: data.recipientId, 
+                    type: 'NEW_ANNOUNCEMENT' as any, 
+                    title: data.title, 
+                    message: fullMessage, 
+                    relatedEntityId: announcement.id 
+                }
+            });
+
+            // 3. Dispatch Email
+            if (student.email) {
+                console.log(`[Announcement-Trainer] Dispatching email to: ${student.email}`);
+                mailerService.sendAnnouncementEmail(
+                    student.email, 
+                    student.name, 
+                    data.title, 
+                    data.message, 
+                    { 
+                        name: trainer?.name || 'المدرب', 
+                        phone: trainer?.phone, 
+                        email: trainer?.email 
+                    }
+                )
+                    .then(() => console.log(`[Announcement-Trainer] Email delivered successfully`))
+                    .catch((err: any) => console.error(`[Announcement-Trainer] Email delivery FAILED:`, err));
+            }
+            return announcement;
+        } else {
+            // Target Audience (ALL students of this trainer)
+            const trainer = await prisma.user.findUnique({ 
+                where: { id: userId },
+                select: { name: true, phone: true, email: true }
+            });
+
+            const contactFooter = `\n\n---\n👤 المرسل: ${trainer?.name || 'المدرب'}\n${trainer?.phone ? `📞 الجوال: ${trainer.phone}\n` : ''}${trainer?.email ? `✉️ البريد: ${trainer.email}` : ''}`;
+            const fullMessage = data.message + contactFooter;
+
+            const announcement = await (prisma.announcement.create as any)({
+                data: { 
+                    title: data.title, 
+                    message: fullMessage, 
+                    targetAudience: 'STUDENTS', 
+                    senderId: userId, 
+                    status: 'SENT', 
+                    sentAt: new Date() 
+                }
+            });
+
+            if (courseIds.length === 0) {
+                console.log(`[Announcement-Trainer] Broadcast skipped: Trainer has no courses.`);
+                return announcement;
+            }
+
+            const activeStudents = await prisma.enrollment.findMany({
+                where: { 
+                    courseId: { in: courseIds }, 
+                    status: { in: ['ACTIVE', 'COMPLETED', 'PRELIMINARY', 'PENDING_PAYMENT'] }, 
+                    deletedAt: null 
+                },
+                select: { student: { select: { id: true, name: true, email: true } } },
+                distinct: ['studentId']
+            });
+
+            console.log(`[Announcement-Trainer] Broadcasting to ${activeStudents.length} students`);
+
+            if (activeStudents.length > 0) {
+                // Create platform notifications in bulk
+                await prisma.notification.createMany({
+                    data: activeStudents.map((s: any) => ({ 
+                        userId: s.student.id, 
+                        type: 'NEW_ANNOUNCEMENT' as any, 
+                        title: data.title, 
+                        message: fullMessage, 
+                        relatedEntityId: announcement.id 
+                    })),
+                    skipDuplicates: true
+                });
+
+                // Fire-and-forget emails
+                for (const { student } of activeStudents as any[]) {
+                    if (student.email) {
+                        mailerService.sendAnnouncementEmail(
+                            student.email, 
+                            student.name, 
+                            data.title, 
+                            data.message, 
+                            { 
+                                name: trainer?.name || 'المدرب', 
+                                phone: trainer?.phone, 
+                                email: trainer?.email 
+                            }
+                        ).catch((e: any) => console.error(`[Announcement-Trainer] Bulk email error:`, e));
+                    }
+                }
+            }
+            return announcement;
+        }
+    }
+
     /**
      * Unenroll (cancel) a student from a trainer’s course
      */

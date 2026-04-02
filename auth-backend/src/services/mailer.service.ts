@@ -261,18 +261,36 @@ class MailerService {
         });
     }
 
-    async sendAnnouncementEmail(to: string, userName: string, title: string, message: string) {
+    async sendAnnouncementEmail(to: string, userName: string, title: string, message: string, senderInfo?: { name: string; phone?: string | null; email?: string | null; instituteName?: string }) {
+        let body = `
+            <p>مرحباً <strong>${userName}</strong>،</p>
+            <div class="card">
+                <p>${message.replace(/\n/g, '<br/>')}</p>
+            </div>
+        `;
+
+        if (senderInfo) {
+            body += `
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #e5e7eb; font-size: 14px; color: #4b5563;">
+                    <p style="margin-bottom: 8px; font-weight: 600;">معلومات التواصل مع المرسل:</p>
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        <li style="margin-bottom: 4px;">👤 <strong>الاسم:</strong> ${senderInfo.name}${senderInfo.instituteName ? ` (${senderInfo.instituteName})` : ''}</li>
+                        ${senderInfo.phone ? `<li style="margin-bottom: 4px;">📞 <strong>الجوال:</strong> ${senderInfo.phone}</li>` : ''}
+                        ${senderInfo.email ? `<li style="margin-bottom: 4px;">✉️ <strong>البريد:</strong> ${senderInfo.email}</li>` : ''}
+                    </ul>
+                </div>
+            `;
+        }
+
+        body += `
+            <p style="margin-top: 16px;">للرد أو للاستفسار، يمكنك تسجيل الدخول إلى حسابك في المنصة.</p>
+            <a class="btn" href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/student/dashboard">الذهاب للمنصة</a>
+        `;
+
         await this.send({
             to,
             subject: `📢 إعلان جديد: ${title}`,
-            html: this.wrapHtml(title, `
-                <p>مرحباً <strong>${userName}</strong>،</p>
-                <div class="card">
-                    <p>${message.replace(/\n/g, '<br/>')}</p>
-                </div>
-                <p>للرد أو للاستفسار، يمكنك تسجيل الدخول إلى حسابك في المنصة.</p>
-                <a class="btn" href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/student/dashboard">الذهاب للمنصة</a>
-            `),
+            html: this.wrapHtml(title, body),
         });
     }
 }

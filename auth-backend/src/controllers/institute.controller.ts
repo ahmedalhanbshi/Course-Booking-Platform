@@ -499,19 +499,28 @@ class InstituteController {
 
     async createStudentAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
+            console.log(`[Controller-Institute] Incoming Announcement Request from User: ${req.user?.userId}`);
+            console.log(`[Controller-Institute] Payload:`, req.body);
+
             if (req.user?.role !== 'INSTITUTE_ADMIN') {
+                console.warn(`[Controller-Institute] Unauthorized access attempt by ${req.user?.role}`);
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { title, message, recipientId } = req.body;
             if (!title || !message) {
                 return sendError(res, 'عنوان ومحتوى الإعلان مطلوبان', 400);
             }
+            
             const announcement = await instituteService.createStudentAnnouncement(
                 req.user.userId, 
                 { title, message, recipientId }
             );
+
+            console.log(`[Controller-Institute] SUCCESS: Announcement created with ID: ${announcement?.id}`);
+
             return sendSuccess(res, 'تم إرسال الإعلان بنجاح', announcement);
         } catch (error: any) {
+            console.error(`[Controller-Institute] CRITICAL ERROR:`, error.message);
             return sendError(res, error.message, 400);
         }
     }

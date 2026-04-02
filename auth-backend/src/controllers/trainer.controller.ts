@@ -475,19 +475,28 @@ class TrainerController {
      */
     async createStudentAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
+            console.log(`[Controller-Trainer] Incoming Announcement Request from User: ${req.user?.userId}`);
+            console.log(`[Controller-Trainer] Payload:`, req.body);
+
             if (req.user?.role !== 'TRAINER') {
+                console.warn(`[Controller-Trainer] Unauthorized access attempt by ${req.user?.role}`);
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { title, message, recipientId } = req.body;
             if (!title || !message) {
                 return sendError(res, 'عنوان ومحتوى الإعلان مطلوبان', 400);
             }
+            
             const announcement = await trainerService.createStudentAnnouncement(
                 req.user.userId, 
                 { title, message, recipientId }
             );
+
+            console.log(`[Controller-Trainer] SUCCESS: Announcement created with ID: ${announcement?.id}`);
+
             return sendSuccess(res, 'تم إرسال الإعلان بنجاح', announcement);
         } catch (error: any) {
+            console.error(`[Controller-Trainer] CRITICAL ERROR:`, error.message);
             return sendError(res, error.message, 400);
         }
     }
