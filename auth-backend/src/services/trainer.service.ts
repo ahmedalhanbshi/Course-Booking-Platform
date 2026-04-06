@@ -12,7 +12,7 @@ class TrainerService {
     async getDashboard(userId: string) {
         const now = new Date();
 
-        // All courses belonging to this trainer
+        // All courses belonging to this trainer (including all statuses as requested)
         const courses = await prisma.course.findMany({
             where: { trainerId: userId },
             select: { id: true, title: true, status: true, maxStudents: true, startDate: true, endDate: true },
@@ -20,13 +20,26 @@ class TrainerService {
 
         const courseIds = courses.map(c => c.id);
 
+        const totalCourses = courses.length;
         const activeCourses = courses.filter(c => c.status === 'ACTIVE').length;
 
-        // Total enrolled students across all trainer courses
+        // Total earnings from enrollments (Approved payments only)
+        const totalEarningsResult = await prisma.payment.aggregate({
+            where: {
+                status: 'APPROVED',
+                enrollment: {
+                    course: { trainerId: userId }
+                }
+            },
+            _sum: { amount: true }
+        });
+        const totalEarnings = Number(totalEarningsResult._sum.amount || 0);
+
+        // Total enrolled students across all trainer courses (All cases)
         const totalStudents = await prisma.enrollment.count({
             where: {
                 courseId: { in: courseIds },
-                status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] },
+                deletedAt: null, // Still exclude permanently deleted ones
             },
         });
 
@@ -45,7 +58,7 @@ class TrainerService {
             orderBy: { startTime: 'asc' },
             take: 5,
             include: {
-                course: { select: { title: true, enrollments: { where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } }, select: { id: true } } } },
+                course: { select: { title: true, enrollments: { where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT', 'COMPLETED'] } }, select: { id: true } } } },
                 room: { select: { name: true } },
             },
         });
@@ -92,9 +105,11 @@ class TrainerService {
 
         return {
             stats: {
+                totalCourses,
                 activeCourses,
                 totalStudents,
                 totalSessions,
+                totalEarnings,
                 upcomingSessions: upcomingSessions.length,
                 pendingRoomBookings: pendingRoomBookings.length,
             },
@@ -112,7 +127,6 @@ class TrainerService {
             orderBy: { createdAt: 'desc' },
             include: {
                 trainer: { select: { name: true, avatar: true } },
-                staffTrainer: { select: { name: true } },
                 institute: { 
                     select: { 
                         name: true, 
@@ -129,32 +143,49 @@ class TrainerService {
             },
         });
 
+        // Gather all staffTrainerIds to fetch in a single query
+        const allStaffIds = [...new Set(courses.flatMap(c => (c as any).staffTrainerIds as string[] || []))];
+        const staffMap = new Map<string, { name: string }>();
+        if (allStaffIds.length > 0) {
+            const staffList = await prisma.instituteStaff.findMany({
+                where: { id: { in: allStaffIds } },
+                select: { id: true, name: true }
+            });
+            staffList.forEach(s => staffMap.set(s.id, s));
+        }
+
         const categories = await prisma.courseCategory.findMany({
             orderBy: { name: 'asc' },
         });
 
         return {
-            courses: courses.map(c => ({
-                id: c.id,
-                title: c.title,
-                description: c.description ?? '',
-                shortDescription: c.shortDescription ?? '',
-                category: c.category?.name ?? 'عام',
-                image: c.image ?? null,
-                studentsCount: c.enrollments.length,
-                sessionsCount: c.sessions.length,
-                duration: `${c.duration} ساعة`,
-                trainer: {
-                    name: c.trainer?.name ?? c.staffTrainer?.name ?? c.institute?.name ?? '—',
-                    avatar: c.trainer?.avatar ?? c.institute?.logo ?? c.institute?.user?.avatar ?? null,
-                },
-                price: Number(c.price),
-                deliveryType: c.sessions[0]?.type === 'ONLINE' ? 'online'
-                    : c.sessions[0]?.type === 'IN_PERSON' ? 'in_person'
-                        : c.sessions.length > 0 ? 'hybrid' : 'online',
-                startDate: c.startDate,
-                createdAt: c.createdAt,
-            })),
+            courses: courses.map(c => {
+                const staffTrainerIds = (c as any).staffTrainerIds as string[] || [];
+                const staffTrainers = staffTrainerIds.map(id => ({ name: staffMap.get(id)?.name ?? '—' }));
+
+                return {
+                    id: c.id,
+                    title: c.title,
+                    description: c.description ?? '',
+                    shortDescription: c.shortDescription ?? '',
+                    category: c.category?.name ?? 'عام',
+                    image: c.image ?? null,
+                    studentsCount: c.enrollments.length,
+                    sessionsCount: c.sessions.length,
+                    duration: `${c.duration} ساعة`,
+                    trainer: {
+                        name: c.trainer?.name ?? staffTrainers[0]?.name ?? c.institute?.name ?? '—',
+                        avatar: c.trainer?.avatar ?? c.institute?.logo ?? c.institute?.user?.avatar ?? null,
+                    },
+                    staffTrainers, // قائمة جميع المدربين
+                    price: Number(c.price),
+                    deliveryType: c.sessions[0]?.type === 'ONLINE' ? 'online'
+                        : c.sessions[0]?.type === 'IN_PERSON' ? 'in_person'
+                            : c.sessions.length > 0 ? 'hybrid' : 'online',
+                    startDate: c.startDate,
+                    createdAt: c.createdAt,
+                };
+            }),
             categories: [{ id: 'all', name: 'الكل' }, ...categories.map(c => ({ id: c.id, name: c.name }))],
         };
     }
@@ -719,13 +750,15 @@ class TrainerService {
                         }
                     }
                 },
-                staffTrainer: {
-                    select: {
-                        name: true,
-                        bio: true,
-                        email: true,
-                        specialties: true
-                    }
+                category: { select: { name: true } },
+                sessions: {
+                    where: { status: { not: 'CANCELLED' } },
+                    orderBy: { startTime: 'asc' },
+                    include: { room: { select: { id: true, name: true, location: true } } },
+                },
+                enrollments: {
+                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
+                    select: { id: true },
                 },
                 institute: {
                     select: {
@@ -747,25 +780,26 @@ class TrainerService {
                         }
                     }
                 },
-                category: { select: { name: true } },
-                sessions: {
-                    where: { status: { not: 'CANCELLED' } },
-                    orderBy: { startTime: 'asc' },
-                    include: { room: { select: { id: true, name: true, location: true } } },
-                },
-                enrollments: {
-                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
-                    select: { id: true },
-                },
             }
         });
 
         if (!course) throw new Error('الدورة غير موجودة أو غير نشطة');
 
+        // Fetch all staff trainers if staffTrainerIds is set (now multi-trainer only)
+        const staffTrainerIds = (course as any).staffTrainerIds as string[] | undefined;
+        let staffTrainers: { id: string; name: string; bio: string | null; email: string | null; specialties: string[] }[] = [];
+        if (staffTrainerIds && staffTrainerIds.length > 0) {
+            const staffList = await prisma.instituteStaff.findMany({
+                where: { id: { in: staffTrainerIds } },
+                select: { id: true, name: true, bio: true, email: true, specialties: true }
+            });
+            staffTrainers = staffList;
+        }
+
         return {
             id: course.id,
             title: course.title,
-            category: course.category?.name ?? 'عام',
+            category: (course as any).category?.name ?? 'عام',
             shortDescription: course.shortDescription ?? '',
             description: course.description ?? '',
             image: course.image ?? null,
@@ -773,16 +807,16 @@ class TrainerService {
             startDate: course.startDate,
             endDate: course.endDate,
             maxStudents: course.maxStudents,
-            enrolledCount: course.enrollments.length,
+            enrolledCount: (course as any).enrollments.length,
             prerequisites: course.prerequisites
                 ? course.prerequisites.split(/\n|,/).map(s => s.trim()).filter(Boolean)
                 : [],
             objectives: course.objectives,
             tags: course.tags,
-            deliveryType: course.sessions[0]?.type === 'ONLINE' ? 'online'
-                : course.sessions[0]?.type === 'IN_PERSON' ? 'in_person'
-                    : course.sessions.length > 0 ? 'hybrid' : 'online',
-            sessions: course.sessions.map(s => ({
+            deliveryType: (course as any).sessions[0]?.type === 'ONLINE' ? 'online'
+                : (course as any).sessions[0]?.type === 'IN_PERSON' ? 'in_person'
+                    : (course as any).sessions.length > 0 ? 'hybrid' : 'online',
+            sessions: (course as any).sessions.map((s: any) => ({
                 id: s.id,
                 topic: s.topic ?? null,
                 startTime: s.startTime,
@@ -794,13 +828,14 @@ class TrainerService {
                 roomId: s.roomId ?? null,
                 room: s.room ? { id: s.room.id, name: s.room.name, location: s.room.location ?? null } : null,
             })),
+            staffTrainers, // قائمة جميع المدربين
             instructor: {
-                name: course.trainer?.name ?? course.staffTrainer?.name ?? course.institute?.name ?? 'مدرب',
-                avatar: course.trainer?.avatar ?? course.institute?.logo ?? course.institute?.user?.avatar ?? null,
-                email: course.trainer?.email ?? course.staffTrainer?.email ?? course.institute?.email ?? null,
-                bio: course.trainer?.trainerProfile?.bio ?? course.staffTrainer?.bio ?? course.institute?.description ?? null,
-                specialties: course.trainer?.trainerProfile?.specialties ?? course.staffTrainer?.specialties ?? [],
-                bankAccounts: course.trainer?.bankAccounts ?? course.institute?.bankAccounts ?? [],
+                name: (course as any).trainer?.name ?? (staffTrainers.length > 0 ? staffTrainers[0].name : ((course as any).institute?.name ?? 'مدرب')),
+                avatar: (course as any).trainer?.avatar ?? ((course as any).institute?.logo ?? (course as any).institute?.user?.avatar ?? null),
+                email: (course as any).trainer?.email ?? (staffTrainers.length > 0 ? staffTrainers[0].email : ((course as any).institute?.email ?? null)),
+                bio: (course as any).trainer?.trainerProfile?.bio ?? (staffTrainers.length > 0 ? staffTrainers[0].bio : ((course as any).institute?.description ?? null)),
+                specialties: (course as any).trainer?.trainerProfile?.specialties ?? (staffTrainers.length > 0 ? staffTrainers[0].specialties : []),
+                bankAccounts: (course as any).trainer?.bankAccounts ?? (course as any).institute?.bankAccounts ?? [],
             },
         };
     }
@@ -1284,25 +1319,22 @@ class TrainerService {
      * Get all unique students enrolled in any of this trainer's courses
      */
     async getAllStudents(userId: string) {
-        // Get all trainer course IDs (only those owned by an active institute)
+        // Get all trainer course IDs (all statuses as requested)
         const courses = await prisma.course.findMany({
             where: {
                 trainerId: userId,
-                instituteId: { not: null },
-                status: { notIn: ["CANCELLED", "REJECTED"] }
             },
             select: { id: true, title: true },
         });
         const courseIds = courses.map(c => c.id);
         const courseMap = Object.fromEntries(courses.map(c => [c.id, c.title]));
 
-        if (courseIds.length === 0) return { students: [], totalStudents: 0, totalEnrollments: 0 };
+        if (courseIds.length === 0) return { students: [], totalStudents: 0, totalEnrollments: 0, totalEarnings: 0 };
 
-        // Get all active enrollments for these courses (excluding deleted ones)
+        // Get all enrollments for these courses (All cases, excluding deleted ones)
         const enrollments = await prisma.enrollment.findMany({
             where: {
                 courseId: { in: courseIds },
-                status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT', 'COMPLETED'] },
                 deletedAt: null,
             },
             select: {
@@ -1323,6 +1355,18 @@ class TrainerService {
             },
             orderBy: { enrolledAt: 'desc' },
         });
+
+        // Calculate total earnings for these students (Approved payments only)
+        const earningsResult = await prisma.payment.aggregate({
+            where: {
+                status: 'APPROVED',
+                enrollment: {
+                    courseId: { in: courseIds }
+                }
+            },
+            _sum: { amount: true }
+        });
+        const totalEarnings = Number(earningsResult._sum.amount || 0);
 
         // Group enrollments by student
         const studentMap = new Map<string, {
@@ -1367,6 +1411,7 @@ class TrainerService {
             students,
             totalStudents: students.length,
             totalEnrollments: enrollments.length,
+            totalEarnings,
         };
     }
 
@@ -1686,6 +1731,38 @@ class TrainerService {
     }
 
     /**
+     * Cancel a direct room booking not linked to any course
+     */
+    async cancelDirectBooking(trainerId: string, bookingId: string) {
+        const booking = await prisma.roomBooking.findUnique({
+            where: { id: bookingId },
+        });
+
+        if (!booking) {
+            throw new Error('طلب الحجز غير موجود');
+        }
+
+        if (booking.requestedById !== trainerId) {
+            throw new Error('غير مصرح لك بإلغاء هذا الحجز');
+        }
+
+        return await prisma.$transaction(async (tx) => {
+            const updatedBooking = await tx.roomBooking.update({
+                where: { id: bookingId },
+                data: { status: 'CANCELLED' }
+            });
+
+            // Cancel any sessions tied to this booking
+            await tx.session.updateMany({
+                where: { roomBookingId: bookingId },
+                data: { status: 'CANCELLED' }
+            });
+
+            return updatedBooking;
+        });
+    }
+
+    /**
      * Get all sessions for all courses owned by this trainer
      */
     async getSchedule(userId: string) {
@@ -1722,6 +1799,7 @@ class TrainerService {
         return sessions.map(s => ({
             id: s.id,
             title: s.topic || 'جلسة تدريبية',
+            courseId: s.courseId ?? null,
             courseTitle: s.course.title,
             startTime: s.startTime,
             endTime: s.endTime,

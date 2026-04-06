@@ -137,9 +137,7 @@ export default function TrainerRoomBookingsPage() {
     }
   }
 
-  const handleEditBooking = () => {
-    toast.info('لتعديل الطلب، يرجى إلغائه وإرسال طلب جديد', { duration: 5000 })
-  }
+
 
   const pendingBookings = bookings.filter(b => ["PENDING", "PENDING_APPROVAL", "PENDING_PAYMENT"].includes(b.status))
   const approvedBookings = bookings.filter(b => b.status === "APPROVED")
@@ -352,25 +350,15 @@ export default function TrainerRoomBookingsPage() {
                       )}
 
                       {(booking.status === 'PENDING' || booking.status === 'PENDING_APPROVAL') && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-gray-700 border-gray-300 hover:bg-gray-50 mb-2"
-                            onClick={handleEditBooking}
-                          >
-                            تعديل الطلب
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-500 hover:bg-red-50 hover:text-red-600 w-full"
-                            onClick={() => handleCancelBooking(booking)}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            إلغاء الطلب
-                          </Button>
-                        </>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-500 hover:bg-red-50 hover:text-red-600 w-full"
+                          onClick={() => handleCancelBooking(booking)}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          إلغاء الطلب
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>

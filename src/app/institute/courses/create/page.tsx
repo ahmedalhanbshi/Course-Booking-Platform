@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -63,10 +63,9 @@ export default function CreateCoursePage() {
     const [courseData, setCourseData] = useState({
         title: "",
         categoryId: "",
-        trainerId: "",
         shortDescription: "",
         description: "",
-        deliveryType: "", // in_person, online, hybrid, capacity_based (risk-free)
+        deliveryType: "",
         price: "",
         minStudents: "",
         maxStudents: "",
@@ -76,6 +75,10 @@ export default function CreateCoursePage() {
         prerequisites: [] as string[],
         tags: [] as string[]
     })
+
+    // Selected trainer IDs (multi-select)
+    const [selectedTrainerIds, setSelectedTrainerIds] = useState<string[]>([])
+    const [trainerDropdownOpen, setTrainerDropdownOpen] = useState(false)
 
     // Schedule State
     const [selectedSessions, setSelectedSessions] = useState<{ date: string, slot: string }[]>([])
@@ -340,7 +343,7 @@ export default function CreateCoursePage() {
             const formData = new FormData()
             formData.append('title', courseData.title)
             formData.append('categoryId', courseData.categoryId)
-            formData.append('trainerId', courseData.trainerId)
+            formData.append('trainerIds', JSON.stringify(selectedTrainerIds))
             formData.append('shortDescription', courseData.shortDescription)
             formData.append('description', courseData.description)
             formData.append('deliveryType', courseData.deliveryType)
@@ -402,7 +405,7 @@ export default function CreateCoursePage() {
     const removeTag = (t: string) => setCourseData(prev => ({ ...prev, tags: prev.tags.filter(tag => tag !== t) }))
 
     // --- Validation ---
-    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && courseData.trainerId;
+    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && selectedTrainerIds.length > 0;
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
@@ -485,13 +488,72 @@ export default function CreateCoursePage() {
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>المدرب *</Label>
-                                        <Select value={courseData.trainerId} onValueChange={v => setCourseData({ ...courseData, trainerId: v })}>
-                                            <SelectTrigger><SelectValue placeholder="اختر المدرب" /></SelectTrigger>
-                                            <SelectContent>
-                                                {trainers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
+                                        <Label>المدربون *</Label>
+                                        <div className="relative">
+                                            {/* Dropdown trigger */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setTrainerDropdownOpen(v => !v)}
+                                                className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                                            >
+                                                <span className={selectedTrainerIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                                                    {selectedTrainerIds.length === 0 ? 'اختر مدرباً أو أكثر...' : `${selectedTrainerIds.length} مدربون مختارون`}
+                                                </span>
+                                                <Plus className="h-4 w-4 text-gray-400 shrink-0" />
+                                            </button>
+
+                                            {/* Dropdown list */}
+                                            {trainerDropdownOpen && (
+                                                <div className="absolute z-50 mt-1 w-full bg-white border rounded-md shadow-lg max-h-52 overflow-y-auto">
+                                                    {trainers.length === 0 ? (
+                                                        <p className="p-3 text-sm text-gray-500">لا يوجد مدربون في الطاقم</p>
+                                                    ) : trainers.map(t => {
+                                                        const selected = selectedTrainerIds.includes(t.id)
+                                                        return (
+                                                            <label
+                                                                key={t.id}
+                                                                className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm ${
+                                                                    selected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selected}
+                                                                    onChange={() => {
+                                                                        setSelectedTrainerIds(prev =>
+                                                                            selected
+                                                                                ? prev.filter(id => id !== t.id)
+                                                                                : [...prev, t.id]
+                                                                        )
+                                                                    }}
+                                                                    className="rounded"
+                                                                />
+                                                                {t.name}
+                                                            </label>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Selected trainers chips */}
+                                        {selectedTrainerIds.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {selectedTrainerIds.map(id => {
+                                                    const tr = trainers.find(t => t.id === id)
+                                                    if (!tr) return null
+                                                    return (
+                                                        <span key={id} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
+                                                            {tr.name}
+                                                            <X
+                                                                className="h-3 w-3 cursor-pointer hover:text-blue-900"
+                                                                onClick={() => setSelectedTrainerIds(prev => prev.filter(i => i !== id))}
+                                                            />
+                                                        </span>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="space-y-2">

@@ -454,6 +454,10 @@ class InstituteController {
             if (typeof payload.tags === 'string') {
                 try { payload.tags = JSON.parse(payload.tags); } catch (e) { }
             }
+            // Parse trainerIds (new multi-trainer support)
+            if (typeof payload.trainerIds === 'string') {
+                try { payload.trainerIds = JSON.parse(payload.trainerIds); } catch (e) { }
+            }
             if (payload.isFree === 'true') payload.isFree = true;
             if (payload.isFree === 'false') payload.isFree = false;
 

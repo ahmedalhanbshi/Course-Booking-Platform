@@ -10,6 +10,7 @@ import { Bell, CheckCircle, CreditCard, Users, Calendar, Megaphone, Clock, Loade
 import { formatDate } from "@/lib/utils"
 import { notificationService, NotificationItem } from "@/lib/notification-service"
 import { useNotifications } from "@/contexts/notification-context"
+import { NotificationMessage } from "@/components/notifications/notification-message"
 import { toast } from "sonner"
 
 export default function StudentNotificationsPage() {
@@ -159,7 +160,7 @@ export default function StudentNotificationsPage() {
                                         <Badge variant="outline" className="text-xs">{getTypeLabel(notification.type)}</Badge>
                                         {!notification.isRead && <div className="w-2 h-2 bg-blue-500 rounded-full ml-auto" />}
                                     </div>
-                                    <p className="text-sm text-gray-500 truncate">{notification.message}</p>
+                                    <NotificationMessage message={notification.message} />
                                     <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
                                         <Clock className="h-3 w-3" />
                                         {formatDate(new Date(notification.createdAt))}
@@ -188,7 +189,7 @@ export default function StudentNotificationsPage() {
                                 </div>
                             </DialogHeader>
                             <div className="space-y-4">
-                                <p className="text-gray-700 leading-relaxed">{selected.message}</p>
+                                <NotificationMessage message={selected.message} isFull={true} />
                                 <div className="flex items-center gap-2 text-sm text-gray-500 border-t pt-3">
                                     <Clock className="h-4 w-4" />
                                     {formatDate(new Date(selected.createdAt))}

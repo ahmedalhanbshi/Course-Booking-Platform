@@ -90,7 +90,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
   const getStatusLabel = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active': return 'مستمر'
-      case 'completed': return 'مكتمل'
       case 'cancelled': return 'ملغى'
       case 'preliminary': return 'مبدئي'
       case 'pending_payment': return 'بانتظار الدفع'
@@ -102,7 +101,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active': return 'bg-green-100 text-green-700 hover:bg-green-200 border-transparent shadow-none'
-      case 'completed': return 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-transparent shadow-none'
       case 'cancelled': return 'bg-red-100 text-red-700 hover:bg-red-200 border-transparent shadow-none'
       case 'preliminary': return 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-transparent shadow-none'
       case 'pending_payment': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent shadow-none'
@@ -587,12 +585,6 @@ export default function CourseStudentsManager({ courseId, backLink, backText, fe
                 <span className="text-gray-600">ملغيين:</span>
                 <span className="font-medium text-red-600">
                   {enrollments.filter(e => e.status === 'cancelled').length}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">مكتملين:</span>
-                <span className="font-medium text-blue-600">
-                  {enrollments.filter(e => e.status === 'completed').length}
                 </span>
               </div>
             </div>

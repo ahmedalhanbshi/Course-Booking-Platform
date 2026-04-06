@@ -26,6 +26,7 @@ export interface CourseCardProps {
         name: string
         avatar: string
     }
+    instructors?: { name: string; avatar?: string }[] // multi-trainer support
     category: string
     basePath?: string
     isFavorite?: boolean
@@ -41,6 +42,7 @@ export function CourseCard({
     level,
     image,
     instructor,
+    instructors,
     category,
     basePath = "/courses",
     isFavorite: initialIsFavorite = false
@@ -142,12 +144,36 @@ export function CourseCard({
                     {description}
                 </p>
 
-                {/* Instructor */}
+                {/* Instructor(s) */}
                 <div className="flex items-center justify-start gap-2 mt-auto pt-3 border-t border-border/50">
-                    <div className="relative w-6 h-6 rounded-full overflow-hidden border border-border">
-                        <Image src={instructor.avatar} alt={instructor.name} fill className="object-cover" unoptimized={true} />
-                    </div>
-                    <span className="text-xs font-medium text-muted-foreground">{instructor.name}</span>
+                    {instructors && instructors.length > 1 ? (
+                        // Multi-trainer: show stacked avatars + names
+                        <div className="flex flex-col gap-1 w-full">
+                            <div className="flex items-center gap-1">
+                                {instructors.slice(0, 3).map((t, i) => (
+                                    <div key={i} className="relative w-6 h-6 rounded-full overflow-hidden border-2 border-white -ml-2 first:ml-0 shadow-sm" style={{ zIndex: 10 - i }}>
+                                        <div className="w-full h-full bg-blue-100 flex items-center justify-center text-[9px] font-bold text-blue-600">
+                                            {t.name.charAt(0)}
+                                        </div>
+                                    </div>
+                                ))}
+                                {instructors.length > 3 && (
+                                    <span className="text-xs text-muted-foreground mr-1">+{instructors.length - 3}</span>
+                                )}
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground truncate">
+                                {instructors.map(t => t.name).join('، ')}
+                            </span>
+                        </div>
+                    ) : (
+                        // Single trainer fallback
+                        <>
+                            <div className="relative w-6 h-6 rounded-full overflow-hidden border border-border">
+                                <Image src={instructor.avatar} alt={instructor.name} fill className="object-cover" unoptimized={true} />
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground">{instructor.name}</span>
+                        </>
+                    )}
                 </div>
             </CardContent>
 

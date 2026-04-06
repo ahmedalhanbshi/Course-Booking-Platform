@@ -603,6 +603,21 @@ class TrainerController {
         }
     }
 
+    /**
+     * Cancel a direct room booking (not linked to any course)
+     */
+    async cancelDirectBooking(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { bookingId } = req.params;
+
+            const updated = await trainerService.cancelDirectBooking(req.user.userId, bookingId);
+            return sendSuccess(res, 'تم إلغاء طلب الحجز بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
     async updateSession(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);

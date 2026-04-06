@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -78,11 +78,13 @@ export default function InstituteCourses() {
 
   const filteredCourses = courses.filter(course => {
     const normalizedTitle = normalizeText(course.title)
-    const normalizedTrainer = normalizeText(course.trainer?.name ?? "")
+    // Support both trainer (single) and trainers (multi)
+    const trainerNames = (course.trainers as any[] | undefined)?.map((t: any) => normalizeText(t.name ?? '')).join(' ') 
+      || normalizeText(course.trainer?.name ?? '')
     const matchesStatus = statusFilter === "all" || course.status === statusFilter
-    const matchesTrainer = trainerFilter === "all" || normalizedTrainer.includes(trainerFilter)
+    const matchesTrainer = trainerFilter === "all" || trainerNames.includes(trainerFilter)
     const matchesSearch = normalizedTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      normalizedTrainer.toLowerCase().includes(searchQuery.toLowerCase())
+      trainerNames.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesStatus && matchesTrainer && matchesSearch
   })
 
@@ -150,7 +152,14 @@ export default function InstituteCourses() {
     }
   }
 
-  const uniqueTrainers = Array.from(new Set(courses.map(course => normalizeText(course.trainer?.name ?? ""))))
+  // Collect unique trainer names from trainers[] or trainer
+  const uniqueTrainers = Array.from(new Set(
+    courses.flatMap(course => 
+      (course as any).trainers?.length > 0
+        ? (course as any).trainers.map((t: any) => normalizeText(t.name ?? ''))
+        : [normalizeText(course.trainer?.name ?? '')]
+    ).filter(Boolean)
+  ))
 
   if (loading) {
     return (
@@ -311,8 +320,21 @@ export default function InstituteCourses() {
                   </div>
                 </div>
 
-                <div className="mt-1 text-sm text-slate-500 line-clamp-1">
-                  المدرب: <span className="font-medium text-slate-700">{normalizeText(course.trainer?.name ?? "-")}</span>
+                <div className="mt-1 text-sm text-slate-500">
+                  {(course as any).trainers?.length > 1 ? (
+                    <>
+                      <span className="font-medium text-slate-600">المدربون: </span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(course as any).trainers.map((t: any) => (
+                          <span key={t.id} className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            {normalizeText(t.name)}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>المدرب: <span className="font-medium text-slate-700">{normalizeText((course as any).trainers?.[0]?.name ?? course.trainer?.name ?? "-")}</span></>
+                  )}
                 </div>
 
                 <div className="mt-3 flex items-center justify-start gap-2 text-sm text-slate-600">

@@ -10,6 +10,7 @@ import { BookOpen, Play, TrendingUp, Users, Bell, ChevronLeft, Search, Heart, Lo
 import { studentService, StudentDashboardData } from "@/lib/student-service"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
+import { NotificationMessage } from "@/components/notifications/notification-message"
 
 const courseImagePlaceholder = "/images/course-abstract.svg"
 
@@ -263,19 +264,17 @@ export default function StudentDashboard() {
             <CardContent className="p-0">
               <div className="divide-y divide-gray-50">
                 {recentNotifications.map((notification) => (
-                  <div key={notification.id} className="p-3 hover:bg-orange-50/30 transition-colors flex gap-3 items-start group">
+                  <Link key={notification.id} href="/student/notifications" className="p-3 hover:bg-orange-50/30 transition-colors flex gap-3 items-start group">
                     <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 shadow-sm transition-transform group-hover:scale-125 ${notification.type === 'material' ? 'bg-blue-500 shadow-blue-200' : 'bg-orange-500 shadow-orange-200'
                       }`} />
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-900 group-hover:text-orange-700 transition-colors">{notification.title}</h4>
-                      <p className="text-[10px] text-gray-600 mt-0.5 leading-relaxed line-clamp-2">
-                        {notification.message}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-semibold text-gray-900 group-hover:text-orange-700 transition-colors line-clamp-1">{notification.title}</h4>
+                      <NotificationMessage message={notification.message} />
                       <span className="text-[9px] text-gray-400 mt-1 block font-medium">
                         {notification.time ? formatDate(new Date(notification.time)) : 'منذ فترة'}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
               <div className="p-3 bg-gray-50/50 border-t border-gray-100">

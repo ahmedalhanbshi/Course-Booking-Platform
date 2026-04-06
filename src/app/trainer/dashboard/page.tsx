@@ -83,9 +83,9 @@ export default function TrainerDashboard() {
               <p className="text-blue-100 text-sm md:text-base opacity-90">
                 لديك{" "}
                 <span className="font-bold text-white">{stats.upcomingSessions} دروس قادمة</span>
-                {" "}و{" "}
-                <span className="font-bold text-white">{stats.activeCourses} دورات نشطة</span>
-                {" "}تحتاج لمتابعتك.
+                {" "}وإجمالي{" "}
+                <span className="font-bold text-white">{stats.totalCourses} دورات</span>
+                {" "}في كافة الحالات.
               </p>
             </div>
 
@@ -109,11 +109,15 @@ export default function TrainerDashboard() {
           <div className="hidden lg:flex gap-4">
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
               <div className="text-2xl font-bold mb-0.5">{stats.totalStudents}</div>
-              <div className="text-[10px] font-medium text-blue-200 uppercase">طالب</div>
+              <div className="text-[10px] font-medium text-blue-200 uppercase tracking-wider">طالب</div>
             </div>
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">{stats.activeCourses}</div>
-              <div className="text-[10px] font-medium text-blue-200 uppercase">دورات</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.totalCourses}</div>
+              <div className="text-[10px] font-medium text-blue-200 uppercase tracking-wider">دورات</div>
+            </div>
+            <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[100px]">
+              <div className="text-2xl font-bold mb-0.5">{stats.totalEarnings.toLocaleString()}</div>
+              <div className="text-[10px] font-medium text-blue-200 uppercase tracking-wider">الأرباح (ر.ي)</div>
             </div>
           </div>
         </div>

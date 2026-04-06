@@ -280,24 +280,43 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
                     </p>
                   </div>
 
-                  {/* Trainer */}
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="relative h-6 w-6 overflow-hidden rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center">
-                      {course.trainer.avatar ? (
-                        <Image
-                          src={resolveImage(course.trainer.avatar)}
-                          alt={course.trainer.name}
-                          fill
-                          sizes="24px"
-                          className="object-cover"
-                          unoptimized={true}
-                        />
-                      ) : (
-                        <span className="text-[10px] font-bold text-slate-500">{course.trainer.name.charAt(0)}</span>
-                      )}
+                  {/* Trainer(s) */}
+                  {(course as any).staffTrainers?.length > 1 ? (
+                    <div className="mt-2 space-y-1">
+                      <span className="text-xs text-slate-400">المدربون:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {(course as any).staffTrainers.map((t: any, i: number) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                          >
+                            <span className="h-4 w-4 rounded-full bg-blue-200 flex items-center justify-center text-[9px] font-bold text-blue-800 shrink-0">
+                              {t.name.charAt(0)}
+                            </span>
+                            {t.name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{course.trainer.name}</span>
-                  </div>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="relative h-6 w-6 overflow-hidden rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center">
+                        {course.trainer.avatar ? (
+                          <Image
+                            src={resolveImage(course.trainer.avatar)}
+                            alt={course.trainer.name}
+                            fill
+                            sizes="24px"
+                            className="object-cover"
+                            unoptimized={true}
+                          />
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-500">{course.trainer.name.charAt(0)}</span>
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{course.trainer.name}</span>
+                    </div>
+                  )}
 
                   {/* Stats */}
                   <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">

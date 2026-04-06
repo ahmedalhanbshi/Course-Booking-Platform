@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Globe } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, CheckCircle, Settings, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Globe, Filter } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { instituteService } from "@/lib/institute-service"
 
@@ -25,6 +26,7 @@ const WEEK_DAYS = ["أحد", "اثن", "ثلا", "أرب", "خم", "جم", "سب
 interface ScheduleSession {
     id: string
     title: string
+    courseId: string | null
     courseTitle: string
     startTime: string
     endTime: string
@@ -45,6 +47,7 @@ export default function InstituteSchedulePage() {
     const [sessions, setSessions] = useState<ScheduleSession[]>([])
     const [loading, setLoading] = useState(true)
     const [now, setNow] = useState(() => new Date())
+    const [selectedCourseId, setSelectedCourseId] = useState<string>("all")
 
     // ── Manage Modal ──────────────────────────────────────────────────────────
     const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null)
@@ -210,8 +213,18 @@ export default function InstituteSchedulePage() {
         }
     }
 
+    // ── Unique course list for filter ─────────────────────────────────────────
+    const courseOptions = Array.from(
+        new Map(sessions.map(s => [s.courseId, s.courseTitle])).entries()
+    ).filter(([id]) => id !== null) as [string, string][]
+
+    // ── Filtered sessions ─────────────────────────────────────────────────────
+    const filteredSessions = selectedCourseId === "all"
+        ? sessions
+        : sessions.filter(s => s.courseId === selectedCourseId)
+
     // ── Grouping ──────────────────────────────────────────────────────────────
-    const sessionsByDate = sessions.reduce((acc, s) => {
+    const sessionsByDate = filteredSessions.reduce((acc, s) => {
         const k = formatDateKey(new Date(s.startTime))
         if (!acc[k]) acc[k] = []
         acc[k].push(s)
@@ -244,20 +257,68 @@ export default function InstituteSchedulePage() {
     )
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">جدول الجلسات</h1>
-                <p className="text-gray-600">جميع الجلسات المقررة في قاعات المعهد</p>
+        <div className="max-w-4xl mx-auto py-8 px-4" dir="rtl">
+
+            {/* ── Header Banner ── */}
+            <div className="mb-8 rounded-2xl bg-gradient-to-l from-violet-600 to-purple-500 p-6 text-white shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h1 className="text-2xl font-bold mb-1">جدول الجلسات</h1>
+                        <p className="text-purple-100 text-sm">جميع الجلسات المقررة في قاعات المعهد</p>
+                    </div>
+                    {sessions.length > 0 && (
+                        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2 text-sm">
+                            <CalendarIcon className="h-4 w-4 opacity-80" />
+                            <span className="font-medium">{filteredSessions.length} جلسة</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {sessions.length === 0 ? (
-                <Card className="bg-gray-50 border-dashed border-2">
-                    <CardContent className="p-12 text-center">
+            {/* ── Course Filter Pills ── */}
+            {courseOptions.length > 0 && (
+                <div className="mb-6">
+                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">فلترة حسب الدورة</p>
+                    <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+                        <button
+                            onClick={() => setSelectedCourseId("all")}
+                            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                selectedCourseId === "all"
+                                    ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                                    : "bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600"
+                            }`}
+                        >
+                            جميع الدورات
+                        </button>
+                        {courseOptions.map(([id, title]) => (
+                            <button
+                                key={id}
+                                onClick={() => setSelectedCourseId(id)}
+                                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                    selectedCourseId === id
+                                        ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                                        : "bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600"
+                                }`}
+                            >
+                                {title}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {filteredSessions.length === 0 ? (
+                <div className="bg-gray-50 border-dashed border-2 rounded-lg">
+                    <div className="p-12 text-center">
                         <CalendarIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">لا توجد جلسات مجدولة</h3>
-                        <p className="text-gray-500">لم يتم حجز أي قاعات أو لا توجد جلسات قادمة.</p>
-                    </CardContent>
-                </Card>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            {selectedCourseId === "all" ? "لا توجد جلسات مجدولة" : "لا توجد جلسات لهذه الدورة"}
+                        </h3>
+                        <p className="text-gray-500">
+                            {selectedCourseId === "all" ? "لم يتم حجز أي قاعات أو لا توجد جلسات قادمة." : "جرّب اختيار دورة أخرى من القائمة أعلاه."}
+                        </p>
+                    </div>
+                </div>
             ) : (
                 <div className="space-y-8">
                     {sortedDates.map(dateStr => (

@@ -62,9 +62,6 @@ export const publicController = {
           trainer: {
             select: { id: true, name: true, avatar: true }
           },
-          staffTrainer: {
-            select: { id: true, name: true }
-          },
           institute: {
             select: { id: true, name: true, logo: true }
           }

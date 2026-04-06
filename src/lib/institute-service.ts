@@ -13,7 +13,7 @@ interface InstituteDashboardData {
         rooms: number;
         roomBookingsToday: number;
         totalStudents: number;
-        monthlyRevenue: number;
+        totalEarnings: number;
     };
     recentBookings: {
         id: string;
@@ -111,8 +111,8 @@ class InstituteService {
         return response.data.data;
     }
 
-    async getStudents(): Promise<{ students: any[]; totalStudents: number; totalEnrollments: number }> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: { students: any[]; totalStudents: number; totalEnrollments: number } }>('/api/institute/students');
+    async getStudents(): Promise<{ students: any[]; totalStudents: number; totalEnrollments: number; totalEarnings: number }> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: { students: any[]; totalStudents: number; totalEnrollments: number; totalEarnings: number } }>('/api/institute/students');
         return response.data.data;
     }
 

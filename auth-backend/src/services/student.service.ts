@@ -32,7 +32,7 @@ class StudentService {
                         image: true,
                         category: { select: { name: true } },
                         trainer: { select: { name: true } },
-                        staffTrainer: { select: { name: true } }
+                        staffTrainerIds: true
                     }
                 }
             },
@@ -40,11 +40,11 @@ class StudentService {
             orderBy: { enrolledAt: 'desc' }
         });
 
-        const currentCourses = enrollments.map(e => ({
+        const currentCourses = enrollments.map((e: any) => ({
             id: e.course.id,
             title: e.course.title,
             shortDescription: e.course.shortDescription || '',
-            trainer: e.course.trainer?.name || e.course.staffTrainer?.name || 'مدرب',
+            trainer: e.course.trainer?.name || ((e.course.staffTrainerIds as string[])?.length > 0 ? 'مدرب معهد' : 'مدرب'),
             image: e.course.image,
             category: e.course.category?.name || 'عام',
         }));
@@ -153,7 +153,7 @@ class StudentService {
                         image: true,
                         category: { select: { name: true } },
                         trainer: { select: { id: true, name: true, avatar: true } },
-                        staffTrainer: { select: { id: true, name: true, institute: { select: { logo: true } } } },
+                        staffTrainerIds: true,
                         startDate: true,
                         endDate: true,
                         price: true,
@@ -173,7 +173,7 @@ class StudentService {
             orderBy: { enrolledAt: 'desc' }
         });
 
-        return enrollments.map(e => ({
+        return enrollments.map((e: any) => ({
             id: e.id,
             status: e.status, // Map this correctly in frontend if needed
             progress: 0, // Placeholder
@@ -183,10 +183,10 @@ class StudentService {
                 title: e.course.title,
                 shortDescription: e.course.shortDescription || '',
                 description: e.course.description || '',
-                trainer: e.course.staffTrainer ? {
-                    id: e.course.staffTrainer.id,
-                    name: e.course.staffTrainer.name,
-                    avatar: e.course.staffTrainer.institute?.logo || null
+                trainer: (e.course.staffTrainerIds as string[])?.length > 0 ? {
+                    id: (e.course.staffTrainerIds as string[])[0],
+                    name: "مدرب المعهد", // المبسطة للعرض
+                    avatar: null // يمكن تحسينه لاحقاً
                 } : {
                     id: e.course.trainer?.id || 'unknown',
                     name: e.course.trainer?.name || 'مدرب الخبير',
@@ -453,15 +453,6 @@ class StudentService {
                                 phone: true
                             }
                         },
-                        staffTrainer: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true,
-                                phone: true,
-                                institute: { select: { logo: true } }
-                            }
-                        },
                         category: true,
                         sessions: {
                             orderBy: { startTime: 'asc' },
@@ -517,13 +508,13 @@ class StudentService {
                 type: nextSession.type,
                 meetingLink: nextSession.meetingLink
             } : null,
-            instructor: course.staffTrainer ? {
-                id: course.staffTrainer.id,
-                name: course.staffTrainer.name,
+            instructor: (course as any).staffTrainerIds?.length > 0 ? {
+                id: (course as any).staffTrainerIds[0],
+                name: 'مدرب المعهد',
                 role: 'مدرب معهد',
-                avatar: course.staffTrainer.institute?.logo,
-                email: course.staffTrainer.email,
-                phone: course.staffTrainer.phone
+                avatar: null,
+                email: null,
+                phone: null
             } : {
                 id: course.trainer?.id,
                 name: course.trainer?.name || 'مدرب',
@@ -567,7 +558,7 @@ class StudentService {
                         price: true,
                         category: { select: { name: true } },
                         trainer: { select: { id: true, name: true, avatar: true } },
-                        staffTrainer: { select: { id: true, name: true } },
+                        staffTrainerIds: true,
                         sessions: { select: { id: true, type: true } }
                     }
                 }
@@ -585,7 +576,7 @@ class StudentService {
                 price: Number(course.price),
                 category: course.category?.name || 'عام',
                 trainer: {
-                    name: course.trainer?.name || course.staffTrainer?.name || 'مدرب',
+                    name: course.trainer?.name || ((course as any).staffTrainerIds?.length > 0 ? 'مدرب معهد' : 'مدرب'),
                 },
                 type: course.sessions[0]?.type === 'ONLINE' ? 'أونلاين' : (course.sessions.length > 0 ? 'حضوري' : 'أونلاين')
             };
@@ -698,18 +689,18 @@ class StudentService {
                     select: {
                         title: true,
                         trainer: { select: { name: true } },
-                        staffTrainer: { select: { name: true } }
+                        staffTrainerIds: true
                     }
                 }
             },
             orderBy: { startTime: 'asc' }
         });
 
-        return sessions.map(s => ({
+        return sessions.map((s: any) => ({
             id: s.id,
             topic: s.topic || 'جلسة تدريبية',
             courseTitle: s.course?.title || '',
-            trainerName: s.course?.trainer?.name || s.course?.staffTrainer?.name || 'مدرب',
+            trainerName: s.course?.trainer?.name || ((s.course as any)?.staffTrainerIds?.length > 0 ? 'مدرب معهد' : 'مدرب'),
             startTime: s.startTime,
             endTime: s.endTime,
             type: s.type.toLowerCase(),

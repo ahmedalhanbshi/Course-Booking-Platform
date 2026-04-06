@@ -84,7 +84,7 @@ export default function InstituteDashboard() {
                 مرحباً بك، {institute.adminName} 👋
               </h1>
               <p className="text-purple-100 text-sm md:text-base opacity-90">
-                إدارة {institute.name} - لديك <span className="font-bold text-white">{stats.roomBookingsToday} حجوزات اليوم</span> و <span className="font-bold text-white">{stats.activeCourses} دورات نشطة</span>.
+                إدارة {institute.name} - لديك <span className="font-bold text-white">{stats.roomBookingsToday} حجوزات اليوم</span> وإجمالي <span className="font-bold text-white">{stats.totalCourses} دورات</span>.
               </p>
             </div>
 
@@ -108,15 +108,15 @@ export default function InstituteDashboard() {
           <div className="hidden lg:flex gap-4">
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
               <div className="text-2xl font-bold mb-0.5">{stats.totalStudents}</div>
-              <div className="text-[10px] font-medium text-purple-200 uppercase">طالب</div>
+              <div className="text-[10px] font-medium text-purple-200 uppercase tracking-wider">طالب</div>
             </div>
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[90px]">
-              <div className="text-2xl font-bold mb-0.5">{stats.activeCourses}</div>
-              <div className="text-[10px] font-medium text-purple-200 uppercase">دورة</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.totalCourses}</div>
+              <div className="text-[10px] font-medium text-purple-200 uppercase tracking-wider">دورة</div>
             </div>
             <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 min-w-[120px]">
-              <div className="text-2xl font-bold mb-0.5">{stats.monthlyRevenue.toLocaleString()}</div>
-              <div className="text-[10px] font-medium text-purple-200 uppercase">ريال يمني</div>
+              <div className="text-2xl font-bold mb-0.5">{stats.totalEarnings.toLocaleString()}</div>
+              <div className="text-[10px] font-medium text-purple-200 uppercase tracking-wider">الأرباح (ر.ي)</div>
             </div>
           </div>
         </div>

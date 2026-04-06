@@ -6,10 +6,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bell, CheckCircle, Building2, Calendar, FileCheck, Megaphone, Clock, Loader2, UserPlus, Info } from "lucide-react"
+import { Bell, CheckCircle, Calendar, Megaphone, Clock, Loader2, UserPlus, Info } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { notificationService, NotificationItem } from "@/lib/notification-service"
 import { useNotifications } from "@/contexts/notification-context"
+import { NotificationMessage } from "@/components/notifications/notification-message"
 import { toast } from "sonner"
 
 export default function InstituteNotificationsPage() {
@@ -156,7 +157,7 @@ export default function InstituteNotificationsPage() {
                                     <Badge variant="outline" className="text-xs">{getTypeLabel(notification.type)}</Badge>
                                     {!notification.isRead && <div className="h-2 w-2 bg-blue-500 rounded-full ml-auto" />}
                                 </div>
-                                <p className="text-sm text-gray-500 truncate">{notification.message}</p>
+                                <NotificationMessage message={notification.message} />
                                 <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
                                     <Clock className="h-3 w-3" />
                                     {formatDate(new Date(notification.createdAt))}
@@ -184,7 +185,7 @@ export default function InstituteNotificationsPage() {
                                 </div>
                             </DialogHeader>
                             <div className="space-y-4">
-                                <p className="text-gray-700 leading-relaxed">{selected.message}</p>
+                                <NotificationMessage message={selected.message} isFull={true} />
                                 <div className="flex items-center gap-2 text-sm text-gray-500 border-t pt-3">
                                     <Clock className="h-4 w-4" />
                                     {formatDate(new Date(selected.createdAt))}

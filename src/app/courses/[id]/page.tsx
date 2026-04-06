@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -1058,29 +1058,57 @@ export default function CourseDetailsPage() {
         >
           <div className="text-right space-y-4">
             <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              معلومات المدرب
+              {((course as any).staffTrainers?.length ?? 0) > 1 ? "المدربون" : "معلومات المدرب"}
             </h3>
-            <div className="flex items-start gap-4">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200">
-                <Image
-                  src={resolveImage(course.instructor.avatar)}
-                  alt={course.instructor.name}
-                  fill
-                  className="object-cover"
-                  unoptimized={true}
-                />
+
+            {/* Multi-trainer support: show all trainers if staffTrainers available */}
+            {(course as any).staffTrainers?.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(course as any).staffTrainers.map((t: any) => (
+                  <div key={t.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-200">
+                      <div className="flex h-full w-full items-center justify-center text-lg font-bold text-slate-500">
+                        {t.name?.charAt(0) ?? "م"}
+                      </div>
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900 truncate">{t.name}</h4>
+                      {t.specialties?.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {t.specialties.slice(0, 3).map((s: string) => (
+                            <span key={s} className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{s}</span>
+                          ))}
+                        </div>
+                      )}
+                      {t.bio && <p className="text-xs text-slate-500 line-clamp-2">{t.bio}</p>}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="space-y-1">
-                <h4 className="text-lg font-bold text-slate-900">
-                  {course.instructor.name}
-                </h4>
-                {course.instructor.bio && (
-                  <p className="text-sm text-slate-500 line-clamp-2 max-w-[560px]">
-                    {course.instructor.bio}
-                  </p>
-                )}
+            ) : (
+              /* Legacy single instructor fallback */
+              <div className="flex items-start gap-4">
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200">
+                  <Image
+                    src={resolveImage(course.instructor.avatar)}
+                    alt={course.instructor.name}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-lg font-bold text-slate-900">
+                    {course.instructor.name}
+                  </h4>
+                  {course.instructor.bio && (
+                    <p className="text-sm text-slate-500 line-clamp-2 max-w-[560px]">
+                      {course.instructor.bio}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </Card>
 

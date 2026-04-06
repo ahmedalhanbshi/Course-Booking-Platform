@@ -124,7 +124,6 @@ model InstituteStaff {
   joinedAt    DateTime    @default(now()) @map("joined_at")
   notes       String?
   instituteId String      @map("institute_id")
-  courses     Course[]
   institute   Institute   @relation(fields: [instituteId], references: [id], onDelete: Cascade)
 
   @@map("institute_staff")
@@ -156,9 +155,9 @@ model Course {
   image            String?
   prerequisites    String?
   objectives       String[]
-  tags             String[]
-  trainerId        String?         @map("trainer_id")
-  staffTrainerId   String?         @map("staff_trainer_id")
+  tags                String[]
+  staffTrainerIds     String[]        @default([]) @map("staff_trainer_ids")
+  trainerId           String?         @map("trainer_id")
   instituteId      String?         @map("institute_id")
   categoryId       String?         @map("category_id")
   deactivatedAt    DateTime?       @map("deactivated_at")
@@ -167,7 +166,6 @@ model Course {
   announcements    Announcement[]
   category         CourseCategory? @relation(fields: [categoryId], references: [id])
   institute        Institute?      @relation(fields: [instituteId], references: [id])
-  staffTrainer     InstituteStaff? @relation(fields: [staffTrainerId], references: [id])
   trainer          User?           @relation("TrainerCourses", fields: [trainerId], references: [id], onDelete: Restrict)
   enrollments      Enrollment[]
   roomBookings     RoomBooking[]

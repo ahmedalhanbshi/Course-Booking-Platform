@@ -283,6 +283,10 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                     name: course.trainer.name,
                     avatar: resolveImage(course.trainer.avatar)
                   }}
+                  instructors={(course as any).staffTrainers?.length > 1
+                    ? (course as any).staffTrainers.map((t: any) => ({ name: t.name, avatar: null }))
+                    : undefined
+                  }
                   basePath={basePath}
                   isFavorite={wishlistIds.includes(course.id)}
                 />

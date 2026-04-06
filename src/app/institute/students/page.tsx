@@ -40,6 +40,7 @@ type StudentsData = {
     students: Student[]
     totalStudents: number
     totalEnrollments: number
+    totalEarnings: number
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
@@ -181,14 +182,14 @@ export default function InstituteStudentsPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center">
-                            <Users className="h-8 w-8 text-blue-600" />
+                            <BookOpen className="h-8 w-8 text-indigo-600" />
                             <div className="mr-4">
-                                <p className="text-sm font-medium text-gray-600">إجمالي الطلاب</p>
-                                <p className="text-2xl font-bold">{data?.totalStudents ?? 0}</p>
+                                <p className="text-sm font-medium text-gray-600 tracking-tight">إجمالي التسجيلات</p>
+                                <p className="text-2xl font-bold">{data?.totalEnrollments ?? 0}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -197,10 +198,27 @@ export default function InstituteStudentsPage() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center">
-                            <BookOpen className="h-8 w-8 text-green-600" />
+                            <Users className="h-8 w-8 text-blue-600" />
                             <div className="mr-4">
-                                <p className="text-sm font-medium text-gray-600">إجمالي التسجيلات</p>
-                                <p className="text-2xl font-bold">{data?.totalEnrollments ?? 0}</p>
+                                <p className="text-sm font-medium text-gray-600 tracking-tight">إجمالي الطلاب</p>
+                                <p className="text-2xl font-bold">{data?.totalStudents ?? 0}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-6 border-r-4 border-emerald-500">
+                        <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center">
+                                <span className="text-emerald-600 font-bold text-xl">$</span>
+                            </div>
+                            <div className="mr-4 text-right">
+                                <p className="text-sm font-medium text-gray-600 uppercase tracking-tight">إجمالي الأرباح</p>
+                                <div className="flex items-baseline gap-1">
+                                    <p className="text-2xl font-bold text-emerald-700">{(data?.totalEarnings ?? 0).toLocaleString()}</p>
+                                    <span className="text-xs font-medium text-emerald-600/70">ر.ي</span>
+                                </div>
                             </div>
                         </div>
                     </CardContent>

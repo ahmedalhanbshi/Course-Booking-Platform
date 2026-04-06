@@ -2,9 +2,11 @@ import apiClient from './api-client';
 
 export interface TrainerDashboardData {
     stats: {
+        totalCourses: number;
         activeCourses: number;
         totalStudents: number;
         totalSessions: number;
+        totalEarnings: number;
         upcomingSessions: number;
         pendingRoomBookings: number;
     };
@@ -101,6 +103,7 @@ export interface CourseDetail {
 export interface Session {
     id: string;
     title: string;
+    courseId: string | null;
     courseTitle: string;
     startTime: string;
     endTime: string;
@@ -272,10 +275,12 @@ class TrainerService {
         return response.data.data;
     }
 
-    async cancelBooking(courseId: string, bookingId: string): Promise<any> {
-        const response = await apiClient.delete<{ success: boolean; message: string; data: any }>(
-            `/api/trainer/courses/${courseId}/bookings/${bookingId}`
-        );
+    async cancelBooking(courseId: string | null | undefined, bookingId: string): Promise<any> {
+        // Direct bookings (not linked to a course) use a different endpoint
+        const url = courseId && courseId !== 'null'
+            ? `/api/trainer/courses/${courseId}/bookings/${bookingId}`
+            : `/api/trainer/bookings/${bookingId}`;
+        const response = await apiClient.delete<{ success: boolean; message: string; data: any }>(url);
         return response.data.data;
     }
 

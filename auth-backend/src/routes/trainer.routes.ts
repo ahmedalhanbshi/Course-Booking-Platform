@@ -134,8 +134,11 @@ router.post(
     trainerController.resubmitBookingPayment
 );
 
-// Cancel Room Booking (alsos cancels course)
+// Cancel Room Booking linked to a course (also cancels course)
 router.delete('/courses/:courseId/bookings/:bookingId', trainerController.cancelBooking);
+
+// Cancel a direct Room Booking (not linked to any course)
+router.delete('/bookings/:bookingId', trainerController.cancelDirectBooking);
 
 // Session Management
 router.patch('/sessions/:sessionId', trainerController.updateSession);
