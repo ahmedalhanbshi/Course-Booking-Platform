@@ -4,14 +4,15 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bell, CheckCircle, Calendar, Megaphone, Clock, Loader2, UserPlus, Info } from "lucide-react"
+import { Bell, CheckCircle, Calendar, Megaphone, Clock, Loader2, UserPlus, Info, ExternalLink } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { notificationService, NotificationItem } from "@/lib/notification-service"
 import { useNotifications } from "@/contexts/notification-context"
 import { NotificationMessage } from "@/components/notifications/notification-message"
 import { toast } from "sonner"
+import Link from "next/link"
 
 export default function InstituteNotificationsPage() {
     const [notifications, setNotifications] = useState<NotificationItem[]>([])
@@ -151,8 +152,11 @@ export default function InstituteNotificationsPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <h3 className={`font-semibold ${!notification.isRead ? 'text-gray-900' : 'text-gray-700'}`}>
+                                    <h3 className={`font-semibold ${!notification.isRead ? 'text-gray-900' : 'text-gray-700'} flex items-center gap-2`}>
                                         {notification.title}
+                                        {notification.actionUrl && (
+                                            <ExternalLink className="h-3 w-3 text-emerald-500 opacity-60" />
+                                        )}
                                     </h3>
                                     <Badge variant="outline" className="text-xs">{getTypeLabel(notification.type)}</Badge>
                                     {!notification.isRead && <div className="h-2 w-2 bg-blue-500 rounded-full ml-auto" />}
@@ -186,7 +190,7 @@ export default function InstituteNotificationsPage() {
                             </DialogHeader>
                             <div className="space-y-4">
                                 <NotificationMessage message={selected.message} isFull={true} />
-                                <div className="flex items-center gap-2 text-sm text-gray-500 border-t pt-3">
+                                <div className="flex items-center gap-2 text-sm text-gray-500 border-y py-3">
                                     <Clock className="h-4 w-4" />
                                     {formatDate(new Date(selected.createdAt))}
                                     <span className="mr-auto">
@@ -197,6 +201,19 @@ export default function InstituteNotificationsPage() {
                                     </span>
                                 </div>
                             </div>
+                            <DialogFooter className="mt-2 flex gap-3 sm:flex-row flex-col">
+                                {selected.actionUrl && (
+                                    <Button asChild className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                                        <Link href={selected.actionUrl}>
+                                            <ExternalLink className="ml-2 h-4 w-4" />
+                                            الانتقال للتفاصيل
+                                        </Link>
+                                    </Button>
+                                )}
+                                <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>
+                                    إغلاق
+                                </Button>
+                            </DialogFooter>
                         </>
                     )}
                 </DialogContent>

@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Play, TrendingUp, Users, Bell, ChevronLeft, Search, Heart, Loader2, AlertCircle } from "lucide-react"
+import { BookOpen, Play, TrendingUp, Users, Bell, ChevronLeft, Search, Heart, Loader2, AlertCircle, ExternalLink } from "lucide-react"
 import { studentService, StudentDashboardData } from "@/lib/student-service"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
@@ -264,11 +264,14 @@ export default function StudentDashboard() {
             <CardContent className="p-0">
               <div className="divide-y divide-gray-50">
                 {recentNotifications.map((notification) => (
-                  <Link key={notification.id} href="/student/notifications" className="p-3 hover:bg-orange-50/30 transition-colors flex gap-3 items-start group">
+                  <Link key={notification.id} href={(notification as any).actionUrl || "/student/notifications"} className="p-3 hover:bg-orange-50/30 transition-colors flex gap-3 items-start group">
                     <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 shadow-sm transition-transform group-hover:scale-125 ${notification.type === 'material' ? 'bg-blue-500 shadow-blue-200' : 'bg-orange-500 shadow-orange-200'
                       }`} />
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-semibold text-gray-900 group-hover:text-orange-700 transition-colors line-clamp-1">{notification.title}</h4>
+                      <h4 className="text-xs font-semibold text-gray-900 group-hover:text-orange-700 transition-colors line-clamp-1 flex items-center justify-between">
+                        {notification.title}
+                        {(notification as any).actionUrl && <ExternalLink className="h-2.5 w-2.5 text-orange-400 group-hover:text-orange-600 transition-colors" />}
+                      </h4>
                       <NotificationMessage message={notification.message} />
                       <span className="text-[9px] text-gray-400 mt-1 block font-medium">
                         {notification.time ? formatDate(new Date(notification.time)) : 'منذ فترة'}

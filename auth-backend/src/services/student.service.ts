@@ -95,7 +95,8 @@ class StudentService {
                 message,
                 time: n.createdAt,
                 type,
-                isRead: n.isRead
+                isRead: n.isRead,
+                actionUrl: n.actionUrl
             };
         });
 

@@ -1061,7 +1061,7 @@ class TrainerService {
                 title: 'طلب حجز قاعة جديد',
                 message: `طلب المدرب ${trainer.name} حجز قاعة "${room.name}"`,
                 relatedEntityId: result.roomBooking.id,
-                actionUrl: '/institute/bookings',
+                actionUrl: '/institute/room-bookings',
                 emailFn: institute.user.email ? () => mailerService.sendNewBookingRequest(institute.user.email!, institute.user.name, trainer.name, room.name) : undefined,
                 whaFn: institute.user.phone ? () => whatsAppService.notifyNewBookingRequest(institute.user.phone!, institute.user.name, trainer.name, room.name) : undefined
             });
@@ -1208,7 +1208,7 @@ class TrainerService {
                     title: 'طلب حجز قاعة جديد',
                     message: `طلب المدرب ${trainer.name} حجز قاعة "${room.name}" لدورة "${course.title}"`,
                     relatedEntityId: roomBooking.id,
-                    actionUrl: '/institute/bookings',
+                    actionUrl: '/institute/room-bookings',
                     emailFn: institute.user.email ? () => mailerService.sendNewBookingRequest(institute.user.email!, institute.user.name, trainer.name, room.name) : undefined,
                     whaFn: institute.user.phone ? () => whatsAppService.notifyNewBookingRequest(institute.user.phone!, institute.user.name, trainer.name, room.name) : undefined
                 });
