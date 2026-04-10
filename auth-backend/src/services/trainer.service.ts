@@ -540,19 +540,36 @@ class TrainerService {
 
 
     /**
-     * Create an announcement for students (ALL or SINGLE_USER) from a trainer.
+     * Create an announcement for students (ALL, COURSE or SINGLE_USER) from a trainer.
      * Uses direct courseId lookup to avoid nested Prisma filter issues.
      */
-    async createStudentAnnouncement(userId: string, data: { title: string; message: string; recipientId?: string }) {
-        console.log(`[Announcement-Trainer] Trainer ${userId} initiating announcement to: ${data.recipientId ?? 'ALL'}`);
+    async createStudentAnnouncement(userId: string, data: {
+        title: string;
+        message: string;
+        recipientId?: string;
+        courseId?: string;
+        category?: string;
+        status?: string;
+        scheduledAt?: string;
+    }) {
+        console.log(`[Announcement-Trainer] Trainer ${userId} initiating announcement to: ${data.recipientId ?? (data.courseId ?? 'ALL')}`);
 
         // STRICTLY INDEPENDENT TRAINER LOOKUP: Fetch only courses owned by this specific trainer User ID
         const trainerCourses = await prisma.course.findMany({ 
             where: { trainerId: userId }, 
             select: { id: true } 
         });
-        const courseIds = trainerCourses.map((c: any) => c.id);
-        console.log(`[Announcement-Trainer] Trainer owns ${courseIds.length} courses`);
+        let courseIds = trainerCourses.map((c: any) => c.id);
+
+        if (data.courseId) {
+            if (courseIds.includes(data.courseId)) {
+                courseIds = [data.courseId];
+            } else {
+                throw new Error("الدورة المحددة غير تابعة لك");
+            }
+        }
+
+        console.log(`[Announcement-Trainer] Trainer owns ${courseIds.length} targeted courses`);
 
         if (data.recipientId) {
             // Target specific student
@@ -585,40 +602,46 @@ class TrainerService {
 
             // 1. Create Announcement Record
             const announcement = await (prisma.announcement.create as any)({
-                data: { 
-                    title: data.title, 
-                    message: fullMessage, 
-                    targetAudience: 'SINGLE_USER', 
-                    senderId: userId, 
-                    recipientId: data.recipientId, 
-                    status: 'SENT', 
-                    sentAt: new Date() 
+                data: {
+                    title: data.title,
+                    message: fullMessage,
+                    targetAudience: 'SINGLE_USER',
+                    senderId: userId,
+                    recipientId: data.recipientId,
+                    courseId: data.courseId || null,
+                    category: (data.category?.toUpperCase() as any) || 'GENERAL',
+                    status: (data.status?.toUpperCase() as any) || (data.scheduledAt ? 'SCHEDULED' : 'SENT'),
+                    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                    sentAt: data.scheduledAt ? null : new Date(),
+                    createdAt: new Date()
                 }
             });
 
-            // 2. Create Platform Notification
-            await prisma.notification.create({
-                data: { 
-                    userId: data.recipientId, 
-                    type: 'NEW_ANNOUNCEMENT' as any, 
-                    title: data.title, 
-                    message: fullMessage, 
-                    relatedEntityId: announcement.id 
-                }
-            });
+            // 2. Create Platform Notification (Only if SENT)
+            if (announcement.status === 'SENT') {
+                await prisma.notification.create({
+                    data: {
+                        userId: data.recipientId,
+                        type: 'NEW_ANNOUNCEMENT' as any,
+                        title: data.title,
+                        message: fullMessage,
+                        relatedEntityId: announcement.id
+                    }
+                });
+            }
 
-            // 3. Dispatch Email
-            if (student.email) {
+            // 3. Dispatch Email (Only if SENT)
+            if (announcement.status === 'SENT' && student.email) {
                 console.log(`[Announcement-Trainer] Dispatching email to: ${student.email}`);
                 mailerService.sendAnnouncementEmail(
-                    student.email, 
-                    student.name, 
-                    data.title, 
-                    data.message, 
-                    { 
-                        name: trainer?.name || 'المدرب', 
-                        phone: trainer?.phone, 
-                        email: trainer?.email 
+                    student.email,
+                    student.name,
+                    data.title,
+                    data.message,
+                    {
+                        name: trainer?.name || 'المدرب',
+                        phone: trainer?.phone,
+                        email: trainer?.email
                     }
                 )
                     .then(() => console.log(`[Announcement-Trainer] Email delivered successfully`))
@@ -636,13 +659,17 @@ class TrainerService {
             const fullMessage = data.message + contactFooter;
 
             const announcement = await (prisma.announcement.create as any)({
-                data: { 
-                    title: data.title, 
-                    message: fullMessage, 
-                    targetAudience: 'STUDENTS', 
-                    senderId: userId, 
-                    status: 'SENT', 
-                    sentAt: new Date() 
+                data: {
+                    title: data.title,
+                    message: fullMessage,
+                    targetAudience: data.courseId ? 'STUDENTS' : 'ALL',
+                    senderId: userId,
+                    courseId: data.courseId || null,
+                    category: (data.category?.toUpperCase() as any) || 'GENERAL',
+                    status: (data.status?.toUpperCase() as any) || (data.scheduledAt ? 'SCHEDULED' : 'SENT'),
+                    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                    sentAt: data.scheduledAt ? null : new Date(),
+                    createdAt: new Date()
                 }
             });
 
@@ -695,6 +722,68 @@ class TrainerService {
             }
             return announcement;
         }
+    }
+
+    /**
+     * Get all announcements sent by this trainer
+     */
+    async getAnnouncements(userId: string) {
+        const announcements = await (prisma.announcement as any).findMany({
+            where: { senderId: userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                sender: { select: { id: true, name: true } },
+                recipient: { select: { id: true, name: true } },
+                course: { select: { id: true, title: true } },
+            }
+        });
+
+        return announcements.map((a: any) => ({
+            id: a.id,
+            title: a.title,
+            message: a.message,
+            targetAudience: a.targetAudience?.toLowerCase(),
+            category: a.category?.toLowerCase(),
+            status: a.status?.toLowerCase(),
+            scheduledAt: a.scheduledAt,
+            sentAt: a.sentAt,
+            createdAt: a.createdAt,
+            courseId: a.courseId,
+            course: a.course,
+            sender: a.sender,
+            recipient: a.recipient,
+        }));
+    }
+
+    /**
+     * Update an announcement (only if it belongs to this trainer)
+     */
+    async updateAnnouncement(userId: string, announcementId: string, data: { title?: string; message?: string }) {
+        const existing = await (prisma.announcement as any).findFirst({
+            where: { id: announcementId, senderId: userId }
+        });
+        if (!existing) throw new Error('الإعلان غير موجود أو لا تملك صلاحية تعديله');
+
+        return (prisma.announcement as any).update({
+            where: { id: announcementId },
+            data: {
+                ...(data.title && { title: data.title }),
+                ...(data.message && { message: data.message }),
+            }
+        });
+    }
+
+    /**
+     * Delete an announcement (only if it belongs to this trainer)
+     */
+    async deleteAnnouncement(userId: string, announcementId: string) {
+        const existing = await (prisma.announcement as any).findFirst({
+            where: { id: announcementId, senderId: userId }
+        });
+        if (!existing) throw new Error('الإعلان غير موجود أو لا تملك صلاحية حذفه');
+
+        await (prisma.announcement as any).delete({ where: { id: announcementId } });
+        return { success: true };
     }
 
     /**
@@ -1404,6 +1493,7 @@ class TrainerService {
 
         const students = Array.from(studentMap.values()).map(s => ({
             ...s,
+            enrollments: s.enrolledCourses, // Add alias for frontend compatibility
             totalCourses: s.enrolledCourses.length,
         }));
 
@@ -1850,7 +1940,7 @@ class TrainerService {
                 data: { meetingLink: data.meetingLink }
             });
         }
-
+        
         return prisma.session.update({
             where: { id: sessionId },
             data: {
@@ -1861,6 +1951,7 @@ class TrainerService {
             }
         });
     }
+
 }
 
 export default new TrainerService();

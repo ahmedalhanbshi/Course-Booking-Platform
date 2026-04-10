@@ -1,650 +1,518 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Megaphone, Plus, Trash2, Edit, Calendar, Users, Bell, Check } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Plus, Send, MessageSquare, Clock, Pencil, Trash2, Loader2, Users, User, GraduationCap } from "lucide-react"
+import { formatDate } from "@/lib/utils"
+import { instituteService } from "@/lib/institute-service"
+import { toast } from "sonner"
 
-// Announcement Type Definition
-interface Announcement {
-    id: string;
-    title: string;
-    content: string;
-    targetAudience: string;
-    selectedRecipients: string[];
-    category: string;
-    priority: string;
-    status: string;
-    createdAt: string;
-    author: string;
-    attachment: string | null;
-    scheduledDate: string;
-    scheduledTime: string;
-}
+export default function InstituteAnnouncements() {
+  const [announcements, setAnnouncements] = useState<any[]>([])
+  const [courses, setCourses] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
+  const [trainers, setTrainers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [announcementToDelete, setAnnouncementToDelete] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
-// Mock data for announcements
-const mockAnnouncements: Announcement[] = [
-    {
-        id: "1",
-        title: "تحديث سياسة الحضور",
-        content: "نود إعلامكم بأنه تم تحديث سياسة الحضور والغياب للمعهد. يرجى الاطلاع على التفاصيل في لوحة المعلومات.",
-        targetAudience: "all", // all, all_trainers, all_students, specific_trainers, specific_students, specific_all
-        selectedRecipients: [],
-        category: "policy",
-        priority: "high",
-        status: "published",
-        createdAt: "2023-11-25",
-        author: "الإدارة",
-        attachment: null as string | null,
-        scheduledDate: "",
-        scheduledTime: ""
-    },
-    {
-        id: "2",
-        title: "عطلة رسمية",
-        content: "بمناسبة اليوم الوطني، سيكون المعهد مغلقاً يوم الأحد القادم.",
-        targetAudience: "all",
-        selectedRecipients: [],
-        category: "holiday",
-        priority: "normal",
-        status: "scheduled",
-        createdAt: "2023-11-20",
-        author: "الموارد البشرية",
-        attachment: null,
-        scheduledDate: "2023-11-30",
-        scheduledTime: "09:00"
-    },
-    {
-        id: "3",
-        title: "اجتماع المدربين الشهري",
-        content: "تذكير بموعد الاجتماع الشهري للمدربين يوم الخميس القادم في القاعة الرئيسية.",
-        targetAudience: "all_trainers",
-        selectedRecipients: [],
-        category: "event",
-        priority: "normal",
-        status: "published",
-        createdAt: "2023-11-15",
-        author: "الإدارة الأكاديمية",
-        attachment: null,
-        scheduledDate: "",
-        scheduledTime: ""
+  const [formData, setFormData] = useState({
+    title: "",
+    message: "",
+    targetAudience: "STUDENTS", // "STUDENTS" | "TRAINERS"
+    courseId: "",
+    scheduledAt: "",
+    selectedRecipients: [] as string[]
+  })
+
+  const fetchData = useCallback(async (isSilent = false) => {
+    try {
+      if (!isSilent) setLoading(true)
+      const [annsRes, coursesRes, studentsRes, trainersRes] = await Promise.all([
+        instituteService.getAnnouncements().catch(() => []),
+        instituteService.getCourses().catch(() => []),
+        instituteService.getStudents().then(res => res.students).catch(() => []),
+        instituteService.getTrainers().catch(() => [])
+      ])
+      setAnnouncements(annsRes || [])
+      setCourses(coursesRes || [])
+      setStudents(studentsRes || [])
+      setTrainers(trainersRes || [])
+    } catch (error) {
+      if (!isSilent) {
+        console.error("Fetch error:", error)
+        toast.error("حدث خطأ أثناء جلب البيانات")
+      }
+    } finally {
+      if (!isSilent) setLoading(false)
     }
-]
+  }, [])
 
-// Mock data for users
-const mockTrainers = [
-    { id: "t1", name: "أحمد محمد" },
-    { id: "t2", name: "سارة علي" },
-    { id: "t3", name: "خالد عمر" },
-]
+  useEffect(() => {
+    fetchData()
+    // Silent background poll every 60 seconds
+    const interval = setInterval(() => fetchData(true), 60000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
-const mockStudents = [
-    { id: "s1", name: "محمد عبدالله" },
-    { id: "s2", name: "فاطمة حسن" },
-    { id: "s3", name: "نورة سعيد" },
-    { id: "s4", name: "عبدالرحمن خالد" },
-    { id: "s5", name: "ريم احمد" },
-]
-
-export default function InstituteAnnouncementsPage() {
-    const [announcements, setAnnouncements] = useState<Announcement[]>(mockAnnouncements)
-    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-    const [selectedAnnouncement, setSelectedAnnouncement] = useState<typeof mockAnnouncements[0] | null>(null)
-
-    const [editingId, setEditingId] = useState<string | null>(null)
-
-    // Form state
-    const [newAnnouncement, setNewAnnouncement] = useState({
-        title: "",
-        content: "",
-        recipientType: "all", // 'all' | 'specific'
-        targetGroup: "both", // 'both' | 'trainers' | 'students'
-        category: "general",
-        priority: "normal",
-        selectedRecipients: [] as string[],
-        attachment: null as File | null,
-        scheduledDate: "",
-        scheduledTime: ""
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      message: "",
+      targetAudience: "STUDENTS",
+      courseId: "",
+      scheduledAt: "",
+      selectedRecipients: []
     })
+    setEditingId(null)
+  }
 
-    const handleCreateAnnouncement = () => {
-        let targetAudience = "all"
-        if (newAnnouncement.recipientType === "all") {
-            if (newAnnouncement.targetGroup === "trainers") targetAudience = "all_trainers"
-            else if (newAnnouncement.targetGroup === "students") targetAudience = "all_students"
-            else targetAudience = "all"
-        } else {
-            if (newAnnouncement.targetGroup === "trainers") targetAudience = "specific_trainers"
-            else if (newAnnouncement.targetGroup === "students") targetAudience = "specific_students"
-            else targetAudience = "specific_all"
-        }
+  const getCourseStudents = (courseId: string) => {
+    if (!courseId || courseId === 'all') return students
+    // Assuming students have enrollment info or we filter by the list we have
+    // If not directly available in basic student list, we might need a better filter
+    return students
+  }
 
-        if (editingId) {
-            setAnnouncements(announcements.map(a => a.id === editingId ? {
-                ...a,
-                title: newAnnouncement.title,
-                content: newAnnouncement.content,
-                targetAudience,
-                selectedRecipients: newAnnouncement.selectedRecipients,
-                category: newAnnouncement.category,
-                priority: newAnnouncement.priority,
-                scheduledDate: newAnnouncement.scheduledDate,
-                scheduledTime: newAnnouncement.scheduledTime,
-                attachment: newAnnouncement.attachment ? URL.createObjectURL(newAnnouncement.attachment) : a.attachment
-            } : a))
-            toast.success("تم تحديث الإعلان بنجاح")
-        } else {
-            const announcement = {
-                id: Math.random().toString(36).substr(2, 9),
-                title: newAnnouncement.title,
-                content: newAnnouncement.content,
-                targetAudience,
-                selectedRecipients: newAnnouncement.selectedRecipients,
-                category: newAnnouncement.category,
-                priority: newAnnouncement.priority,
-                status: "published",
-                createdAt: new Date().toISOString().split('T')[0],
-                author: "الإدارة",
-                scheduledDate: newAnnouncement.scheduledDate,
-                scheduledTime: newAnnouncement.scheduledTime,
-                attachment: newAnnouncement.attachment ? URL.createObjectURL(newAnnouncement.attachment) : null
-            }
-            setAnnouncements([announcement, ...announcements])
-            toast.success("تم إنشاء الإعلان بنجاح")
-        }
+  const handleCreateAnnouncement = async () => {
+    if (!formData.title.trim() || !formData.message.trim()) {
+      toast.error("يرجى إكمال الحقول المطلوبة")
+      return
+    }
 
-        setIsCreateDialogOpen(false)
-        setNewAnnouncement({
-            title: "",
-            content: "",
-            recipientType: "all",
-            targetGroup: "both",
-            category: "general",
-            priority: "normal",
-            selectedRecipients: [],
-            attachment: null,
-            scheduledDate: "",
-            scheduledTime: ""
+    try {
+      setSubmitting(true)
+      
+      const currentListForCheck = getRecipientList();
+      const isAllSelected = formData.selectedRecipients.length > 0 && formData.selectedRecipients.length === currentListForCheck.length;
+
+      const payload: any = {
+        title: formData.title,
+        message: formData.message,
+        targetAudience: formData.targetAudience, // Always use the explicitly chosen audience
+        courseId: ((formData.targetAudience === 'STUDENTS' || formData.targetAudience === 'ALL') && formData.courseId !== 'all') ? formData.courseId : undefined,
+        status: formData.scheduledAt ? 'SCHEDULED' : 'SENT',
+        scheduledAt: formData.scheduledAt ? new Date(formData.scheduledAt).toISOString() : undefined,
+        recipientIds: formData.selectedRecipients.length > 0 ? formData.selectedRecipients : undefined,
+      }
+
+      if (editingId) {
+        await instituteService.updateAnnouncement(editingId, {
+          title: formData.title,
+          message: formData.message,
         })
-        setEditingId(null)
+        toast.success("تم تحديث الإعلان")
+      } else {
+        await instituteService.sendStudentAnnouncement(payload)
+        const isScheduled = !!formData.scheduledAt;
+        const count = formData.selectedRecipients.length;
+        toast.success(
+          isScheduled 
+            ? (count > 0 ? `تمت جدولة الإعلانات لـ ${count} مستلم` : "تمت جدولة الإعلان بنجاح")
+            : (count > 0 ? `تم إرسال الإعلانات لـ ${count} مستلم` : "تم إرسال الإعلان بنجاح")
+        )
+      }
+
+      resetForm()
+      setIsCreateDialogOpen(false)
+      fetchData()
+    } catch (error: any) {
+      toast.error(error.message || "فشل في حفظ الإعلان")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleEditClick = (announcement: any) => {
+    setEditingId(announcement.id)
+    setFormData({
+      title: announcement.title,
+      message: announcement.message,
+      targetAudience: announcement.targetAudience?.toUpperCase() || "STUDENTS",
+      courseId: announcement.courseId || "all",
+      scheduledAt: announcement.scheduledAt ? new Date(announcement.scheduledAt).toISOString().slice(0, 16) : "",
+      selectedRecipients: announcement.recipientId ? [announcement.recipientId] : []
+    })
+    setIsCreateDialogOpen(true)
+  }
+
+  const handleDeleteClick = (id: string) => {
+    setAnnouncementToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (announcementToDelete) {
+      try {
+        setSubmitting(true)
+        await instituteService.deleteAnnouncement(announcementToDelete)
+        toast.success("تم الحذف بنجاح")
+        setIsDeleteDialogOpen(false)
+        setAnnouncementToDelete(null)
+        fetchData()
+      } catch (error: any) {
+        toast.error(error.message || "فشل حذف الإعلان")
+      } finally {
+        setSubmitting(false)
+      }
+    }
+  }
+
+  const getRecipientList = () => {
+    const trainersList = trainers.map(t => ({ ...t, type: 'trainer' }));
+    const studentsList = (formData.courseId && formData.courseId !== 'all')
+      ? students.filter(s => s.enrolledCourses?.some((c: any) => c.courseId === formData.courseId)).map(s => ({ ...s, type: 'student' }))
+      : students.map(s => ({ ...s, type: 'student' }));
+
+    if (formData.targetAudience === 'TRAINERS') {
+      return trainersList;
+    }
+    
+    if (formData.targetAudience === 'ALL') {
+      return [...trainersList, ...studentsList];
+    }
+    
+    // Explicitly check for STUDENTS or default to studentsList ONLY if that's the audience
+    if (formData.targetAudience === 'STUDENTS') {
+      return studentsList;
     }
 
-    const handleEditClick = (announcement: typeof mockAnnouncements[0]) => {
-        setEditingId(announcement.id)
+    // Default to an empty list or studentsList depending on safest assumption
+    return formData.targetAudience === 'STUDENTS' ? studentsList : [];
+  }
 
-        let recipientType = "all"
-        let targetGroup = "both"
+  const toggleRecipientSelection = (id: string) => {
+    setFormData(prev => {
+      const isSelected = prev.selectedRecipients.includes(id)
+      return {
+        ...prev,
+        selectedRecipients: isSelected
+          ? prev.selectedRecipients.filter(rId => rId !== id)
+          : [...prev.selectedRecipients, id]
+      }
+    })
+  }
 
-        if (announcement.targetAudience.startsWith("specific")) {
-            recipientType = "specific"
-            if (announcement.targetAudience.includes("trainers")) targetGroup = "trainers"
-            else if (announcement.targetAudience.includes("students")) targetGroup = "students"
-            else targetGroup = "both"
-        } else {
-            recipientType = "all"
-            if (announcement.targetAudience.includes("trainers")) targetGroup = "trainers"
-            else if (announcement.targetAudience.includes("students")) targetGroup = "students"
-            else targetGroup = "both"
-        }
-
-        setNewAnnouncement({
-            title: announcement.title,
-            content: announcement.content,
-            recipientType,
-            targetGroup,
-            category: announcement.category,
-            priority: announcement.priority,
-            selectedRecipients: announcement.selectedRecipients,
-            attachment: null,
-            scheduledDate: announcement.scheduledDate || "",
-            scheduledTime: announcement.scheduledTime || ""
-        })
-        setIsCreateDialogOpen(true)
+  const toggleAllRecipients = () => {
+    const list = getRecipientList();
+    const ids = list.map(r => r.id);
+    
+    if (formData.selectedRecipients.length === ids.length && ids.length > 0) {
+      setFormData(prev => ({ ...prev, selectedRecipients: [] }))
+    } else {
+      setFormData(prev => ({ ...prev, selectedRecipients: ids }))
     }
+  }
 
-    const handleDeleteAnnouncement = () => {
-        if (selectedAnnouncement) {
-            setAnnouncements(announcements.filter(a => a.id !== selectedAnnouncement.id))
-            setIsDeleteDialogOpen(false)
-            setSelectedAnnouncement(null)
-            toast.success("تم حذف الإعلان بنجاح")
-        }
-    }
-
-    const getAudienceLabel = (announcement: typeof mockAnnouncements[0]) => {
-        switch (announcement.targetAudience) {
-            case 'all': return 'الجميع'
-            case 'all_trainers': return 'جميع المدربين'
-            case 'all_students': return 'جميع الطلاب'
-            case 'specific_trainers': return `${announcement.selectedRecipients.length} مدربين`
-            case 'specific_students': return `${announcement.selectedRecipients.length} طلاب`
-            case 'specific_all': return `${announcement.selectedRecipients.length} مستخدمين`
-            default: return announcement.targetAudience
-        }
-    }
-
-    const toggleRecipient = (id: string) => {
-        setNewAnnouncement(prev => {
-            const isSelected = prev.selectedRecipients.includes(id)
-            return {
-                ...prev,
-                selectedRecipients: isSelected
-                    ? prev.selectedRecipients.filter(rid => rid !== id)
-                    : [...prev.selectedRecipients, id]
-            }
-        })
-    }
-
-    const getCategoryLabel = (category: string) => {
-        switch (category) {
-            case 'general': return 'عام'
-            case 'event': return 'فعالية'
-            case 'urgent': return 'عاجل'
-            case 'maintenance': return 'صيانة'
-            case 'holiday': return 'عطلة'
-            case 'policy': return 'تحديث سياسات'
-            default: return category
-        }
-    }
-
-    const getPriorityBadge = (priority: string) => {
-        switch (priority) {
-            case 'high': return <Badge variant="destructive">مهم</Badge>
-            case 'critical': return <Badge variant="destructive" className="animate-pulse">طارئ</Badge>
-            default: return <Badge variant="secondary">عادي</Badge>
-        }
-    }
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">إعلانات المعهد</h1>
-                    <p className="text-gray-600 mt-2">إدارة ونشر الإعلانات للمدربين والطلاب</p>
-                </div>
-                <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
-                    setIsCreateDialogOpen(open)
-                    if (!open) {
-                        setNewAnnouncement({
-                            title: "",
-                            content: "",
-                            recipientType: "all",
-                            targetGroup: "both",
-                            category: "general",
-                            priority: "normal",
-                            selectedRecipients: [],
-                            attachment: null,
-                            scheduledDate: "",
-                            scheduledTime: ""
-                        })
-                        setEditingId(null)
-                    }
-                }}>
-                    <DialogTrigger asChild>
-                        <Button className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            إعلان جديد
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                        <DialogHeader>
-                            <DialogTitle>{editingId ? "تعديل الإعلان" : "إنشاء إعلان جديد"}</DialogTitle>
-                            <DialogDescription>
-                                قم بتعبئة تفاصيل الإعلان الجديد للنشر
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="title">عنوان الإعلان</Label>
-                                <Input
-                                    id="title"
-                                    placeholder="مثال: تحديث سياسة الحضور"
-                                    value={newAnnouncement.title}
-                                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="content">نص الإعلان</Label>
-                                <Textarea
-                                    id="content"
-                                    placeholder="اكتب نص الإعلان هنا..."
-                                    value={newAnnouncement.content}
-                                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="category">تصنيف الإعلان</Label>
-                                    <Select
-                                        value={newAnnouncement.category}
-                                        onValueChange={(value) => setNewAnnouncement({ ...newAnnouncement, category: value })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="اختر التصنيف" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="general">عام</SelectItem>
-                                            <SelectItem value="event">فعالية</SelectItem>
-                                            <SelectItem value="urgent">عاجل</SelectItem>
-                                            <SelectItem value="maintenance">صيانة</SelectItem>
-                                            <SelectItem value="holiday">عطلة</SelectItem>
-                                            <SelectItem value="policy">تحديث سياسات</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="priority">الأهمية</Label>
-                                    <Select
-                                        value={newAnnouncement.priority}
-                                        onValueChange={(value) => setNewAnnouncement({ ...newAnnouncement, priority: value })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="اختر الأهمية" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="normal">عادي</SelectItem>
-                                            <SelectItem value="high">مهم</SelectItem>
-                                            <SelectItem value="critical">طارئ</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="date">تاريخ النشر</Label>
-                                    <Input
-                                        id="date"
-                                        type="date"
-                                        value={newAnnouncement.scheduledDate}
-                                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, scheduledDate: e.target.value })}
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="time">وقت النشر</Label>
-                                    <Input
-                                        id="time"
-                                        type="time"
-                                        value={newAnnouncement.scheduledTime}
-                                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, scheduledTime: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="attachment">مرفقات</Label>
-                                <Input
-                                    id="attachment"
-                                    type="file"
-                                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, attachment: e.target.files ? e.target.files[0] : null })}
-                                />
-                            </div>
-
-                            <div className="grid gap-4 border rounded-md p-4">
-                                <Label className="text-base">الجمهور المستهدف</Label>
-
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>طريقة الإرسال</Label>
-                                        <RadioGroup
-                                            value={newAnnouncement.recipientType}
-                                            onValueChange={(value) => setNewAnnouncement({ ...newAnnouncement, recipientType: value, selectedRecipients: [] })}
-                                            className="flex gap-4"
-                                        >
-                                            <div className="flex items-center space-x-2 space-x-reverse">
-                                                <RadioGroupItem value="all" id="rt-all" />
-                                                <Label htmlFor="rt-all" className="font-normal cursor-pointer">الجميع</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2 space-x-reverse">
-                                                <RadioGroupItem value="specific" id="rt-specific" />
-                                                <Label htmlFor="rt-specific" className="font-normal cursor-pointer">محدد</Label>
-                                            </div>
-                                        </RadioGroup>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>الفئة المستهدفة</Label>
-                                        <div className="flex gap-4">
-                                            <div className="flex items-center space-x-2 space-x-reverse">
-                                                <Checkbox
-                                                    id="tg-trainers"
-                                                    checked={newAnnouncement.targetGroup === 'trainers' || newAnnouncement.targetGroup === 'both'}
-                                                    onCheckedChange={(checked) => {
-                                                        if (checked) {
-                                                            setNewAnnouncement({
-                                                                ...newAnnouncement,
-                                                                targetGroup: newAnnouncement.targetGroup === 'students' ? 'both' : 'trainers',
-                                                                selectedRecipients: []
-                                                            })
-                                                        } else {
-                                                            setNewAnnouncement({
-                                                                ...newAnnouncement,
-                                                                targetGroup: newAnnouncement.targetGroup === 'both' ? 'students' : 'both',
-                                                                selectedRecipients: []
-                                                            })
-                                                        }
-                                                    }}
-                                                />
-                                                <Label htmlFor="tg-trainers" className="font-normal cursor-pointer">المدربين</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2 space-x-reverse">
-                                                <Checkbox
-                                                    id="tg-students"
-                                                    checked={newAnnouncement.targetGroup === 'students' || newAnnouncement.targetGroup === 'both'}
-                                                    onCheckedChange={(checked) => {
-                                                        if (checked) {
-                                                            setNewAnnouncement({
-                                                                ...newAnnouncement,
-                                                                targetGroup: newAnnouncement.targetGroup === 'trainers' ? 'both' : 'students',
-                                                                selectedRecipients: []
-                                                            })
-                                                        } else {
-                                                            setNewAnnouncement({
-                                                                ...newAnnouncement,
-                                                                targetGroup: newAnnouncement.targetGroup === 'both' ? 'trainers' : 'both',
-                                                                selectedRecipients: []
-                                                            })
-                                                        }
-                                                    }}
-                                                />
-                                                <Label htmlFor="tg-students" className="font-normal cursor-pointer">الطلاب</Label>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {newAnnouncement.recipientType === 'specific' && (
-                                        <div className="space-y-4 pt-2 border-t">
-                                            {(newAnnouncement.targetGroup === 'trainers' || newAnnouncement.targetGroup === 'both') && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-sm text-muted-foreground">اختر المدربين</Label>
-                                                    <ScrollArea className="h-[120px] border rounded-md p-2">
-                                                        <div className="space-y-2">
-                                                            {mockTrainers.map(trainer => (
-                                                                <div key={trainer.id} className="flex items-center space-x-2 space-x-reverse">
-                                                                    <Checkbox
-                                                                        id={`trainer-${trainer.id}`}
-                                                                        checked={newAnnouncement.selectedRecipients.includes(trainer.id)}
-                                                                        onCheckedChange={() => toggleRecipient(trainer.id)}
-                                                                    />
-                                                                    <Label htmlFor={`trainer-${trainer.id}`} className="font-normal cursor-pointer">
-                                                                        {trainer.name}
-                                                                    </Label>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </ScrollArea>
-                                                </div>
-                                            )}
-
-                                            {(newAnnouncement.targetGroup === 'students' || newAnnouncement.targetGroup === 'both') && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-sm text-muted-foreground">اختر الطلاب</Label>
-                                                    <ScrollArea className="h-[120px] border rounded-md p-2">
-                                                        <div className="space-y-2">
-                                                            {mockStudents.map(student => (
-                                                                <div key={student.id} className="flex items-center space-x-2 space-x-reverse">
-                                                                    <Checkbox
-                                                                        id={`student-${student.id}`}
-                                                                        checked={newAnnouncement.selectedRecipients.includes(student.id)}
-                                                                        onCheckedChange={() => toggleRecipient(student.id)}
-                                                                    />
-                                                                    <Label htmlFor={`student-${student.id}`} className="font-normal cursor-pointer">
-                                                                        {student.name}
-                                                                    </Label>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </ScrollArea>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleCreateAnnouncement}>
-                                {editingId ? "حفظ التغييرات" : "نشر الإعلان"}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">إجمالي الإعلانات</CardTitle>
-                        <Megaphone className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{announcements.length}</div>
-                        <p className="text-xs text-muted-foreground">إعلان منشور</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">إعلانات نشطة</CardTitle>
-                        <Bell className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{announcements.filter(a => a.status === 'published').length}</div>
-                        <p className="text-xs text-muted-foreground">يظهر حالياً للمستخدمين</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">الوصول</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">1,234</div>
-                        <p className="text-xs text-muted-foreground">مشاهدة للإعلانات</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>سجل الإعلانات</CardTitle>
-                    <CardDescription>عرض وإدارة الإعلانات السابقة والحالية</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>العنوان</TableHead>
-                                <TableHead>التصنيف</TableHead>
-                                <TableHead>الأهمية</TableHead>
-                                <TableHead>الجمهور</TableHead>
-                                <TableHead>تاريخ النشر</TableHead>
-                                <TableHead>الحالة</TableHead>
-                                <TableHead className="text-left">الإجراءات</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {announcements.map((announcement) => (
-                                <TableRow key={announcement.id}>
-                                    <TableCell>
-                                        <div className="font-medium">{announcement.title}</div>
-                                        <div className="text-sm text-gray-500 truncate max-w-[300px]">{announcement.content}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{getCategoryLabel(announcement.category)}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {getPriorityBadge(announcement.priority)}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-4 w-4 text-gray-500" />
-                                            {getAudienceLabel(announcement)}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Calendar className="h-4 w-4 text-gray-500" />
-                                            {announcement.createdAt}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={announcement.status === 'published' ? 'default' : 'secondary'}>
-                                            {announcement.status === 'published' ? 'منشور' : 'مجدول'}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => handleEditClick(announcement)}>
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                onClick={() => {
-                                                    setSelectedAnnouncement(announcement)
-                                                    setIsDeleteDialogOpen(true)
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>تأكيد الحذف</DialogTitle>
-                        <DialogDescription>
-                            هل أنت متأكد من رغبتك في حذف هذا الإعلان؟ لا يمكن التراجع عن هذا الإجراء.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>إلغاء</Button>
-                        <Button variant="destructive" onClick={handleDeleteAnnouncement}>حذف</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+  return (
+    <div className="space-y-6 text-right" dir="rtl">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">إعلانات المعهد</h1>
+          <p className="text-gray-600 mt-2">نشر الإعلانات والتواصل مع المدربين والطلاب</p>
         </div>
-    )
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open)
+          if (!open) resetForm()
+        }}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              إعلان جديد
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-right">{editingId ? "تعديل الإعلان" : "إنشاء إعلان جديد"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 text-right">
+              <div>
+                <Label htmlFor="title" className="block mb-1">عنوان الإعلان</Label>
+                <Input
+                  id="title"
+                  className="text-right"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="عنوان الإعلان"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <Label className="block mb-1">الجمهور المستهدف</Label>
+                   <Select value={formData.targetAudience} onValueChange={(value) => setFormData({ ...formData, targetAudience: value, selectedRecipients: [], courseId: "" })}>
+                    <SelectTrigger className="text-right">
+                      <SelectValue placeholder="اختر الجمهور" />
+                    </SelectTrigger>
+                    <SelectContent className="text-right">
+                      <SelectItem value="STUDENTS">الطلاب</SelectItem>
+                      <SelectItem value="TRAINERS">المدربين (إيميل فقط)</SelectItem>
+                      <SelectItem value="ALL">الجميع (طلاب + مدربين)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(formData.targetAudience === 'STUDENTS' || formData.targetAudience === 'ALL') && (
+                  <div>
+                    <Label className="block mb-1">تحديد الدورة</Label>
+                    <Select value={formData.courseId} onValueChange={(value) => setFormData({ ...formData, courseId: value, selectedRecipients: [] })}>
+                      <SelectTrigger className="text-right">
+                        <SelectValue placeholder="كل الدورات" />
+                      </SelectTrigger>
+                      <SelectContent className="text-right max-h-[250px]">
+                        <SelectItem value="all">جميع الطلاب</SelectItem>
+                        {courses.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Recipient Selection Card */}
+              <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-bold text-primary">
+                    {formData.targetAudience === 'ALL' 
+                      ? "تحديد طلاب ومدربين محددين" 
+                      : formData.targetAudience === 'TRAINERS' 
+                        ? "تحديد مدربين محددين" 
+                        : "تحديد طلاب محددين"} (اختياري)
+                  </Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs h-7 text-primary hover:text-primary/80"
+                    onClick={toggleAllRecipients}
+                  >
+                    {formData.selectedRecipients.length === getRecipientList().length && getRecipientList().length > 0 ? "إلغاء الكل" : "تحديد الكل"}
+                  </Button>
+                </div>
+                
+                <div className="max-h-[200px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {getRecipientList().length > 0 ? (
+                    getRecipientList().map(item => (
+                      <div key={item.id} className="flex items-center space-x-2 space-x-reverse hover:bg-white p-2 rounded transition-colors border border-transparent hover:border-gray-200">
+                        <Checkbox
+                          id={`r-${item.id}`}
+                          checked={formData.selectedRecipients.includes(item.id)}
+                          onCheckedChange={() => toggleRecipientSelection(item.id)}
+                        />
+                        <Label htmlFor={`r-${item.id}`} className="text-sm font-normal cursor-pointer flex-1 text-right">
+                          {item.name} <span className="text-[10px] text-muted-foreground mr-1">({item.type === 'trainer' ? 'مدرب' : 'طالب'})</span>
+                        </Label>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-2">لا يوجد بيانات للعرض</p>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground italic text-right">
+                  * اتركه فارغاً للإرسال للجميع تلقائياً. إعلانات المدربين ترسل كإيميل فقط.
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="message" className="block mb-1">نص الإعلان</Label>
+                <Textarea
+                  id="message"
+                  className="text-right"
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  placeholder="اكتب نص الإعلان هنا..."
+                  rows={4}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="scheduledAt" className="block mb-1">جدولة الإرسال (اختياري)</Label>
+                <Input
+                  id="scheduledAt"
+                  type="datetime-local"
+                  className="text-right"
+                  value={formData.scheduledAt}
+                  onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
+                />
+              </div>
+
+              <Button onClick={handleCreateAnnouncement} className="w-full" disabled={submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Send className="h-4 w-4 ml-2" />}
+                {editingId ? "تحديث الإعلان" : "نشر الإعلان"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إجمالي الإعلانات</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{announcements.length}</div>
+            <p className="text-xs text-muted-foreground">نشاط الإعلانات</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إعلانات الطلاب</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {announcements.filter(a => a.targetAudience === 'STUDENTS' || !a.targetAudience).length}
+            </div>
+            <p className="text-xs text-muted-foreground">منصة + بريد</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إعلانات المدربين</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {announcements.filter(a => a.targetAudience === 'TRAINERS').length}
+            </div>
+            <p className="text-xs text-muted-foreground">بريد إلكتروني فقط</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Announcements Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-right">سجل الإعلانات</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">الإعلان</TableHead>
+                  <TableHead className="text-right">الجمهور</TableHead>
+                  <TableHead className="text-right">تاريخ الإرسال</TableHead>
+                  <TableHead className="text-right">الحالة</TableHead>
+                  <TableHead className="text-left">الإجراءات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {announcements.length > 0 ? (
+                  announcements.map((announcement) => {
+                    const isSelective = announcement.title && announcement.title.includes('\u200B');
+                    const displayTitle = announcement.title ? announcement.title.replace(/\u200B/g, '') : '';
+                    
+                    return (
+                      <TableRow key={announcement.id}>
+                        <TableCell className="text-right">
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{displayTitle}</span>
+                            <p className="text-xs text-gray-500 line-clamp-1 mt-1 italic">{announcement.message}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="outline" className="gap-1 whitespace-nowrap">
+                            {announcement.targetAudience === 'TRAINERS' ? (
+                              <>
+                                <Users className="h-3 w-3" />
+                                {announcement.recipientId ? `خاص: ${announcement.recipient?.name || 'مدرب'}` : (isSelective ? "المدربين (مختارون)" : "المدربين")}
+                              </>
+                            ) : announcement.targetAudience === 'ALL' ? (
+                              <>
+                                <Users className="h-3 w-3" />
+                                {isSelective ? "الجميع (مختارون)" : "الجميع"}
+                              </>
+                            ) : (announcement.targetAudience === 'STUDENTS' || !announcement.targetAudience) ? (
+                              <>
+                                <GraduationCap className="h-3 w-3" />
+                                {announcement.recipientId ? `خاص: ${announcement.recipient?.name || 'طالب'}` : (isSelective ? "الطلاب (مختارون)" : "الطلاب")}
+                              </>
+                            ) : (
+                              <>
+                                <User className="h-3 w-3" />
+                                {announcement.recipient?.name ? `خاص: ${announcement.recipient.name}` : "إعلانات خاصة"}
+                              </>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatDate(announcement.sentAt || announcement.createdAt)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {announcement.status?.toUpperCase() === 'SENT' ? (
+                            <Badge className="bg-green-100 text-green-800 border-none hover:bg-green-100">مرسل</Badge>
+                          ) : (
+                            <Badge className="bg-blue-100 text-blue-800 border-none hover:bg-blue-100">مجدول</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 justify-start">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditClick(announcement)}>
+                              <Pencil className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(announcement.id)}>
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      لا يوجد سجل إعلانات حالياً
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-right">تأكيد الحذف</DialogTitle>
+            <DialogDescription className="text-right">
+              هل أنت متأكد من رغبتك في حذف هذا الإعلان؟ لا يمكن التراجع عن هذا الإجراء.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 justify-start flex-row-reverse">
+            <DialogClose asChild>
+              <Button variant="outline">إلغاء</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={confirmDelete} disabled={submitting}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
+              حذف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
 }

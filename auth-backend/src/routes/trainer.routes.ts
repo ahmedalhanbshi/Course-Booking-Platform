@@ -113,6 +113,9 @@ router.get('/students', trainerController.getAllStudents);
 
 // Announcements
 router.post('/announcements/send', trainerController.createStudentAnnouncement);
+router.get('/announcements', trainerController.getAnnouncements);
+router.put('/announcements/:id', trainerController.updateAnnouncement);
+router.delete('/announcements/:id', trainerController.deleteAnnouncement);
 
 // Enrollments management
 router.get('/enrollments', trainerController.getEnrollments);

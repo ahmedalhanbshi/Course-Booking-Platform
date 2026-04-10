@@ -250,8 +250,11 @@ export interface Announcement {
   sentAt?: Date;
   courseId?: string;
   senderId: string;
+  recipientId?: string;
   instituteId?: string;
-  targetAudience?: 'all' | 'students' | 'trainers' | 'institute_admins' | 'platform_admins' | 'course_students';
+  category?: string;
+  status?: string;
+  targetAudience?: 'all' | 'students' | 'trainers' | 'institute_admins' | 'platform_admins' | 'course_students' | 'SINGLE_USER' | 'STUDENTS' | 'ALL';
 }
 
 export interface Wishlist {

@@ -482,14 +482,14 @@ class TrainerController {
                 console.warn(`[Controller-Trainer] Unauthorized access attempt by ${req.user?.role}`);
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
-            const { title, message, recipientId } = req.body;
+            const { title, message, recipientId, courseId, category, status, scheduledAt } = req.body;
             if (!title || !message) {
                 return sendError(res, 'عنوان ومحتوى الإعلان مطلوبان', 400);
             }
             
             const announcement = await trainerService.createStudentAnnouncement(
                 req.user.userId, 
-                { title, message, recipientId }
+                { title, message, recipientId, courseId, category, status, scheduledAt }
             );
 
             console.log(`[Controller-Trainer] SUCCESS: Announcement created with ID: ${announcement?.id}`);
@@ -497,6 +497,39 @@ class TrainerController {
             return sendSuccess(res, 'تم إرسال الإعلان بنجاح', announcement);
         } catch (error: any) {
             console.error(`[Controller-Trainer] CRITICAL ERROR:`, error.message);
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async getAnnouncements(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await trainerService.getAnnouncements(req.user.userId);
+            return sendSuccess(res, 'تم جلب الإعلانات بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async updateAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { id } = req.params;
+            const { title, message } = req.body;
+            const data = await trainerService.updateAnnouncement(req.user.userId, id, { title, message });
+            return sendSuccess(res, 'تم تحديث الإعلان بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async deleteAnnouncement(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { id } = req.params;
+            await trainerService.deleteAnnouncement(req.user.userId, id);
+            return sendSuccess(res, 'تم حذف الإعلان بنجاح', null);
+        } catch (error: any) {
             return sendError(res, error.message, 400);
         }
     }

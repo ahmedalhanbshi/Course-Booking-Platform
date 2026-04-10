@@ -14,6 +14,7 @@ import prisma from './config/database';
 import redis from './config/redis';
 import { startSessionScheduler } from './utils/sessionScheduler';
 import { startSessionReminderJob } from './jobs/session-reminder.job';
+import { startAnnouncementScheduler } from './utils/announcementScheduler';
 
 const app: Application = express();
 
@@ -100,6 +101,7 @@ app.listen(PORT, () => {
     console.log(`📱 Environment: ${config.nodeEnv}`);
     startSessionScheduler();
     startSessionReminderJob();
+    startAnnouncementScheduler();
 });
 
 export default app;

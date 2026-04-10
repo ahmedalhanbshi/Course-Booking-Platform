@@ -244,9 +244,31 @@ class TrainerService {
         return response.data.data;
     }
 
-    async sendStudentAnnouncement(data: { title: string; message: string; recipientId?: string }): Promise<any> {
+    async sendStudentAnnouncement(data: {
+        title: string;
+        message: string;
+        recipientId?: string;
+        courseId?: string;
+        category?: string;
+        status?: string;
+        scheduledAt?: string;
+    }): Promise<any> {
         const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/trainer/announcements/send', data);
         return response.data.data;
+    }
+
+    async getAnnouncements(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/announcements');
+        return response.data.data;
+    }
+
+    async updateAnnouncement(id: string, data: { title: string; message: string }): Promise<any> {
+        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/trainer/announcements/${id}`, data);
+        return response.data.data;
+    }
+
+    async deleteAnnouncement(id: string): Promise<void> {
+        await apiClient.delete(`/api/trainer/announcements/${id}`);
     }
 
     async getEnrollments(): Promise<any[]> {

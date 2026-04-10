@@ -318,8 +318,7 @@ class InstituteService {
             throw new Error("لم يتم العثور على المعهد");
         }
 
-        // Fetch all enrollments for institute-managed courses only (trainerId: null = not an external trainer's own course)
-        const enrollments = (await prisma.enrollment.findMany({
+        const enrollments = await prisma.enrollment.findMany({
             where: {
                 course: {
                     instituteId: institute.id,
@@ -349,56 +348,32 @@ class InstituteService {
                 },
             },
             orderBy: { enrolledAt: "desc" },
-        })) as any[];
+        });
 
-        // Group by student — matching TrainerService shape
-        const studentMap = new Map<
-            string,
-            {
-                id: string;
-                name: string;
-                email: string;
-                phone: string | null;
-                avatar: string | null;
-                status: string;
-                enrolledCourses: {
-                    courseId: string;
-                    courseTitle: string;
-                    enrollmentId: string;
-                    status: string;
-                    enrolledAt: Date;
-                    trainerName: string;
-                }[];
-                lastActivity: Date;
-            }
-        >();
+        const studentMap = new Map<string, any>();
 
         for (const e of enrollments) {
-            const s = e.student;
-            // Additional safety check for soft-deleted students
-            if (s.deletedAt) continue;
+            if (e.student.deletedAt) continue;
 
-            if (!studentMap.has(s.id)) {
-                studentMap.set(s.id, {
-                    id: s.id,
-                    name: s.name,
-                    email: s.email,
-                    phone: s.phone,
-                    avatar: s.avatar,
-                    status: s.status.toLowerCase(),
+            if (!studentMap.has(e.student.id)) {
+                studentMap.set(e.student.id, {
+                    ...e.student,
+                    status: e.student.status.toLowerCase(),
                     enrolledCourses: [],
                     lastActivity: e.enrolledAt,
                 });
             }
-            const entry = studentMap.get(s.id)!;
+
+            const entry = studentMap.get(e.student.id);
             entry.enrolledCourses.push({
                 courseId: e.course.id,
                 courseTitle: e.course.title,
                 enrollmentId: e.id,
                 status: e.status.toLowerCase(),
                 enrolledAt: e.enrolledAt,
-                trainerName: e.course.trainer?.name || (((e.course as any).staffTrainerIds?.length > 0) ? "مدرب معهد" : ""),
+                trainerName: e.course.trainer?.name || (e.course.staffTrainerIds?.length > 0 ? "مدرب معهد" : ""),
             });
+
             if (e.enrolledAt > entry.lastActivity) {
                 entry.lastActivity = e.enrolledAt;
             }
@@ -435,171 +410,252 @@ class InstituteService {
     // =====================================================
 
     /**
-     * Create an announcement for students (ALL or SINGLE_USER)
+     * Create and send an announcement to students and/or trainers
      */
-    async createStudentAnnouncement(userId: string, data: { title: string; message: string; recipientId?: string }) {
-        console.log(`[Announcement-Institute] Admin ${userId} initiated announcement to: ${data.recipientId ?? 'ALL'}`);
-
+    async createStudentAnnouncement(userId: string, data: {
+        title: string;
+        message: string;
+        recipientId?: string;
+        recipientIds?: string[]; // For batching
+        courseId?: string;
+        category?: string;
+        status?: string;
+        targetAudience?: string;
+        scheduledAt?: string
+    }) {
         const institute = await prisma.institute.findUnique({
-            where: { userId }
+            where: { userId },
+            include: { user: true }
         });
 
-        if (!institute) {
-            console.error(`[Announcement-Institute] Error: No institute found for user ${userId}`);
-            throw new Error("لم يتم العثور على بيانات المعهد الخاصة بك");
-        }
+        if (!institute) throw new Error("لم يتم العثور على بيانات المعهد");
 
-        // Fetch ALL course IDs for this institute to ensure total coverage (Staff & Freelance trainers)
+        const instituteAdmin = institute.user;
+
+        const contactFooter = `\n\n---\n🏛️ المعهد: ${institute.name}\n👤 المرسل: ${instituteAdmin?.name || 'مدير المعهد'}`;
+        const fullMessage = data.message + contactFooter;
+
+        // Fetch ALL course IDs for this institute
         const instituteCourses = await prisma.course.findMany({
             where: { instituteId: institute.id },
             select: { id: true }
         });
-        const courseIds = instituteCourses.map((c: any) => c.id);
-        console.log(`[Announcement-Institute] Institute ${institute.id} manages ${courseIds.length} courses`);
+        const allCourseIds = instituteCourses.map(c => c.id);
 
-        if (data.recipientId) {
-            // Target specific student verification
-            console.log(`[Announcement-Institute] Verifying enrollment for target student ${data.recipientId}`);
-            const isEnrolled = courseIds.length > 0 ? await prisma.enrollment.findFirst({
-                where: {
-                    studentId: data.recipientId,
-                    courseId: { in: courseIds },
-                    deletedAt: null
-                }
-            }) : null;
-
-            if (!isEnrolled) {
-                console.warn(`[Announcement-Institute] TARGET_ERROR: Student ${data.recipientId} NOT enrolled in any institute courses`);
-                throw new Error("الطالب المحدد غير مسجل في أي من دورات المعهد الخاصة بك");
-            }
-
-            const student = await prisma.user.findUnique({ where: { id: data.recipientId } });
-            if (!student) throw new Error("بيانات الطالب غير موجودة في النظام");
-
-            const instituteAdmin = await prisma.user.findUnique({
-                where: { id: userId },
-                select: { name: true, phone: true, email: true }
-            });
-
-            const contactFooter = `\n\n---\n🏛️ المعهد: ${institute.name}\n👤 المرسل: ${instituteAdmin?.name || 'مدير المعهد'}\n${instituteAdmin?.phone ? `📞 الجوال: ${instituteAdmin.phone}\n` : ''}${instituteAdmin?.email ? `✉️ البريد: ${instituteAdmin.email}` : ''}`;
-            const fullMessage = data.message + contactFooter;
-
-            // 1. Create Announcement row
-            const announcement = await (prisma.announcement.create as any)({
-                data: {
-                    title: data.title,
-                    message: fullMessage,
-                    targetAudience: AnnouncementAudience.SINGLE_USER,
-                    senderId: userId,
-                    recipientId: data.recipientId,
-                    status: "SENT",
-                    sentAt: new Date()
-                }
-            });
-
-            // 2. Platform Notification
-            await prisma.notification.create({
-                data: {
-                    userId: data.recipientId,
-                    type: "NEW_ANNOUNCEMENT" as any,
-                    title: data.title,
-                    message: fullMessage,
-                    relatedEntityId: announcement.id
-                }
-            });
-
-            // 3. Email Dispatch
-            if (student.email) {
-                console.log(`[Announcement-Institute] Dispatching email to: ${student.email}`);
-                mailerService.sendAnnouncementEmail(
-                    student.email, 
-                    student.name, 
-                    data.title, 
-                    data.message,
-                    {
-                        name: instituteAdmin?.name || 'مدير المعهد',
-                        phone: instituteAdmin?.phone,
-                        email: instituteAdmin?.email,
-                        instituteName: institute.name
+        // Helper for single individual dispatch
+        const dispatchToPerson = async (rId: string, announcementId: string, title: string, message: string) => {
+            const user = await prisma.user.findUnique({ where: { id: rId } });
+            if (user) {
+                // To Student User
+                await prisma.notification.create({
+                    data: {
+                        userId: user.id,
+                        type: 'NEW_ANNOUNCEMENT' as any,
+                        title,
+                        message,
+                        relatedEntityId: announcementId
                     }
-                )
-                    .then(() => console.log(`[Announcement-Institute] Email sent successfully`))
-                    .catch((err: any) => console.error(`[Announcement-Institute] Email delivery FAILED:`, err));
-            }
-
-            return announcement;
-        } else {
-            const instituteAdmin = await prisma.user.findUnique({
-                where: { id: userId },
-                select: { name: true, phone: true, email: true }
-            });
-
-            const contactFooter = `\n\n---\n🏛️ المعهد: ${institute.name}\n👤 المرسل: ${instituteAdmin?.name || 'مدير المعهد'}\n${instituteAdmin?.phone ? `📞 الجوال: ${instituteAdmin.phone}\n` : ''}${instituteAdmin?.email ? `✉️ البريد: ${instituteAdmin.email}` : ''}`;
-            const fullMessage = data.message + contactFooter;
-
-            // Broadcast to all active/pending students in any institute course
-            const announcement = await (prisma.announcement.create as any)({
-                data: {
-                    title: data.title,
-                    message: fullMessage,
-                    targetAudience: AnnouncementAudience.STUDENTS,
-                    senderId: userId,
-                    status: "SENT",
-                    sentAt: new Date()
-                }
-            });
-
-            if (courseIds.length === 0) {
-                console.log(`[Announcement-Institute] Broadcast skipped: Institute has no courses.`);
-                return announcement;
-            }
-
-            const activeStudents = await prisma.enrollment.findMany({
-                where: {
-                    courseId: { in: courseIds },
-                    status: { in: ["ACTIVE", "COMPLETED", "PRELIMINARY", "PENDING_PAYMENT"] },
-                    deletedAt: null
-                },
-                select: { student: { select: { id: true, name: true, email: true } } },
-                distinct: ["studentId"]
-            });
-
-            console.log(`[Announcement-Institute] Broadcasting to ${activeStudents.length} students`);
-
-            if (activeStudents.length > 0) {
-                // Batch create platform notifications
-                await prisma.notification.createMany({
-                    data: activeStudents.map((s: any) => ({
-                        userId: s.student.id,
-                        type: "NEW_ANNOUNCEMENT" as any,
-                        title: data.title,
-                        message: fullMessage,
-                        relatedEntityId: announcement.id
-                    })),
-                    skipDuplicates: true
                 });
-
-                // Fire-and-forget emails
-                for (const { student } of activeStudents as any[]) {
-                    if (student.email) {
-                        mailerService.sendAnnouncementEmail(
-                            student.email, 
-                            student.name, 
-                            data.title, 
-                            data.message,
-                            {
-                                name: instituteAdmin?.name || 'مدير المعهد',
-                                phone: instituteAdmin?.phone,
-                                email: instituteAdmin?.email,
-                                instituteName: institute.name
-                            }
-                        ).catch((e: any) => console.error(`[Announcement-Institute] Bulk email error:`, e));
-                    }
+                if (user.email) {
+                    mailerService.sendAnnouncementEmail(user.email, user.name, title, message, {
+                        name: instituteAdmin?.name || 'مدير المعهد',
+                        instituteName: institute.name
+                    }).catch(e => console.error(`[Mailer-Async] Error:`, e));
+                }
+            } else {
+                // To Institute Staff (Trainer)
+                const staff = await prisma.instituteStaff.findFirst({
+                    where: { id: rId, instituteId: institute.id }
+                });
+                if (staff?.email) {
+                    mailerService.sendAnnouncementEmail(staff.email, staff.name, title, message, {
+                        name: instituteAdmin?.name || 'مدير المعهد',
+                        instituteName: institute.name
+                    }).catch(e => console.error(`[Mailer-Async] Error:`, e));
                 }
             }
+        };
 
+        // --- EXECUTION LOGIC ---
+
+        // 1. If batch of recipients is specified (Selected Users)
+        if (data.recipientIds && data.recipientIds.length > 0) {
+            // Create ONE unified record
+            // Add hidden marker \u200B to title if it's a selective batch
+            const selectiveTitle = data.title + '\u200B';
+
+            const announcement = await (prisma.announcement as any).create({
+                data: {
+                    title: selectiveTitle,
+                    message: fullMessage,
+                    targetAudience: (data.targetAudience?.toUpperCase() as any) || 'SINGLE_USER',
+                    senderId: userId,
+                    recipientId: data.recipientIds.length === 1 ? data.recipientIds[0] : null,
+                    recipientIds: data.recipientIds || [], // PERSIST THE BATCH ARRAY
+                    courseId: (data.courseId && data.courseId !== 'all') ? data.courseId : null,
+                    category: (data.category?.toUpperCase() as any) || 'GENERAL',
+                    status: (data.status?.toUpperCase() as any) || (data.scheduledAt ? 'SCHEDULED' : 'SENT'),
+                    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                    sentAt: (!data.scheduledAt) ? new Date() : null,
+                }
+            });
+
+            if (announcement.status === 'SENT') {
+                // Dispatch to everyone in parallel without waiting for emails
+                Promise.all(data.recipientIds.map(rid => dispatchToPerson(rid, announcement.id, data.title, fullMessage)))
+                    .catch(e => console.error(`[Batch-Dispatch] Error:`, e));
+            }
             return announcement;
         }
+
+        // 2. If single recipient is specified (Legacy/Simple)
+        if (data.recipientId) {
+            const announcement = await (prisma.announcement as any).create({
+                data: {
+                    title: data.title,
+                    message: fullMessage,
+                    targetAudience: 'SINGLE_USER',
+                    senderId: userId,
+                    recipientId: data.recipientId,
+                    courseId: (data.courseId && data.courseId !== 'all') ? data.courseId : null,
+                    category: (data.category?.toUpperCase() as any) || 'GENERAL',
+                    status: (data.status?.toUpperCase() as any) || (data.scheduledAt ? 'SCHEDULED' : 'SENT'),
+                    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                    sentAt: (!data.scheduledAt) ? new Date() : null,
+                }
+            });
+
+            if (announcement.status === 'SENT') {
+                dispatchToPerson(data.recipientId, announcement.id, data.title, fullMessage);
+            }
+            return announcement;
+        }
+
+        // --- BROADCAST LOGIC ---
+        const audience = data.targetAudience?.toUpperCase() || 'STUDENTS';
+
+        const announcement = await (prisma.announcement as any).create({
+            data: {
+                title: data.title,
+                message: fullMessage,
+                targetAudience: audience as any,
+                senderId: userId,
+                recipientId: null,
+                courseId: (data.courseId && data.courseId !== 'all') ? data.courseId : null,
+                category: (data.category?.toUpperCase() as any) || 'GENERAL',
+                status: (data.status?.toUpperCase() as any) || (data.scheduledAt ? 'SCHEDULED' : 'SENT'),
+                scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                sentAt: (!data.scheduledAt) ? new Date() : null,
+            }
+        });
+
+        if (announcement.status === 'SENT') {
+            // A. Trainers
+            if (audience === 'TRAINERS' || audience === 'ALL') {
+                const trainers = await prisma.instituteStaff.findMany({
+                    where: { instituteId: institute.id, status: "ACTIVE" }
+                });
+                for (const t of trainers) {
+                    if (t.email) {
+                        mailerService.sendAnnouncementEmail(t.email, t.name, data.title, data.message, {
+                            name: instituteAdmin?.name || 'مدير المعهد',
+                            instituteName: institute.name
+                        }).catch(e => console.error(e));
+                    }
+                }
+            }
+            // B. Students
+            if (audience === 'STUDENTS' || audience === 'ALL') {
+                const targetCourseIds = (data.courseId && data.courseId !== 'all') ? [data.courseId] : allCourseIds;
+                const enrollments = await prisma.enrollment.findMany({
+                    where: { courseId: { in: targetCourseIds }, status: 'ACTIVE', deletedAt: null },
+                    select: { student: { select: { id: true, name: true, email: true } } },
+                    distinct: ['studentId']
+                });
+                if (enrollments.length > 0) {
+                    await prisma.notification.createMany({
+                        data: enrollments.map(e => ({
+                            userId: e.student.id,
+                            type: 'NEW_ANNOUNCEMENT' as any,
+                            title: data.title,
+                            message: fullMessage,
+                            relatedEntityId: announcement.id
+                        })),
+                        skipDuplicates: true
+                    });
+                    for (const { student } of enrollments) {
+                        if (student.email) {
+                            mailerService.sendAnnouncementEmail(student.email, student.name, data.title, data.message, {
+                                name: instituteAdmin?.name || 'مدير المعهد',
+                                instituteName: institute.name
+                            }).catch(e => console.error(e));
+                        }
+                    }
+                }
+            }
+        }
+        return announcement;
+    }
+
+    async getAnnouncements(userId: string) {
+        const institute = await prisma.institute.findUnique({ where: { userId } });
+        if (!institute) throw new Error('لم يتم العثور على بيانات المعهد');
+
+        const announcements = await (prisma.announcement as any).findMany({
+            where: { senderId: userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                sender: { select: { id: true, name: true } },
+                recipient: { select: { id: true, name: true } },
+                course: { select: { id: true, title: true } },
+            }
+        });
+
+        return announcements.map((a: any) => ({
+            id: a.id,
+            title: a.title,
+            message: a.message,
+            targetAudience: a.targetAudience?.toUpperCase(),
+            category: a.category?.toUpperCase() || 'GENERAL',
+            status: a.status?.toUpperCase(),
+            scheduledAt: a.scheduledAt,
+            sentAt: a.sentAt,
+            createdAt: a.createdAt,
+            sender: a.sender,
+            recipient: a.recipient,
+            course: (a as any).course
+        }));
+    }
+
+    /**
+     * Update an announcement (only if it belongs to this institute and not yet sent)
+     */
+    async updateAnnouncement(userId: string, announcementId: string, data: { title?: string; message?: string }) {
+        const existing = await (prisma.announcement as any).findFirst({
+            where: { id: announcementId, senderId: userId }
+        });
+        if (!existing) throw new Error('الإعلان غير موجود أو لا تملك صلاحية تعديله');
+
+        return (prisma.announcement as any).update({
+            where: { id: announcementId },
+            data: {
+                ...(data.title && { title: data.title }),
+                ...(data.message && { message: data.message }),
+            }
+        });
+    }
+
+    /**
+     * Delete an announcement (only if it belongs to this institute)
+     */
+    async deleteAnnouncement(userId: string, announcementId: string) {
+        const existing = await (prisma.announcement as any).findFirst({
+            where: { id: announcementId, senderId: userId }
+        });
+        if (!existing) throw new Error('الإعلان غير موجود أو لا تملك صلاحية حذفه');
+
+        await (prisma.announcement as any).delete({ where: { id: announcementId } });
+        return { success: true };
     }
 
     // =====================================================
@@ -2141,7 +2197,7 @@ class InstituteService {
         // Fetch user avatars for staff if applicable. 
         // This is a bit complex in SQL because staff is a separate model without user relation directly in staff (it's often text).
         // For simplicity, we just map what we have.
-        
+
         return {
             id: institute.id,
             name: institute.name,

@@ -303,6 +303,7 @@ model Announcement {
   createdAt      DateTime             @default(now()) @map("created_at")
   senderId       String?              @map("sender_id")
   recipientId    String?              @map("recipient_id")
+  recipientIds   String[]             @default([]) @map("recipient_ids")
   courseId       String?              @map("course_id")
   course         Course?              @relation(fields: [courseId], references: [id])
   sender         User?                @relation(fields: [senderId], references: [id])

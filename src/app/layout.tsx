@@ -43,7 +43,7 @@ export default function RootLayout({
             >
               <NavbarWrapper />
               {children}
-              <Toaster />
+              <Toaster richColors position="bottom-right" />
             </ThemeProvider>
           </NotificationProvider>
         </AuthProvider>
