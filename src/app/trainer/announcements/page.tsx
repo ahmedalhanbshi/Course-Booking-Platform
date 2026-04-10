@@ -37,9 +37,9 @@ export default function TrainerAnnouncements() {
     selectedStudents: [] as string[]
   })
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true)
+      if (!isSilent) setLoading(true)
       const [annsRes, coursesRes, studentsRes] = await Promise.all([
         trainerService.getAnnouncements().catch(() => []),
         trainerService.getCourses().catch(() => []),
@@ -49,15 +49,20 @@ export default function TrainerAnnouncements() {
       setCourses(coursesRes || [])
       setStudents(studentsRes?.students || [])
     } catch (error) {
-      console.error("Fetch error:", error)
-      toast.error("حدث خطأ أثناء جلب البيانات")
+      if (!isSilent) {
+        console.error("Fetch error:", error)
+        toast.error("حدث خطأ أثناء جلب البيانات")
+      }
     } finally {
-      setLoading(false)
+      if (!isSilent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     fetchData()
+    // Silent background poll every 60 seconds
+    const interval = setInterval(() => fetchData(true), 60000)
+    return () => clearInterval(interval)
   }, [fetchData])
 
   const resetForm = () => {
