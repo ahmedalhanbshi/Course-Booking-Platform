@@ -824,6 +824,7 @@ class TrainerService {
                         name: true,
                         avatar: true,
                         email: true,
+                        phone: true,
                         trainerProfile: {
                             select: { bio: true, specialties: true }
                         },
@@ -854,6 +855,7 @@ class TrainerService {
                         name: true,
                         logo: true,
                         email: true,
+                        phone: true,
                         description: true,
                         user: { select: { avatar: true } },
                         bankAccounts: {
@@ -876,11 +878,11 @@ class TrainerService {
 
         // Fetch all staff trainers if staffTrainerIds is set (now multi-trainer only)
         const staffTrainerIds = (course as any).staffTrainerIds as string[] | undefined;
-        let staffTrainers: { id: string; name: string; bio: string | null; email: string | null; specialties: string[] }[] = [];
+        let staffTrainers: { id: string; name: string; bio: string | null; email: string | null; phone: string | null; specialties: string[] }[] = [];
         if (staffTrainerIds && staffTrainerIds.length > 0) {
             const staffList = await prisma.instituteStaff.findMany({
                 where: { id: { in: staffTrainerIds } },
-                select: { id: true, name: true, bio: true, email: true, specialties: true }
+                select: { id: true, name: true, bio: true, email: true, phone: true, specialties: true }
             });
             staffTrainers = staffList;
         }
@@ -918,10 +920,18 @@ class TrainerService {
                 room: s.room ? { id: s.room.id, name: s.room.name, location: s.room.location ?? null } : null,
             })),
             staffTrainers, // قائمة جميع المدربين
+            institute: (course.trainerId === null && (course as any).institute) ? {
+                name: (course as any).institute.name,
+                logo: (course as any).institute.logo,
+                email: (course as any).institute.email,
+                phone: (course as any).institute.phone,
+                description: (course as any).institute.description,
+            } : null,
             instructor: {
                 name: (course as any).trainer?.name ?? (staffTrainers.length > 0 ? staffTrainers[0].name : ((course as any).institute?.name ?? 'مدرب')),
                 avatar: (course as any).trainer?.avatar ?? ((course as any).institute?.logo ?? (course as any).institute?.user?.avatar ?? null),
                 email: (course as any).trainer?.email ?? (staffTrainers.length > 0 ? staffTrainers[0].email : ((course as any).institute?.email ?? null)),
+                phone: (course as any).trainer?.phone ?? (staffTrainers.length > 0 ? staffTrainers[0].phone : ((course as any).institute?.phone ?? null)),
                 bio: (course as any).trainer?.trainerProfile?.bio ?? (staffTrainers.length > 0 ? staffTrainers[0].bio : ((course as any).institute?.description ?? null)),
                 specialties: (course as any).trainer?.trainerProfile?.specialties ?? (staffTrainers.length > 0 ? staffTrainers[0].specialties : []),
                 bankAccounts: (course as any).trainer?.bankAccounts ?? (course as any).institute?.bankAccounts ?? [],
@@ -1354,9 +1364,22 @@ class TrainerService {
     }
 
     /**
-     * Update the trainer's own profile (name, phone, bio, specialties)
+     * Update the trainer's own profile (name, phone, bio, specialties, email)
      */
-    async updateProfile(userId: string, data: { name?: string; phone?: string; bio?: string; specialties?: string[]; avatarPath?: string }) {
+    async updateProfile(userId: string, data: { name?: string; phone?: string; bio?: string; specialties?: string[]; avatarPath?: string; email?: string }) {
+        // If email is provided, check uniqueness
+        if (data.email) {
+            const existingUser = await prisma.user.findFirst({
+                where: {
+                    email: data.email,
+                    NOT: { id: userId }
+                }
+            });
+            if (existingUser) {
+                throw new Error('البريد الإلكتروني موجود بالفعل');
+            }
+        }
+
         // Update base user fields
         await prisma.user.update({
             where: { id: userId },
@@ -1364,6 +1387,7 @@ class TrainerService {
                 ...(data.name && { name: data.name }),
                 ...(data.phone !== undefined && { phone: data.phone }),
                 ...(data.avatarPath && { avatar: data.avatarPath }),
+                ...(data.email && { email: data.email }),
             },
         });
 
@@ -1922,7 +1946,9 @@ class TrainerService {
         if ((data.startTime || data.endTime) && session.roomId) {
             const newStart = data.startTime ?? session.startTime;
             const newEnd = data.endTime ?? session.endTime;
-            const conflict = await prisma.session.findFirst({
+
+            // 1. Check for other sessions
+            const sessionConflict = await prisma.session.findFirst({
                 where: {
                     id: { not: sessionId },
                     roomId: session.roomId,
@@ -1931,7 +1957,26 @@ class TrainerService {
                     endTime: { gt: newStart }
                 }
             });
-            if (conflict) throw new Error('هذا الوقت محجوز بالفعل في نفس القاعة');
+            if (sessionConflict) throw new Error('هذا الوقت محجوز بالفعل بواسطة جلسة أخرى في نفس القاعة');
+
+            // 2. Check for blanket RoomBookings (those without sessions yet)
+            const bookingConflict = await prisma.roomBooking.findFirst({
+                where: {
+                    roomId: session.roomId,
+                    status: { in: ['APPROVED', 'PENDING_PAYMENT'] },
+                    sessions: { none: {} }, // Blanket booking
+                    startDate: { lte: newEnd },
+                    endDate: { gte: newStart }
+                }
+            });
+            
+            if (bookingConflict) {
+                // Check if the times also overlap (approximated for simplicity)
+                if (bookingConflict.defaultStartTime.getHours() < newEnd.getHours() && 
+                    bookingConflict.defaultEndTime.getHours() > newStart.getHours()) {
+                    throw new Error('هذا الوقت محجوز بالفعل ضمن حجز قاعة كلي');
+                }
+            }
         }
 
         if (data.updateAll && data.meetingLink !== undefined && session.courseId) {
@@ -1941,6 +1986,23 @@ class TrainerService {
             });
         }
         
+        // If moved outside RoomBooking range, expand the range
+        if (data.startTime && session.roomBookingId) {
+            const booking = await prisma.roomBooking.findUnique({ where: { id: session.roomBookingId } });
+            if (booking) {
+                const updates: any = {};
+                if (data.startTime < booking.startDate) updates.startDate = data.startTime;
+                if ((data.endTime ?? session.endTime) > booking.endDate) updates.endDate = data.endTime ?? session.endTime;
+                
+                if (Object.keys(updates).length > 0) {
+                    await prisma.roomBooking.update({
+                        where: { id: booking.id },
+                        data: updates
+                    });
+                }
+            }
+        }
+
         return prisma.session.update({
             where: { id: sessionId },
             data: {

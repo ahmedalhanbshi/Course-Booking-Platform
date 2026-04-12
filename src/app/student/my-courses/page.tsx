@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BookOpen, Calendar, Clock, Award, FileText, Download, X, CheckCircle, AlertCircle, Play, ArrowLeft, Users } from "lucide-react"
+import { BookOpen, Calendar, Clock, Award, FileText, Download, X, CheckCircle, AlertCircle, Play, ArrowLeft, Users, CreditCard, CheckCircle2, Info } from "lucide-react"
 import { Course, Enrollment, User } from "@/types"
 import { studentService } from "@/lib/student-service"
 import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
@@ -18,7 +18,10 @@ type EnrollmentWithCourse = {
   status: string
   progress: number
   enrolledAt: Date
-  course: Course & { image: string }
+  course: Course & { 
+    image: string,
+    trainers?: { id: string, name: string, avatar: string | null }[]
+  }
   nextSession?: {
     startTime: string
     endTime: string
@@ -30,6 +33,11 @@ type EnrollmentWithCourse = {
 const statusVariants = {
   active: {
     label: "سارية",
+    activeClass: "bg-white text-slate-900 shadow-sm",
+    inactiveClass: "text-slate-600 hover:text-slate-900"
+  },
+  pending: {
+    label: "معلقة",
     activeClass: "bg-white text-slate-900 shadow-sm",
     inactiveClass: "text-slate-600 hover:text-slate-900"
   },
@@ -116,7 +124,10 @@ export default function MyCoursesPage() {
 
   const getEnrollmentsByStatus = (status: string) => {
     if (status === 'active') {
-      return enrollments.filter(e => ['active', 'pending_payment', 'preliminary'].includes(e.status))
+      return enrollments.filter(e => e.status === 'active')
+    }
+    if (status === 'pending') {
+      return enrollments.filter(e => ['pending_payment', 'preliminary'].includes(e.status))
     }
     return enrollments.filter(enrollment => enrollment.status === status)
   }
@@ -144,14 +155,49 @@ export default function MyCoursesPage() {
     }
   }
 
-  const renderCourseCard = (enrollment: EnrollmentWithCourse) => {
+    const renderCourseCard = (enrollment: EnrollmentWithCourse) => {
     const courseLink = `/student/courses/${enrollment.course.id}`
 
-    const hasUpcomingSession = ['active', 'pending_payment', 'preliminary'].includes(enrollment.status) && enrollment.nextSession
+    const isActive = enrollment.status === 'active'
+    const hasUpcomingSession = isActive && enrollment.nextSession
     const nextDate = hasUpcomingSession ? new Date(enrollment.nextSession!.startTime) : null
 
+    // Status Message Config
+    const statusInfo: Record<string, { icon: any, message: string, color: string, textColor: string, iconColor: string }> = {
+      preliminary: { 
+        icon: Info, 
+        message: "طلب التسجيل قيد المراجعة الجارية من قبل الإدارة وسيتم إشعارك عند القبول", 
+        color: "bg-amber-50/50", 
+        textColor: "text-amber-800",
+        iconColor: "text-amber-600"
+      },
+      pending_payment: { 
+        icon: CreditCard, 
+        message: "تم طلب التسجيل بنجاح! يرجى إتمام عملية الدفع لتفعيل الدورة والمباشرة", 
+        color: "bg-indigo-50/50", 
+        textColor: "text-indigo-800",
+        iconColor: "text-indigo-600"
+      },
+      completed: { 
+        icon: CheckCircle2, 
+        message: "لقد أكملت هذه الدورة بنجاح وتحصيل نتائجك التعليمية", 
+        color: "bg-green-50/50", 
+        textColor: "text-green-800",
+        iconColor: "text-green-600"
+      },
+      cancelled: { 
+        icon: AlertCircle, 
+        message: "تم إلغاء هذا الالتحاق، يمكنك التواصل مع الدعم للمزيد من المعلومات", 
+        color: "bg-red-50/50", 
+        textColor: "text-red-800",
+        iconColor: "text-red-600"
+      }
+    }
+
+    const currentStatus = statusInfo[enrollment.status]
+
     return (
-      <Card key={enrollment.id} className="w-full overflow-hidden border border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
+      <Card key={enrollment.id} className="w-full overflow-hidden border border-slate-200/60 shadow-md hover:shadow-xl transition-all duration-300 rounded-2xl group">
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col md:flex-row-reverse gap-6 items-stretch">
             <Link
@@ -176,29 +222,57 @@ export default function MyCoursesPage() {
                 <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
                   {enrollment.course.shortDescription || enrollment.course.description}
                 </p>
-                <p className="text-muted-foreground text-sm flex items-center justify-end gap-2">
-                  <Users className="h-4 w-4" />
-                  المدرب: {enrollment.course.trainer.name}
-                </p>
+                <div className="flex flex-wrap items-center justify-start gap-2 pt-1" dir="rtl">
+                  <div className="flex items-center gap-1.5 text-muted-foreground ml-1">
+                    <Users className="h-3.5 w-3.5" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">المدربين:</span>
+                  </div>
+                  {(enrollment.course.trainers || [enrollment.course.trainer]).map((t, idx) => (
+                    <div 
+                      key={t.id + idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 text-xs font-bold shadow-sm"
+                    >
+                      {t.avatar ? (
+                        <div className="relative h-4 w-4 rounded-full overflow-hidden border border-blue-200">
+                          <Image src={getFileUrl(t.avatar) || "/images/avatar-placeholder.png"} alt={t.name} fill className="object-cover" unoptimized />
+                        </div>
+                      ) : (
+                        <div className="h-4 w-4 rounded-full bg-blue-200 flex items-center justify-center text-[10px] text-blue-700">
+                          {t.name.charAt(0)}
+                        </div>
+                      )}
+                      <span>{t.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm space-y-1">
-                <div className="flex items-center justify-end gap-2 text-primary">
-                  <Calendar className="h-4 w-4" />
-                  <span className="font-medium">الدرس القادم</span>
+              {isActive ? (
+                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm space-y-1">
+                  <div className="flex items-center justify-end gap-2 text-primary">
+                    <Calendar className="h-4 w-4" />
+                    <span className="font-medium">الدرس القادم</span>
+                  </div>
+                  <div className="text-foreground flex items-center gap-2" dir="rtl">
+                    {nextDate ? (
+                      <>
+                        <span className="whitespace-nowrap">{formatDate(nextDate)}</span>
+                        <span className="text-muted-foreground select-none">•</span>
+                        <span className="whitespace-nowrap">{formatTime(nextDate)}</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">لا توجد جلسات قادمة</span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-foreground flex items-center gap-2" dir="rtl">
-                  {nextDate ? (
-                    <>
-                      <span className="whitespace-nowrap">{formatDate(nextDate)}</span>
-                      <span className="text-muted-foreground select-none">•</span>
-                      <span className="whitespace-nowrap">{formatTime(nextDate)}</span>
-                    </>
-                  ) : (
-                    <span>لا توجد جلسات قادمة</span>
-                  )}
+              ) : currentStatus ? (
+                <div className={`rounded-xl border border-transparent ${currentStatus.color} px-4 py-3 text-sm flex items-center gap-3`} dir="rtl">
+                  <currentStatus.icon className={`h-5 w-5 ${currentStatus.iconColor} shrink-0`} />
+                  <p className={`${currentStatus.textColor} font-medium leading-relaxed`}>
+                    {currentStatus.message}
+                  </p>
                 </div>
-              </div>
+              ) : null}
 
               <div className="flex flex-col sm:flex-row-reverse gap-2 pt-1">
                 <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
@@ -250,6 +324,7 @@ export default function MyCoursesPage() {
   }
 
   const activeCourses = getEnrollmentsByStatus('active')
+  const pendingCourses = getEnrollmentsByStatus('pending')
   const completedCourses = getEnrollmentsByStatus('completed')
   const cancelledCourses = getEnrollmentsByStatus('cancelled')
 
@@ -264,38 +339,50 @@ export default function MyCoursesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <Card className="border border-border/60 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <Card className="border border-border/60 shadow-sm bg-blue-50/20">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
               <Play className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground font-medium">دورات سارية</p>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">دورات سارية</p>
               <p className="text-2xl font-bold">{activeCourses.length}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border/60 shadow-sm">
+        <Card className="border border-border/60 shadow-sm bg-amber-50/20">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">طلبات معلقة</p>
+              <p className="text-2xl font-bold">{pendingCourses.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border/60 shadow-sm bg-green-50/20">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center text-green-600">
               <CheckCircle className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground font-medium">دورات مكتملة</p>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">دورات مكتملة</p>
               <p className="text-2xl font-bold">{completedCourses.length}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border/60 shadow-sm">
+        <Card className="border border-border/60 shadow-sm bg-red-50/20">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center text-red-600">
               <AlertCircle className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground font-medium">دورات ملغاة</p>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">دورات ملغاة</p>
               <p className="text-2xl font-bold">{cancelledCourses.length}</p>
             </div>
           </CardContent>
@@ -304,11 +391,16 @@ export default function MyCoursesPage() {
 
       {/* Courses Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="grid w-full grid-cols-3 gap-2 rounded-full bg-muted/50 p-1 mb-8">
+        <div className="grid w-full grid-cols-4 gap-2 rounded-full bg-muted/50 p-1 mb-8">
           <StatusPill
             status="active"
             isActive={activeTab === "active"}
             onClick={() => setActiveTab("active")}
+          />
+          <StatusPill
+            status="pending"
+            isActive={activeTab === "pending"}
+            onClick={() => setActiveTab("pending")}
           />
           <StatusPill
             status="completed"
@@ -333,6 +425,18 @@ export default function MyCoursesPage() {
             />
           ) : (
             activeCourses.map(renderCourseCard)
+          )}
+        </TabsContent>
+
+        <TabsContent value="pending" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {pendingCourses.length === 0 ? (
+            <EmptyState
+              icon={Clock}
+              title="لا توجد طلبات معلقة"
+              description="جميع طلباتك تمت معالجتها بنجاح."
+            />
+          ) : (
+            pendingCourses.map(renderCourseCard)
           )}
         </TabsContent>
 

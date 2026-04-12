@@ -548,13 +548,27 @@ export class AuthService {
         return user;
     }
 
-    async updateProfile(userId: string, data: { name?: string; phone?: string; avatar?: string }) {
+    async updateProfile(userId: string, data: { name?: string; phone?: string; avatar?: string; email?: string }) {
+        // If email is provided, check uniqueness
+        if (data.email) {
+            const existingUser = await prisma.user.findFirst({
+                where: {
+                    email: data.email,
+                    NOT: { id: userId }
+                }
+            });
+            if (existingUser) {
+                throw new Error('البريد الإلكتروني موجود بالفعل');
+            }
+        }
+
         const user = await prisma.user.update({
             where: { id: userId },
             data: {
                 name: data.name,
                 phone: data.phone,
                 avatar: data.avatar,
+                email: data.email,
             },
             select: {
                 id: true,
@@ -570,7 +584,15 @@ export class AuthService {
         });
 
         if (!user) {
-            throw new Error('User not found');
+            throw new Error('لم يتم العثور على المستخدم');
+        }
+
+        // If user is an institute admin and email changed, update the institute record for consistency
+        if (user.role === 'INSTITUTE_ADMIN' && data.email) {
+            await prisma.institute.updateMany({
+                where: { userId: userId },
+                data: { email: data.email }
+            });
         }
 
         return user;

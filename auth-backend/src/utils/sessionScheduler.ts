@@ -44,13 +44,41 @@ async function autoCompleteCourses() {
     }
 }
 
+/**
+ * Automatically marks enrollments as COMPLETED when their course is COMPLETED.
+ * Only targets ACTIVE enrollments (students who completed registration).
+ */
+async function autoCompleteEnrollments() {
+    try {
+        const now = new Date();
+        const result = await prisma.enrollment.updateMany({
+            where: {
+                status: 'ACTIVE',
+                deletedAt: null,
+                course: {
+                    status: 'COMPLETED'
+                }
+            },
+            data: { status: 'COMPLETED' },
+        });
+
+        if (result.count > 0) {
+            console.log(`[Scheduler] ✅ Auto-completed ${result.count} enrollment(s) at ${now.toISOString()}`);
+        }
+    } catch (err) {
+        console.error('[Scheduler] Failed to auto-complete enrollments:', err);
+    }
+}
+
 export function startSessionScheduler() {
     console.log('[Scheduler] Auto-complete scheduler started (runs every minute)');
     // Run immediately on startup
     autoCompleteSessions();
     autoCompleteCourses();
+    autoCompleteEnrollments();
     // Then run every 60 seconds
     setInterval(autoCompleteSessions, 60 * 1000);
     setInterval(autoCompleteCourses, 60 * 1000);
+    setInterval(autoCompleteEnrollments, 60 * 1000);
 }
 

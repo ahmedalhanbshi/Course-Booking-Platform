@@ -40,7 +40,7 @@ export default function TrainerProfilePage() {
     const [activeTab, setActiveTab] = useState("personal")
 
     // Editable fields mirror
-    const [form, setForm] = useState({ name: "", phone: "", bio: "", specialties: [] as string[] })
+    const [form, setForm] = useState({ name: "", phone: "", bio: "", specialties: [] as string[], email: "" })
     const [newSpecialty, setNewSpecialty] = useState("")
     const [avatarFile, setAvatarFile] = useState<File | null>(null)
     const [avatarPreview, setAvatarPreview] = useState<string>("")
@@ -148,7 +148,7 @@ export default function TrainerProfilePage() {
             try {
                 const data = await trainerService.getProfile()
                 setProfile(data)
-                setForm({ name: data.name, phone: data.phone ?? "", bio: data.bio ?? "", specialties: data.specialties ?? [] })
+                setForm({ name: data.name, phone: data.phone ?? "", bio: data.bio ?? "", specialties: data.specialties ?? [], email: data.email ?? "" })
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || "فشل في تحميل الملف الشخصي")
             } finally {
@@ -169,7 +169,7 @@ export default function TrainerProfilePage() {
 
     const startEditing = () => {
         if (!profile) return
-        setForm({ name: profile.name, phone: profile.phone, bio: profile.bio, specialties: [...profile.specialties] })
+        setForm({ name: profile.name, phone: profile.phone, bio: profile.bio, specialties: [...profile.specialties], email: profile.email })
         setAvatarFile(null)
         setAvatarPreview("")
         setIsEditing(true)
@@ -188,6 +188,7 @@ export default function TrainerProfilePage() {
             const updated = await trainerService.updateProfile({
                 name: form.name,
                 phone: form.phone,
+                email: form.email,
                 bio: form.bio,
                 specialties: form.specialties,
                 avatar: avatarFile ?? undefined,
@@ -345,12 +346,12 @@ export default function TrainerProfilePage() {
                                         <Input
                                             id="email"
                                             type="email"
-                                            value={profile.email}
-                                            disabled
-                                            className="pr-10 bg-gray-50"
+                                            value={isEditing ? form.email : profile.email}
+                                            onChange={e => setForm({ ...form, email: e.target.value })}
+                                            disabled={!isEditing}
+                                            className={`pr-10 ${!isEditing ? "bg-gray-50" : ""}`}
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-400">لا يمكن تغيير البريد الإلكتروني</p>
                                 </div>
 
                                 <div className="space-y-2">

@@ -189,6 +189,7 @@ class InstituteService {
         data: {
             name?: string;
             phone?: string;
+            email?: string;
             instituteName?: string;
             instituteAddress?: string;
             instituteWebsite?: string;
@@ -205,6 +206,19 @@ class InstituteService {
             throw new Error("لم يتم العثور على المعهد");
         }
 
+        // If email is provided, check uniqueness
+        if (data.email) {
+            const existingUser = await prisma.user.findFirst({
+                where: {
+                    email: data.email,
+                    NOT: { id: userId }
+                }
+            });
+            if (existingUser) {
+                throw new Error('البريد الإلكتروني موجود بالفعل');
+            }
+        }
+
         // Update User info
         const updatedUser = await prisma.user.update({
             where: { id: userId },
@@ -212,6 +226,7 @@ class InstituteService {
                 name: data.name !== undefined ? data.name : undefined,
                 phone: data.phone !== undefined ? data.phone : undefined,
                 avatar: data.avatar !== undefined ? data.avatar : undefined,
+                email: data.email !== undefined ? data.email : undefined,
             },
         });
 
@@ -224,6 +239,7 @@ class InstituteService {
                 website: data.instituteWebsite !== undefined ? data.instituteWebsite : undefined,
                 description: data.instituteDescription !== undefined ? data.instituteDescription : undefined,
                 logo: data.logo !== undefined ? data.logo : undefined,
+                email: data.email !== undefined ? data.email : undefined,
             },
         });
 
@@ -1919,7 +1935,9 @@ class InstituteService {
         if ((data.startTime || data.endTime) && session.roomId) {
             const newStart = data.startTime ?? session.startTime;
             const newEnd = data.endTime ?? session.endTime;
-            const conflict = await prisma.session.findFirst({
+
+            // 1. Check for other sessions
+            const sessionConflict = await prisma.session.findFirst({
                 where: {
                     id: { not: sessionId },
                     roomId: session.roomId,
@@ -1928,7 +1946,27 @@ class InstituteService {
                     endTime: { gt: newStart }
                 }
             });
-            if (conflict) throw new Error('هذا الوقت محجوز بالفعل في نفس القاعة');
+            if (sessionConflict) throw new Error('هذا الوقت محجوز بالفعل بواسطة جلسة أخرى في نفس القاعة');
+
+            // 2. Check for blanket RoomBookings (those without sessions yet)
+            // In getHallAvailabilityPublic, these act as blocks for the whole day range
+            const bookingConflict = await prisma.roomBooking.findFirst({
+                where: {
+                    roomId: session.roomId,
+                    status: { in: ['APPROVED', 'PENDING_PAYMENT'] },
+                    sessions: { none: {} }, // Blanket booking
+                    startDate: { lte: newEnd },
+                    endDate: { gte: newStart }
+                }
+            });
+            
+            if (bookingConflict) {
+                // Check if the times also overlap (approximated for simplicity)
+                if (bookingConflict.defaultStartTime.getHours() < newEnd.getHours() && 
+                    bookingConflict.defaultEndTime.getHours() > newStart.getHours()) {
+                    throw new Error('هذا الوقت محجوز بالفعل ضمن حجز قاعة كلي');
+                }
+            }
         }
 
         if (data.updateAll && data.meetingLink !== undefined && session.courseId) {
@@ -1936,6 +1974,23 @@ class InstituteService {
                 where: { courseId: session.courseId },
                 data: { meetingLink: data.meetingLink }
             });
+        }
+
+        // If moved outside RoomBooking range, expand the range
+        if (data.startTime && session.roomBookingId) {
+            const booking = await prisma.roomBooking.findUnique({ where: { id: session.roomBookingId } });
+            if (booking) {
+                const updates: any = {};
+                if (data.startTime < booking.startDate) updates.startDate = data.startTime;
+                if ((data.endTime ?? session.endTime) > booking.endDate) updates.endDate = data.endTime ?? session.endTime;
+                
+                if (Object.keys(updates).length > 0) {
+                    await prisma.roomBooking.update({
+                        where: { id: booking.id },
+                        data: updates
+                    });
+                }
+            }
         }
 
         return prisma.session.update({

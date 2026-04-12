@@ -35,7 +35,10 @@ import {
   UploadCloud,
   Users,
   X,
-  ImageIcon
+  ImageIcon,
+  Mail,
+  Phone,
+  Building2
 } from "lucide-react"
 import { toast } from "sonner"
 import { trainerService, CourseDetail } from "@/lib/trainer-service"
@@ -56,6 +59,11 @@ const deliveryLabels: Record<string, string> = {
   in_person: "حضوري",
   hybrid: "مدمج",
   capacity_based: "تحديد القاعة عند اكتمال العدد"
+}
+
+function formatWhatsAppLink(phone: string): string {
+  const cleanPhone = phone.replace(/\D/g, "")
+  return `https://wa.me/${cleanPhone}`
 }
 
 type RegistrationStatus =
@@ -1063,32 +1071,66 @@ export default function CourseDetailsPage() {
 
             {/* Multi-trainer support: show all trainers if staffTrainers available */}
             {(course as any).staffTrainers?.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-6 sm:grid-cols-2">
                 {(course as any).staffTrainers.map((t: any) => (
-                  <div key={t.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-200">
-                      <div className="flex h-full w-full items-center justify-center text-lg font-bold text-slate-500">
-                        {t.name?.charAt(0) ?? "م"}
+                  <div key={t.id} className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all duration-300 hover:bg-white hover:shadow-md hover:border-blue-200 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-slate-200 shadow-sm transition-transform group-hover:scale-105">
+                        <div className="flex h-full w-full items-center justify-center text-xl font-black text-blue-600 bg-blue-50">
+                          {t.name?.charAt(0) ?? "م"}
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h4 className="text-base font-bold text-slate-900 truncate">{t.name}</h4>
+                        {t.specialties?.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {t.specialties.slice(0, 2).map((s: string) => (
+                              <span key={s} className="inline-block rounded-lg bg-blue-100/50 px-2 py-0.5 text-[10px] font-bold text-blue-700">{s}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="min-w-0 space-y-1">
-                      <h4 className="text-sm font-bold text-slate-900 truncate">{t.name}</h4>
-                      {t.specialties?.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {t.specialties.slice(0, 3).map((s: string) => (
-                            <span key={s} className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{s}</span>
-                          ))}
-                        </div>
+                    
+                    {t.bio && (
+                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-2 border-r-2 border-blue-200 pr-2 mr-1">
+                        {t.bio}
+                      </p>
+                    )}
+
+                    <div className="mt-auto flex flex-col gap-1.5 pt-2">
+                      {t.phone && (
+                        <a
+                          href={formatWhatsAppLink(t.phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors group/link"
+                        >
+                          <div className="rounded-full bg-emerald-50 p-1 group-hover/link:bg-emerald-100">
+                             <Phone className="h-3 w-3" />
+                          </div>
+                          <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{t.phone}</span>
+                        </a>
                       )}
-                      {t.bio && <p className="text-xs text-slate-500 line-clamp-2">{t.bio}</p>}
+                      {t.email && (
+                        <a
+                          href={`mailto:${t.email}`}
+                          className="flex items-center gap-2 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors group/link"
+                        >
+                          <div className="rounded-full bg-blue-50 p-1 group-hover/link:bg-blue-100">
+                            <Mail className="h-3 w-3" />
+                          </div>
+                          <span className="truncate max-w-[180px] hover:underline decoration-blue-200 underline-offset-4">{t.email}</span>
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               /* Legacy single instructor fallback */
-              <div className="flex items-start gap-4">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200">
+              <div className="flex flex-col sm:flex-row items-start gap-5 p-2">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow-md bg-slate-100">
                   <Image
                     src={resolveImage(course.instructor.avatar)}
                     alt={course.instructor.name}
@@ -1097,20 +1139,121 @@ export default function CourseDetailsPage() {
                     unoptimized={true}
                   />
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-lg font-bold text-slate-900">
+                <div className="space-y-3 flex-1">
+                  <h4 className="text-xl font-black text-slate-900">
                     {course.instructor.name}
                   </h4>
+                  
                   {course.instructor.bio && (
-                    <p className="text-sm text-slate-500 line-clamp-2 max-w-[560px]">
+                    <p className="text-sm text-slate-600 leading-relaxed line-clamp-2 max-w-[600px] bg-slate-100/30 p-3 rounded-xl border border-slate-200">
                       {course.instructor.bio}
                     </p>
                   )}
+
+                  <div className="flex flex-wrap gap-4 pt-1">
+                    {course.instructor.phone && (
+                      <a
+                        href={formatWhatsAppLink(course.instructor.phone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
+                      >
+                        <div className="rounded-full bg-emerald-50 p-2 group-hover/link:bg-emerald-100">
+                          <Phone className="h-4 w-4" />
+                        </div>
+                        <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{course.instructor.phone}</span>
+                      </a>
+                    )}
+                    {course.instructor.email && (
+                      <a
+                        href={`mailto:${course.instructor.email}`}
+                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
+                      >
+                        <div className="rounded-full bg-blue-50 p-2 group-hover/link:bg-blue-100">
+                          <Mail className="h-4 w-4" />
+                        </div>
+                        <span className="hover:underline decoration-blue-200 underline-offset-4">{course.instructor.email}</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </Card>
+
+        {/* Institute Info Section */}
+        {(course as any).institute && (
+          <Card
+            dir="rtl"
+            className="mb-8 w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.08)] overflow-hidden relative"
+            data-reveal
+            style={{ "--reveal-delay": "50ms" } as CSSProperties}
+          >
+            <div className="absolute top-0 right-0 w-2 h-full bg-blue-600" />
+            <div className="text-right space-y-4 pr-2">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-blue-600" />
+                المعهد المستضيف
+              </h3>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition-transform hover:scale-105 duration-300">
+                  {(course as any).institute.logo ? (
+                    <Image
+                      src={resolveImage((course as any).institute.logo)}
+                      alt={(course as any).institute.name}
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-slate-300">
+                      <Building2 className="h-10 w-10" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-4 flex-1 text-center sm:text-right w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
+                    <h4 className="text-2xl font-black text-slate-900">{(course as any).institute.name}</h4>
+                  </div>
+                  
+                  {(course as any).institute.description && (
+                    <p className="text-sm text-slate-600 leading-relaxed line-clamp-3 max-w-[90%] bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      {(course as any).institute.description}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap justify-center sm:justify-start gap-4">
+                    {(course as any).institute.phone && (
+                      <a
+                        href={formatWhatsAppLink((course as any).institute.phone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
+                      >
+                        <div className="rounded-full bg-emerald-50 p-2 group-hover/link:bg-emerald-100">
+                          <Phone className="h-4 w-4" />
+                        </div>
+                        <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{(course as any).institute.phone}</span>
+                      </a>
+                    )}
+                    {(course as any).institute.email && (
+                      <a
+                        href={`mailto:${(course as any).institute.email}`}
+                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
+                      >
+                        <div className="rounded-full bg-blue-50 p-2 group-hover/link:bg-blue-100">
+                          <Mail className="h-4 w-4" />
+                        </div>
+                        <span className="hover:underline decoration-blue-200 underline-offset-4">{(course as any).institute.email}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card

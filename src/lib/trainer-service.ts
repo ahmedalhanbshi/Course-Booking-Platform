@@ -87,6 +87,7 @@ export interface CourseDetail {
         name: string;
         avatar: string | null;
         email: string | null;
+        phone: string | null;
         bio: string | null;
         specialties: string[];
         bankAccounts?: {
@@ -98,6 +99,21 @@ export interface CourseDetail {
             isActive: boolean;
         }[];
     };
+    staffTrainers?: {
+        id: string;
+        name: string;
+        bio: string | null;
+        email: string | null;
+        phone: string | null;
+        specialties: string[];
+    }[];
+    institute?: {
+        name: string;
+        logo: string | null;
+        email: string | null;
+        phone: string | null;
+        description: string | null;
+    } | null;
 }
 
 export interface Session {
@@ -218,6 +234,7 @@ class TrainerService {
     async updateProfile(data: {
         name?: string;
         phone?: string;
+        email?: string;
         bio?: string;
         specialties?: string[];
         avatar?: File;
@@ -225,6 +242,7 @@ class TrainerService {
         const formData = new FormData();
         if (data.name) formData.append('name', data.name);
         if (data.phone !== undefined) formData.append('phone', data.phone);
+        if (data.email) formData.append('email', data.email);
         if (data.bio !== undefined) formData.append('bio', data.bio);
         if (data.specialties) formData.append('specialties', JSON.stringify(data.specialties));
         if (data.avatar) formData.append('avatar', data.avatar);

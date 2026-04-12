@@ -61,6 +61,7 @@ export default function StudentProfilePage() {
             const formData = new FormData()
             formData.append("name", user.name)
             formData.append("phone", user.phone)
+            formData.append("email", user.email)
             if (selectedAvatar) {
                 formData.append("avatar", selectedAvatar)
             }
@@ -151,8 +152,9 @@ export default function StudentProfilePage() {
                                 id="email"
                                 type="email"
                                 value={user.email}
-                                disabled={true}
-                                className="pl-10 text-right h-11 rounded-xl bg-slate-50 cursor-not-allowed"
+                                onChange={(e) => setUser({ ...user, email: e.target.value })}
+                                disabled={!isEditing}
+                                className={`pl-10 text-right h-11 rounded-xl ${!isEditing ? "bg-slate-50 cursor-not-allowed" : ""}`}
                                 dir="ltr"
                             />
                         </div>

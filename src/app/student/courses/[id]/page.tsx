@@ -21,14 +21,56 @@ import {
   Award,
   MessageSquare,
   Video,
-  AlertCircle,
   Globe,
-  Play,
+  MapPin,
   Ban,
   Lock,
-  MapPin,
+  AlertCircle,
+  Phone,
+  Mail,
+  ShieldCheck,
+  GraduationCap,
   ImageIcon,
-  X
+  X,
+  Play,
+  CheckCircle2,
+  Trash2,
+  ChevronRight,
+  ChevronLeft,
+  Layout,
+  BookOpen,
+  Users,
+  Settings,
+  Bell,
+  Search,
+  Menu,
+  MoreVertical,
+  LogOut,
+  User,
+  ExternalLink,
+  Download,
+  Upload,
+  Heart,
+  Eye,
+  Star,
+  Share2,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  FileIcon,
+  HelpCircle,
+  Info,
+  Check,
+  Filter,
+  ArrowRight,
+  ArrowLeft,
+  RefreshCw,
+  Edit,
+  BarChart,
+  PieChart,
+  Home,
+  Briefcase,
+  CreditCard
 } from "lucide-react"
 import {
   Dialog,
@@ -59,6 +101,11 @@ export default function StudentCourseDashboard() {
   const [hallData, setHallData] = useState<any>(null)
   const [isLoadingHall, setIsLoadingHall] = useState(false)
   const [hallImageError, setHallImageError] = useState(false)
+  
+  const formatWhatsAppLink = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, "")
+    return `https://wa.me/${cleanPhone}`
+  }
 
   const openHallModal = async (hallId: string) => {
     try {
@@ -130,8 +177,13 @@ export default function StudentCourseDashboard() {
   // If the API returned it, the user is authorized.
   // We can further check the enrollment status if we want to redirect to the public page.
   const isEnrolled = !!courseData
-  const isCompleted = courseData.enrollmentStatus === 'COMPLETED' || searchParams.get('status') === 'completed'
-  const isCancelled = courseData.enrollmentStatus === 'CANCELLED' || searchParams.get('status') === 'cancelled'
+  const isCompleted = courseData.enrollmentStatus === 'COMPLETED' || courseData.enrollmentStatus === 'completed' || searchParams.get('status') === 'completed'
+  const isCancelled = courseData.enrollmentStatus === 'CANCELLED' || courseData.enrollmentStatus === 'cancelled' || searchParams.get('status') === 'cancelled'
+  const isPreliminary = courseData.enrollmentStatus === 'PRELIMINARY' || courseData.enrollmentStatus === 'preliminary'
+  const isPendingPayment = courseData.enrollmentStatus === 'PENDING_PAYMENT' || courseData.enrollmentStatus === 'pending_payment'
+  const isPending = isPreliminary || isPendingPayment
+  const isActive = courseData.enrollmentStatus === 'ACTIVE' || courseData.enrollmentStatus === 'active'
+  const shouldLockContent = isCancelled || isPending
 
   const safeText = (value: string | undefined | null, fallback: string) => {
     if (typeof value !== "string") return fallback
@@ -143,7 +195,9 @@ export default function StudentCourseDashboard() {
   const courseDescription = safeText(courseData.description, "لا يوجد وصف للدورة حالياً.")
   const courseShortDescription = safeText(courseData.shortDescription, courseDescription)
   const courseDeliveryType = safeText(courseData.deliveryType, "أونلاين")
-  const coursePlatform = safeText(courseData.onlinePlatform, "Zoom")
+  const coursePlatform = courseDeliveryType === "حضوري" 
+    ? safeText(courseData.locationName, "القاعة التدريبية")
+    : safeText(courseData.onlinePlatform, "Zoom")
   const courseImage = getFileUrl(courseData.image) || "/images/course-abstract.svg"
 
   const instructor = courseData.instructor || {}
@@ -155,10 +209,8 @@ export default function StudentCourseDashboard() {
   const sessionDates = sessions.map((s: any) => s.startTime ? formatDate(s.startTime) : "").filter(Boolean)
 
   const dateRangeLabel = (() => {
-    if (sessions.length === 0 || !sessions[0].startTime) return "غير محدد"
-    const start = formatDate(sessions[0].startTime)
-    const end = formatDate(sessions[sessions.length - 1].startTime)
-    return start === end ? start : `${start} - ${end}`
+    if (!courseData.startDate || !courseData.endDate) return "غير محدد"
+    return `${formatDate(courseData.startDate)} - ${formatDate(courseData.endDate)}`
   })()
 
   const DEFAULT_SESSION_MINUTES = 60
@@ -224,15 +276,6 @@ export default function StudentCourseDashboard() {
               <h2 className="text-2xl md:text-3xl font-semibold leading-tight line-clamp-2">
                 {courseTitle}
               </h2>
-              <div className="flex items-center gap-2 text-blue-200 text-sm">
-                <span>بواسطة: {instructorName}</span>
-                {instructorRole && (
-                  <>
-                    <span className="w-1 h-1 rounded-full bg-blue-400" />
-                    <span>{instructorRole}</span>
-                  </>
-                )}
-              </div>
               <p className="text-sm text-blue-100/70 leading-relaxed line-clamp-2 max-w-2xl">
                 {courseShortDescription}
               </p>
@@ -250,7 +293,7 @@ export default function StudentCourseDashboard() {
                   )}
                   <span>
                     {courseDeliveryType === "حضوري" ? "القاعة/المكان:" : "المنصة:"}{" "}
-                    {courseDeliveryType === "حضوري" && courseData.sessions?.[0]?.roomId ? (
+                    {(courseDeliveryType === "حضوري" || courseDeliveryType === "هجين") && courseData.sessions?.[0]?.roomId ? (
                       <button
                         type="button"
                         onClick={() => openHallModal(courseData.sessions[0].roomId)}
@@ -266,10 +309,6 @@ export default function StudentCourseDashboard() {
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-blue-400" />
                   <span>{dateRangeLabel}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-400" />
-                  <span dir="ltr">{firstSessionTimeLabel}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Award className="h-4 w-4 text-blue-400" />
@@ -302,14 +341,14 @@ export default function StudentCourseDashboard() {
 
             {/* Banners */}
             {isCompleted ? (
-              <Card className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm">
+              <Card className="rounded-2xl border border-green-100 bg-green-50 shadow-sm">
                 <CardContent className="p-8 flex items-center gap-6">
-                  <div className="p-4 bg-white rounded-full shadow-sm text-amber-500 border border-amber-100">
-                    <Award className="w-10 h-10" />
+                  <div className="p-4 bg-white rounded-full shadow-sm text-green-500 border border-green-100">
+                    <CheckCircle2 className="w-10 h-10" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-xl text-amber-900 mb-2">مبروك! لقد أتممت الدورة بنجاح</h3>
-                    <p className="text-amber-700">تم الانتهاء من الدورة بنجاح. نتمنى لك التوفيق في رحلتك التعليمية القادمة.</p>
+                  <div className="text-right">
+                    <h3 className="font-bold text-xl text-green-900 mb-2">مبروك! لقد أتممت الدورة بنجاح</h3>
+                    <p className="text-green-700">تم الانتهاء من كافة المتطلبات التعليمية للدورة بنجاح. نتمنى لك التوفيق.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -317,16 +356,40 @@ export default function StudentCourseDashboard() {
               <Card className="rounded-2xl border border-red-100 bg-red-50 shadow-sm">
                 <CardContent className="p-8 flex items-center gap-6">
                   <div className="p-4 bg-white rounded-full shadow-sm text-red-500 border border-red-100">
-                    <Ban className="w-10 h-10" />
+                    <AlertCircle className="w-10 h-10" />
                   </div>
-                  <div>
+                  <div className="text-right">
                     <h3 className="font-bold text-xl text-red-900 mb-2">عذراً، تم إلغاء اشتراكك في هذه الدورة</h3>
-                    <p className="text-red-700">لم يعد بإمكانك الوصول لمحتوى الدورة. يرجى تجديد الاشتراك للمتابعة.</p>
+                    <p className="text-red-700">لم يعد بإمكانك الوصول لمحتوى الدورة أو الجدول الدراسي. يرجى مراجعة الإدارة.</p>
                   </div>
                 </CardContent>
               </Card>
-            ) : nextUpcomingSessionData ? (
-              <Card className="rounded-2xl border border-blue-100 bg-blue-50 shadow-sm">
+            ) : isPreliminary ? (
+              <Card className="rounded-2xl border border-amber-100 bg-amber-50 shadow-sm">
+                <CardContent className="p-8 flex items-center gap-6">
+                  <div className="p-4 bg-white rounded-full shadow-sm text-amber-500 border border-amber-100">
+                    <Info className="w-10 h-10" />
+                  </div>
+                  <div className="text-right">
+                    <h3 className="font-bold text-xl text-amber-900 mb-2">طلب التسجيل قيد المراجعة</h3>
+                    <p className="text-amber-700">طلبك حالياً قيد التدقيق من قبل الإدارة. سيتم إشعارك وتفعيل المحتوى فور القبول.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : isPendingPayment ? (
+              <Card className="rounded-2xl border border-indigo-100 bg-indigo-50 shadow-sm">
+                <CardContent className="p-8 flex items-center gap-6">
+                  <div className="p-4 bg-white rounded-full shadow-sm text-indigo-500 border border-indigo-100">
+                    <CreditCard className="w-10 h-10" />
+                  </div>
+                  <div className="text-right">
+                    <h3 className="font-bold text-xl text-indigo-900 mb-2">بانتظار إتمام عملية الدفع</h3>
+                    <p className="text-indigo-700">تم قبول طلبك المبدئي! يرجى سداد رسوم الدورة لتتمكن من الوصول للجدول والإعلانات.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : nextUpcomingSessionData && isActive ? (
+              <Card className="rounded-2xl border border-blue-200 bg-blue-50 shadow-sm">
                 <CardContent className="p-6 flex items-center justify-between gap-4">
                   <div className="flex flex-col gap-2 text-right">
                     <h3 className="text-sm font-semibold text-slate-900">
@@ -370,15 +433,15 @@ export default function StudentCourseDashboard() {
               </TabsList>
 
               <TabsContent value="schedule" className="mt-6 relative">
-                {isCancelled && (
-                  <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200">
+                {shouldLockContent && (
+                  <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 text-center px-4">
                     <Lock className="w-12 h-12 text-slate-400 mb-2" />
-                    <h3 className="font-bold text-lg text-slate-900">الجدول مقفل</h3>
-                    <p className="text-slate-500 text-sm">يجب إعادة الاشتراك</p>
+                    <h3 className="font-bold text-lg text-slate-900">الجدول الدراسي مقفل</h3>
+                    <p className="text-slate-500 text-sm max-w-xs">يجب إتمام عملية التسجيل وتفعيل الحساب لتتمكن من عرض جدول المحاضرات.</p>
                   </div>
                 )}
-                <div className={isCancelled ? "opacity-40 pointer-events-none blur-sm" : ""}>
-                  <Card className="rounded-2xl border border-slate-100 shadow-sm">
+                <div className={shouldLockContent ? "opacity-40 pointer-events-none blur-sm" : ""}>
+                  <Card className="rounded-2xl border border-slate-200 shadow-sm">
                     <CardHeader>
                       <CardTitle className="text-slate-900 text-lg">جدول الدروس</CardTitle>
                     </CardHeader>
@@ -451,10 +514,18 @@ export default function StudentCourseDashboard() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="announcements" className="mt-6 space-y-4">
-                {courseData.announcements?.length > 0 ? (
-                  courseData.announcements.map((announcement: any) => (
-                    <Card key={announcement.id} className="rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <TabsContent value="announcements" className="mt-6 relative px-1">
+                {shouldLockContent && (
+                  <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 text-center px-4">
+                    <Bell className="w-12 h-12 text-slate-400 mb-2" />
+                    <h3 className="font-bold text-lg text-slate-900">الإعلانات مقفلة</h3>
+                    <p className="text-slate-500 text-sm max-w-xs">سيتم إتاحة الوصول للإعلانات والتعميمات بعد تفعيل اشتراكك في الدورة.</p>
+                  </div>
+                )}
+                <div className={shouldLockContent ? "opacity-40 pointer-events-none blur-sm h-[200px]" : "space-y-4"}>
+                  {courseData.announcements?.length > 0 ? (
+                    courseData.announcements.map((announcement: any) => (
+                    <Card key={announcement.id} className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                       <CardHeader className="bg-slate-50/50 py-4">
                         <div className="flex items-center justify-between">
                           <h3 className="font-bold flex items-center gap-2 text-slate-900">
@@ -476,56 +547,210 @@ export default function StudentCourseDashboard() {
                 ) : (
                   <div className="py-12 text-center text-slate-500">لا توجد إعلانات حالياً</div>
                 )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>
 
-          {/* Left Column (Sidebar) */}
-          <div className="space-y-6">
-            <Card className="rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">عن المدرب</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 relative rounded-full overflow-hidden border-2 border-slate-100">
-                    <Image
-                      src={instructorAvatar}
-                      alt={instructorName}
-                      fill
-                      className="object-cover"
-                      unoptimized={true}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900">{instructorName}</p>
-                    <p className="text-xs text-slate-500">{instructorRole}</p>
-                  </div>
-                </div>
+            {/* Trainer & Institute Info - Redesigned Sidebar */}
+            <div className="space-y-6">
+              {/* Instructor Card */}
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-blue-600" />
+                    مدرب الدور
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-5 space-y-6">
+                  {/* Master Instructor or Multiple Staff */}
+                  {courseData.staffTrainers?.length > 0 ? (
+                    <div className="space-y-6">
+                      {courseData.staffTrainers.map((t: any) => (
+                        <div key={t.id} className="space-y-3 group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shrink-0 group-hover:bg-blue-100 transition-colors">
+                              {t.name?.charAt(0) || "م"}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 truncate">{t.name}</p>
+                              {t.specialties?.length > 0 && (
+                                <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md inline-block">
+                                  {t.specialties[0]}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {t.bio && (
+                            <p className="text-xs text-slate-600 leading-relaxed border-r-2 border-blue-200 pr-2 mr-1 line-clamp-3">
+                              {t.bio}
+                            </p>
+                          )}
 
-                <Separator className="my-4 opacity-50" />
-
-                <div className="space-y-3">
-                  {instructor.phone && (
-                    <div className="flex items-center gap-3 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <MessageSquare className="w-4 h-4" />
+                          <div className="flex flex-col gap-1.5 pt-1">
+                            {t.phone && (
+                              <a
+                                href={formatWhatsAppLink(t.phone)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors group/link"
+                              >
+                                <div className="rounded-full bg-emerald-50 p-1 group-hover/link:bg-emerald-100">
+                                  <Phone className="h-3 w-3" />
+                                </div>
+                                <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{t.phone}</span>
+                              </a>
+                            )}
+                            {t.email && (
+                              <a
+                                href={`mailto:${t.email}`}
+                                className="flex items-center gap-2 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors group/link"
+                              >
+                                <div className="rounded-full bg-blue-50 p-1 group-hover/link:bg-blue-100">
+                                  <Mail className="h-3 w-3" />
+                                </div>
+                                <span className="truncate hover:underline decoration-blue-200 underline-offset-4">{t.email}</span>
+                              </a>
+                            )}
+                          </div>
+                          {courseData.staffTrainers.length > 1 && <Separator className="mt-4 opacity-50" />}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Single Instructor View */
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 relative rounded-2xl overflow-hidden border-2 border-white shadow-sm ring-1 ring-slate-100">
+                          <Image
+                            src={instructorAvatar}
+                            alt={instructorName}
+                            fill
+                            className="object-cover"
+                            unoptimized={true}
+                          />
+                        </div>
+                        <div>
+                          <p className="font-bold text-lg text-slate-900">{instructorName}</p>
+                          <p className="text-xs text-blue-600 font-bold">{instructorRole}</p>
+                        </div>
                       </div>
-                      <span className="font-medium" dir="ltr">{instructor.phone}</span>
+
+                      {instructor.bio && (
+                        <p className="text-xs text-slate-600 leading-relaxed bg-slate-100/30 p-3 rounded-xl border border-slate-200">
+                          {instructor.bio}
+                        </p>
+                      )}
+
+                      {instructor.specialties?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {instructor.specialties.map((s: string) => (
+                            <span key={s} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold border border-blue-100">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <Separator className="my-2 opacity-50" />
+
+                      <div className="space-y-2.5">
+                        {instructor.phone && (
+                          <a
+                            href={formatWhatsAppLink(instructor.phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
+                          >
+                            <div className="rounded-full bg-emerald-50 p-2 group-hover/link:bg-emerald-100">
+                              <Phone className="h-4 w-4" />
+                            </div>
+                            <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{instructor.phone}</span>
+                          </a>
+                        )}
+                        {instructor.email && (
+                          <a
+                            href={`mailto:${instructor.email}`}
+                            className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
+                          >
+                            <div className="rounded-full bg-blue-50 p-2 group-hover/link:bg-blue-100">
+                              <Mail className="h-4 w-4" />
+                            </div>
+                            <span className="hover:underline decoration-blue-200 underline-offset-4">{instructor.email}</span>
+                          </a>
+                        )}
+                      </div>
                     </div>
                   )}
-                  {instructor.email && (
-                    <div className="flex items-center gap-3 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                      <div className="p-2 bg-slate-50 rounded-lg">
-                        <FileText className="w-4 h-4" />
+                </CardContent>
+              </Card>
+
+              {/* Institute Card */}
+              {courseData.institute && (
+                <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-bl-full -mr-12 -mt-12 transition-all group-hover:bg-blue-100/50" />
+                  <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 relative">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900">
+                      <ShieldCheck className="w-4 h-4 text-blue-600" />
+                      المعهد المستضيف
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-5 space-y-4 relative">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-sm p-1">
+                        <Image
+                          src={getFileUrl(courseData.institute.logo) || "/images/institute-logo.png"}
+                          alt={courseData.institute.name}
+                          fill
+                          className="object-contain"
+                          unoptimized={true}
+                        />
                       </div>
-                      <span className="font-medium truncate">{instructor.email}</span>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-slate-900 truncate">{courseData.institute.name}</h4>
+                        <p className="text-[10px] text-slate-500 font-medium">مؤسسة تعليمية معتمدة</p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+
+                    {courseData.institute.description && (
+                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        {courseData.institute.description}
+                      </p>
+                    )}
+
+                    <Separator className="my-2 opacity-30" />
+
+                    <div className="space-y-2.5">
+                      {courseData.institute.phone && (
+                        <a
+                          href={formatWhatsAppLink(courseData.institute.phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
+                        >
+                          <div className="rounded-full bg-emerald-50 p-1.5 group-hover/link:bg-emerald-100">
+                            <Phone className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{courseData.institute.phone}</span>
+                        </a>
+                      )}
+                      {courseData.institute.email && (
+                        <a
+                          href={`mailto:${courseData.institute.email}`}
+                          className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
+                        >
+                          <div className="rounded-full bg-blue-50 p-1.5 group-hover/link:bg-blue-100">
+                            <Mail className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="hover:underline decoration-blue-200 underline-offset-4">{courseData.institute.email}</span>
+                        </a>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
         </div>
       </div>
       {/* Hall Information Modal */}
@@ -556,7 +781,6 @@ export default function StudentCourseDashboard() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-4 right-4 text-white">
                   <h3 className="text-xl font-bold mb-0">{hallData.name}</h3>
-                  <p className="text-white/80 text-xs text-right">القاعة التدريبية</p>
                 </div>
                 <DialogClose className="absolute left-4 top-4 rounded-full bg-black/20 p-2 text-white hover:bg-black/40 transition-colors">
                   <X className="h-4 w-4" />
@@ -592,36 +816,19 @@ export default function StudentCourseDashboard() {
 
                   <div className="flex items-start gap-3 text-right">
                     <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                      <ImageIcon className="h-4 w-4" />
+                      <Users className="h-4 w-4" />
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
                         <p className="text-[10px] text-slate-500 mb-0.5">الجهة المالكة</p>
                         <p className="text-sm font-bold text-slate-900">{hallData.instituteName}</p>
                       </div>
-                      {hallData.instituteLogo && (
-                        <div className="h-8 w-8 relative overflow-hidden rounded border border-slate-100">
-                          <Image
-                            src={getFileUrl(hallData.instituteLogo) || ""}
-                            alt={hallData.instituteName}
-                            fill
-                            className="object-contain"
-                            unoptimized={true}
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Actions */}
                 <div className="pt-2 flex gap-3 text-right" dir="rtl">
-                  <Button
-                    className="flex-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white h-11 font-cairo shadow-sm"
-                    onClick={() => setIsHallModalOpen(false)}
-                  >
-                    موافق
-                  </Button>
                   {hallData.locationUrl && (
                     <Button
                       variant="outline"

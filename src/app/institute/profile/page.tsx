@@ -180,6 +180,7 @@ export default function InstituteProfilePage() {
             const formData = new FormData()
             formData.append("name", user.name)
             formData.append("phone", user.phone)
+            formData.append("email", user.email)
             formData.append("instituteName", user.instituteName)
             formData.append("instituteAddress", user.instituteAddress)
             formData.append("instituteWebsite", user.instituteWebsite)

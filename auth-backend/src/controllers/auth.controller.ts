@@ -146,14 +146,14 @@ export class AuthController {
     async updateProfile(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             const userId = req.user!.userId;
-            const { name, phone } = req.body;
+            const { name, phone, email } = req.body;
 
             let avatar = undefined;
             if (req.file) {
                 avatar = `/uploads/${req.file.filename}`;
             }
 
-            const user = await authService.updateProfile(userId, { name, phone, avatar });
+            const user = await authService.updateProfile(userId, { name, phone, avatar, email });
             return sendSuccess(res, 'تم تحديث الملف الشخصي بنجاح', user);
         } catch (error: any) {
             return sendError(res, error.message, 400);

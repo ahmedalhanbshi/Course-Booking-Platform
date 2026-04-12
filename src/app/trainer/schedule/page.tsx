@@ -33,6 +33,8 @@ export default function TrainerSchedulePage() {
     const [loading, setLoading] = useState(true)
     const [now, setNow] = useState(() => new Date())
     const [selectedCourseId, setSelectedCourseId] = useState<string>("all")
+    const [view, setView] = useState<'all' | 'upcoming'>('upcoming')
+
 
     // ── Manage Modal ──────────────────────────────────────────────────────────
     const [selectedSession, setSelectedSession] = useState<Session | null>(null)
@@ -203,9 +205,12 @@ export default function TrainerSchedulePage() {
     ).filter(([id]) => id !== null) as [string, string][]
 
     // ── Filtered sessions ─────────────────────────────────────────────────────
-    const filteredSessions = selectedCourseId === "all"
-        ? sessions
-        : sessions.filter(s => s.courseId === selectedCourseId)
+    const filteredSessions = sessions.filter(s => {
+        const matchesCourse = selectedCourseId === "all" || s.courseId === selectedCourseId
+        const isUpcoming = new Date(s.endTime).getTime() > now.getTime()
+        return matchesCourse && (view === 'all' || isUpcoming)
+    })
+
 
     // ── Grouping ──────────────────────────────────────────────────────────────
     const toLocalDateKey = (iso: string) => formatDateKey(new Date(iso))
@@ -260,6 +265,34 @@ export default function TrainerSchedulePage() {
                     )}
                 </div>
             </div>
+
+            {/* ── View Filter Pills ── */}
+            <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">عرض الجلسات</p>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setView("upcoming")}
+                        className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                            view === "upcoming"
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600"
+                        }`}
+                    >
+                        الجلسات القادمة
+                    </button>
+                    <button
+                        onClick={() => setView("all")}
+                        className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                            view === "all"
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600"
+                        }`}
+                    >
+                        كل الجلسات (بما فيها المنتهية)
+                    </button>
+                </div>
+            </div>
+
 
             {/* ── Course Filter Pills ── */}
             {courseOptions.length > 0 && (

@@ -174,39 +174,69 @@ class StudentService {
             orderBy: { enrolledAt: 'desc' }
         });
 
-        return enrollments.map((e: any) => ({
-            id: e.id,
-            status: e.status, // Map this correctly in frontend if needed
-            progress: 0, // Placeholder
-            enrolledAt: e.enrolledAt,
-            course: {
-                id: e.course.id,
-                title: e.course.title,
-                shortDescription: e.course.shortDescription || '',
-                description: e.course.description || '',
-                trainer: (e.course.staffTrainerIds as string[])?.length > 0 ? {
-                    id: (e.course.staffTrainerIds as string[])[0],
-                    name: "مدرب المعهد", // المبسطة للعرض
-                    avatar: null // يمكن تحسينه لاحقاً
-                } : {
+        // Collect all staff trainer IDs to fetch their names in bulk
+        const allStaffIds = Array.from(new Set(
+            enrollments.flatMap(e => (e.course.staffTrainerIds as string[]) || [])
+        ));
+
+        const staffNamesMap = new Map();
+        if (allStaffIds.length > 0) {
+            const staff = await prisma.instituteStaff.findMany({
+                where: { id: { in: allStaffIds } },
+                select: { id: true, name: true }
+            });
+            staff.forEach(s => staffNamesMap.set(s.id, s.name));
+        }
+
+        return enrollments.map((e: any) => {
+            const staffIds = (e.course.staffTrainerIds as string[]) || [];
+
+            // Detailed trainers list for flexible UI rendering
+            const trainersList = staffIds.length > 0 
+                ? staffIds.map(id => ({
+                    id,
+                    name: staffNamesMap.get(id) || 'مدرب المعهد',
+                    avatar: null
+                }))
+                : [{
                     id: e.course.trainer?.id || 'unknown',
-                    name: e.course.trainer?.name || 'مدرب الخبير',
+                    name: e.course.trainer?.name || 'مدرب',
                     avatar: e.course.trainer?.avatar || null
+                }];
+
+            const trainerName = trainersList.map(t => t.name).join('، ');
+
+            return {
+                id: e.id,
+                status: e.status,
+                progress: 0,
+                enrolledAt: e.enrolledAt,
+                course: {
+                    id: e.course.id,
+                    title: e.course.title,
+                    shortDescription: e.course.shortDescription || '',
+                    description: e.course.description || '',
+                    trainer: {
+                        id: trainersList[0].id,
+                        name: trainerName,
+                        avatar: trainersList[0].avatar
+                    },
+                    trainers: trainersList, // New array for advanced UI
+                    image: e.course.image,
+                    category: e.course.category?.name || 'عام',
+                    startDate: e.course.startDate,
+                    endDate: e.course.endDate,
+                    price: e.course.price
                 },
-                image: e.course.image,
-                category: e.course.category?.name || 'عام',
-                startDate: e.course.startDate,
-                endDate: e.course.endDate,
-                price: e.course.price
-            },
-            nextSession: e.course.sessions[0] ? {
-                id: e.course.sessions[0].id,
-                topic: e.course.sessions[0].topic,
-                startTime: e.course.sessions[0].startTime,
-                endTime: e.course.sessions[0].endTime,
-                type: e.course.sessions[0].type
-            } : null
-        }));
+                nextSession: e.course.sessions[0] ? {
+                    id: e.course.sessions[0].id,
+                    topic: e.course.sessions[0].topic,
+                    startTime: e.course.sessions[0].startTime,
+                    endTime: e.course.sessions[0].endTime,
+                    type: e.course.sessions[0].type
+                } : null
+            };
+        });
     }
 
     /**
@@ -451,7 +481,10 @@ class StudentService {
                                 name: true,
                                 avatar: true,
                                 email: true,
-                                phone: true
+                                phone: true,
+                                trainerProfile: {
+                                    select: { bio: true, specialties: true }
+                                }
                             }
                         },
                         category: true,
@@ -462,6 +495,15 @@ class StudentService {
                         announcements: {
                             where: { status: 'SENT' },
                             orderBy: { createdAt: 'desc' }
+                        },
+                        institute: {
+                            select: {
+                                name: true,
+                                logo: true,
+                                email: true,
+                                phone: true,
+                                description: true
+                            }
                         }
                     }
                 }
@@ -490,6 +532,16 @@ class StudentService {
             ? (primarySession.meetingLink?.includes('zoom') ? 'Zoom' : primarySession.meetingLink?.includes('meet.google') ? 'Google Meet' : 'أونلاين')
             : (primarySession?.room?.name || primarySession?.location || '—');
 
+        // Fetch staff trainers if staffTrainerIds is set
+        const staffTrainerIds = (course as any).staffTrainerIds as string[] | undefined;
+        let staffTrainers: any[] = [];
+        if (staffTrainerIds && staffTrainerIds.length > 0) {
+            staffTrainers = await prisma.instituteStaff.findMany({
+                where: { id: { in: staffTrainerIds }, status: 'ACTIVE' },
+                select: { id: true, name: true, bio: true, email: true, phone: true, specialties: true }
+            });
+        }
+
         return {
             id: course.id,
             title: course.title,
@@ -510,20 +562,32 @@ class StudentService {
                 meetingLink: nextSession.meetingLink
             } : null,
             instructor: (course as any).staffTrainerIds?.length > 0 ? {
-                id: (course as any).staffTrainerIds[0],
-                name: 'مدرب المعهد',
+                id: staffTrainers[0]?.id,
+                name: staffTrainers[0]?.name || 'مدرب المعهد',
                 role: 'مدرب معهد',
                 avatar: null,
-                email: null,
-                phone: null
+                email: staffTrainers[0]?.email,
+                phone: staffTrainers[0]?.phone,
+                bio: staffTrainers[0]?.bio,
+                specialties: staffTrainers[0]?.specialties || []
             } : {
                 id: course.trainer?.id,
                 name: course.trainer?.name || 'مدرب',
                 role: 'مدرب الدورة',
                 avatar: course.trainer?.avatar,
                 email: course.trainer?.email,
-                phone: course.trainer?.phone
+                phone: course.trainer?.phone,
+                bio: (course.trainer as any)?.trainerProfile?.bio || null,
+                specialties: (course.trainer as any)?.trainerProfile?.specialties || []
             },
+            staffTrainers,
+            institute: (course.trainerId === null && (course as any).institute) ? {
+                name: (course as any).institute.name,
+                logo: (course as any).institute.logo,
+                email: (course as any).institute.email,
+                phone: (course as any).institute.phone,
+                description: (course as any).institute.description,
+            } : null,
             sessions: course.sessions.map(s => ({
                 id: s.id,
                 topic: s.topic,
@@ -531,7 +595,8 @@ class StudentService {
                 endTime: s.endTime,
                 status: s.status,
                 type: s.type,
-                meetingLink: s.meetingLink
+                meetingLink: s.meetingLink,
+                roomId: s.roomId
             })),
             announcements: course.announcements.map(a => ({
                 id: a.id,
@@ -539,7 +604,9 @@ class StudentService {
                 content: a.message,
                 createdAt: a.createdAt,
                 publishedAt: a.createdAt
-            }))
+            })),
+            startDate: course.startDate,
+            endDate: course.endDate
         };
     }
 
@@ -699,6 +766,7 @@ class StudentService {
 
         return sessions.map((s: any) => ({
             id: s.id,
+            courseId: s.courseId,
             topic: s.topic || 'جلسة تدريبية',
             courseTitle: s.course?.title || '',
             trainerName: s.course?.trainer?.name || ((s.course as any)?.staffTrainerIds?.length > 0 ? 'مدرب معهد' : 'مدرب'),

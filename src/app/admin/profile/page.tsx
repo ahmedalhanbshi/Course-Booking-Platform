@@ -72,6 +72,7 @@ export default function AdminProfilePage() {
             const formData = new FormData()
             formData.append('name', profileForm.name)
             formData.append('phone', profileForm.phone)
+            formData.append('email', profileForm.email)
             
             if (selectedFile) {
                 formData.append('avatar', selectedFile)

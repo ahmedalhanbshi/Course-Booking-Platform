@@ -414,7 +414,7 @@ class TrainerController {
     async updateProfile(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
-            const { name, phone, bio, specialties } = req.body;
+            const { name, phone, bio, specialties, email } = req.body;
 
             const files = req.files as { [fieldname: string]: Express.Multer.File[] };
             let avatarPath: string | undefined;
@@ -434,6 +434,7 @@ class TrainerController {
                 bio,
                 specialties: safeSpecialties,
                 avatarPath,
+                email,
             });
             return sendSuccess(res, 'تم تحديث الملف الشخصي بنجاح', updated);
         } catch (error: any) {
