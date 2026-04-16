@@ -50,6 +50,7 @@ router.put('/courses/:id/students/:enrollmentId/unenroll', instituteController.u
 // Course Details & Edit
 router.get('/courses/:id', instituteController.getCourseById);
 router.put('/courses/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'paymentReceipt', maxCount: 1 }]), instituteController.updateCourse);
+router.patch('/courses/:id/activate', instituteController.activateCourse);
 
 // Metadata
 router.get('/categories', instituteController.getCategories);

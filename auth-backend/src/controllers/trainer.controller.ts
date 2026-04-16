@@ -258,6 +258,7 @@ class TrainerController {
                 price: body.price !== undefined && body.price !== '' ? Number(body.price) : undefined,
                 duration: body.duration !== undefined && body.duration !== '' ? Number(body.duration) : undefined,
                 maxStudents: body.maxStudents !== undefined && body.maxStudents !== '' ? Number(body.maxStudents) : undefined,
+                minStudents: body.minStudents !== undefined && body.minStudents !== '' ? Number(body.minStudents) : undefined,
                 startDate: body.startDate && body.startDate !== '' ? body.startDate : undefined,
                 endDate: body.endDate && body.endDate !== '' ? body.endDate : undefined,
                 categoryId: body.categoryId || undefined,
@@ -358,12 +359,12 @@ class TrainerController {
                 shortDescription: body.shortDescription || '',
                 description: body.description,
                 deliveryType: body.deliveryType,
-                price: Number(body.price) || 0,
-                minStudents: Number(body.minStudents) || 0,
-                maxStudents: Number(body.maxStudents) || 0,
-                duration: Number(body.duration) || 1,
+                price: body.price !== undefined && body.price !== '' ? Number(body.price) : undefined,
+                minStudents: body.minStudents !== undefined && body.minStudents !== '' ? Number(body.minStudents) : undefined,
+                maxStudents: body.maxStudents !== undefined && body.maxStudents !== '' ? Number(body.maxStudents) : undefined,
+                duration: body.duration !== undefined && body.duration !== '' ? Number(body.duration) : undefined,
                 isFree: body.isFree === 'true',
-                hallId: body.hallId || '',
+                hallId: (body.hallId && body.hallId !== "undefined" && body.hallId.trim() !== "") ? body.hallId : undefined,
                 startDate: body.startDate || '',
                 endDate: body.endDate || '',
                 status: body.status || 'DRAFT',
@@ -665,6 +666,21 @@ class TrainerController {
             };
             const updated = await trainerService.updateSession(req.user.userId, sessionId, data);
             return sendSuccess(res, 'تم تحديث الجلسة بنجاح', updated);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
+     * Activate a PENDING_MINIMUM online course and notify all waiting students.
+     * Only works if the minimum enrollment threshold is met.
+     */
+    async activateCourse(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { courseId } = req.params;
+            const data = await trainerService.activatePendingMinimumCourse(req.user.userId, courseId);
+            return sendSuccess(res, 'تم تفعيل الدورة وإشعار الطلاب بنجاح', data);
         } catch (error: any) {
             return sendError(res, error.message, 400);
         }

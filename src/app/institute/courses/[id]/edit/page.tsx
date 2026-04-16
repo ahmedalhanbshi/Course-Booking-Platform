@@ -60,7 +60,8 @@ export default function EditCoursePage() {
         deliveryType: "",
         objectives: [] as string[],
         prerequisites: [] as string[],
-        tags: [] as string[]
+        tags: [] as string[],
+        enrolledStudents: 0
     })
 
     // Helper inputs
@@ -138,7 +139,8 @@ export default function EditCoursePage() {
         setIsSlotsLoading(true)
         try {
             const data = await instituteService.getHallAvailability(selectedHallId, dateKey)
-            const dateObj = new Date(dateKey)
+            const [y, m, d] = dateKey.split("-").map(Number)
+            const dateObj = new Date(y, m - 1, d)
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][dateObj.getDay()]
             const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
             const hasAvailability = data.availability?.length > 0
@@ -191,7 +193,8 @@ export default function EditCoursePage() {
                     deliveryType: course.deliveryType || "",
                     objectives: course.objectives || [],
                     prerequisites: course.prerequisites || [],
-                    tags: course.tags || []
+                    tags: course.tags || [],
+                    enrolledStudents: course.enrolledStudents ?? 0,
                 })
                 if (course.image) setImagePreviewUrl(getFileUrl(course.image) || "")
             } catch (err: any) {
@@ -278,6 +281,12 @@ export default function EditCoursePage() {
     const removeTag = (t: string) => setCourseData(p => ({ ...p, tags: p.tags.filter(tag => tag !== t) }))
 
     const isDraft = courseData.status === 'DRAFT' || courseData.status === 'draft'
+    const isPendingMinimum = courseData.status === 'PENDING_MINIMUM' || courseData.status === 'pending_minimum'
+    // For PENDING_MINIMUM courses, only unlock the schedule tab if minimum is reached
+    const minimumReached = isPendingMinimum
+        && Number(courseData.minStudents) > 0
+        && Number(courseData.enrolledStudents ?? 0) >= Number(courseData.minStudents)
+    const canSetupSchedule = isDraft || minimumReached
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
@@ -295,15 +304,34 @@ export default function EditCoursePage() {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">تعديل الدورة: {courseData.title}</h1>
                     {isDraft && <Badge variant="secondary" className="mt-1">مسودة — أكمل الحجز والمواعيد لنشر الدورة</Badge>}
+                    {isPendingMinimum && !minimumReached && <Badge className="mt-1 bg-purple-100 text-purple-800">بانتظار اكتمال العدد</Badge>}
+                    {minimumReached && <Badge className="mt-1 bg-green-100 text-green-800">اكتمل العدد — أكمل الإعداد لتفعيل الدورة</Badge>}
                 </div>
             </div>
+
+            {/* PENDING_MINIMUM instructional banner */}
+            {minimumReached && (
+                <div className="flex items-start gap-3 rounded-xl border border-green-400/40 bg-green-50 px-4 py-3 text-sm mb-6">
+                    <CheckCircle className="h-5 w-5 mt-0.5 shrink-0 text-green-600" />
+                    <div>
+                        <p className="font-semibold text-green-800">🎉 اكتمل الحد الأدنى من الطلاب!</p>
+                        <p className="text-green-700 text-xs mt-0.5">
+                            الدورة جاهزة للتفعيل. انتقل إلى تبويب <strong>"الحجز والمواعيد"</strong> لإضافة
+                            {courseData.deliveryType === 'online' ? ' الجلسات والرابط ثم اضغط "تفعيل الدورة".' : ' القاعة والمواعيد ورفع سند الدفع.'}
+                        </p>
+                        <Button size="sm" className="mt-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => setActiveTab('schedule')}>
+                            الانتقال للإعداد ←
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
                 <div className="w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100 sticky top-0 z-10">
                     <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-50/50">
                         <TabsTrigger value="info" className="data-[state=active]:bg-white h-10">1. بيانات الدورة</TabsTrigger>
-                        <TabsTrigger value="schedule" className="data-[state=active]:bg-white h-10" disabled={!isDraft}>
-                            {isDraft ? "2. الحجز والمواعيد (لنشر الدورة)" : "2. الحجز والمواعيد"}
+                        <TabsTrigger value="schedule" className="data-[state=active]:bg-white h-10" disabled={!canSetupSchedule}>
+                            {canSetupSchedule ? "2. الحجز والمواعيد (لتفعيل الدورة)" : "2. الحجز والمواعيد"}
                         </TabsTrigger>
                     </TabsList>
                 </div>
@@ -423,7 +451,7 @@ export default function EditCoursePage() {
                     <div className="flex justify-between items-center pt-6 border-t">
                         <Button variant="outline" type="button" onClick={() => router.back()}>إلغاء</Button>
                         <div className="flex gap-2">
-                            {isDraft && (
+                            {canSetupSchedule && (
                                 <Button variant="outline" onClick={() => setActiveTab("schedule")}>
                                     الحجز والمواعيد ←
                                 </Button>
@@ -439,10 +467,12 @@ export default function EditCoursePage() {
 
                 {/* ---- Tab 2: Schedule (DRAFT only) ---- */}
                 <TabsContent value="schedule" className="space-y-6">
-                    {!isDraft ? (
+                    {!canSetupSchedule ? (
                         <Card><CardContent className="py-12 text-center text-gray-500">
                             <AlertCircle className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                            <p>لا يمكن تعديل الحجز والمواعيد إلا للدورات في حالة المسودة.</p>
+                            {isPendingMinimum
+                                ? <p>لا يمكن إعداد الجلسات حتى يكتمل الحد الأدنى من الطلاب المسجلين.</p>
+                                : <p>لا يمكن تعديل الحجز والمواعيد إلا للدورات في حالة المسودة.</p>}
                         </CardContent></Card>
                     ) : (
                         <>
@@ -652,7 +682,7 @@ export default function EditCoursePage() {
                                 <div className="flex gap-2">
                                     <Button onClick={() => handleSubmit('ACTIVE')} disabled={submitting || !courseData.deliveryType}>
                                         {submitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                                        نشر الدورة
+                                        {isPendingMinimum ? 'تفعيل الدورة وإشعار الطلاب' : 'نشر الدورة'}
                                     </Button>
                                 </div>
                             </div>

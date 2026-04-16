@@ -288,7 +288,7 @@ export default function CreateCoursePage() {
     }
 
     // --- Submission Logic ---
-    const handleSubmit = async (status: 'DRAFT' | 'ACTIVE') => {
+    const handleSubmit = async (status: 'DRAFT' | 'ACTIVE' | 'PENDING_MINIMUM') => {
         try {
             setIsSubmitting(true)
 
@@ -296,10 +296,10 @@ export default function CreateCoursePage() {
             let startDate: string, endDate: string;
             let sessionsPayload: any[] = [];
 
-            if (status === 'DRAFT') {
-                // Drafts don't need hall/session — save with placeholders
+            if (status === 'DRAFT' || status === 'PENDING_MINIMUM') {
+                // Drafts and PENDING_MINIMUM — no sessions required yet
                 startDate = new Date().toISOString().split('T')[0];
-                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 sessionsPayload = [];
             } else if (courseData.deliveryType === 'in_person') {
                 if (selectedSessions.length === 0) throw new Error("يجب اختيار جلسة واحدة على الأقل");
@@ -368,7 +368,11 @@ export default function CreateCoursePage() {
 
             await instituteService.createCourse(formData);
 
-            toast.success(status === 'DRAFT' ? 'تم حفظ المسودة بنجاح' : 'تم إنشاء الدورة بنجاح');
+            toast.success(
+                status === 'DRAFT'           ? 'تم حفظ المسودة بنجاح' :
+                status === 'PENDING_MINIMUM' ? 'تم نشر الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد' :
+                                              'تم إنشاء الدورة بنجاح'
+            );
             router.push('/institute/courses');
 
         } catch (err: any) {
@@ -662,6 +666,7 @@ export default function CreateCoursePage() {
                         </div>
                     </div>
                     <div className="flex justify-between items-center pt-6 border-t mt-4">
+                        {/* Left: Save as draft */}
                         <Button
                             variant="ghost"
                             onClick={() => handleSubmit('DRAFT')}
@@ -671,7 +676,25 @@ export default function CreateCoursePage() {
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                             حفظ كمسودة
                         </Button>
-                        <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي ←</Button>
+
+                        <div className="flex items-center gap-3">
+                            {/* Publish with minimum threshold — only when minStudents > 1 */}
+                            {Number(courseData.minStudents) > 1 && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleSubmit('PENDING_MINIMUM')}
+                                    disabled={isSubmitting || !isInfoValid}
+                                    className="border-purple-300 text-purple-700 hover:bg-purple-50 hover:border-purple-400 gap-2"
+                                >
+                                    {isSubmitting
+                                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                                        : <Users className="h-4 w-4" />
+                                    }
+                                    نشر بانتظار الحد الأدنى
+                                </Button>
+                            )}
+                            <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي ←</Button>
+                        </div>
                     </div>
                 </TabsContent>
 

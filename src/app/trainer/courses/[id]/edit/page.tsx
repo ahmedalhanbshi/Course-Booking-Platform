@@ -121,7 +121,8 @@ export default function EditTrainerCoursePage() {
         setIsSlotsLoading(true)
         try {
             const data = await trainerService.getHallAvailability(selectedHallId, dateKey)
-            const dateObj = new Date(dateKey)
+            const [y, m, d] = dateKey.split("-").map(Number)
+            const dateObj = new Date(y, m - 1, d)
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][dateObj.getDay()]
             const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
             const hasAvailability = data.availability?.length > 0
@@ -165,7 +166,11 @@ export default function EditTrainerCoursePage() {
                     trainerService.getTrainerCourseById(courseId),
                     trainerService.getHalls()
                 ])
-                setCourseData({ ...data, startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '', endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '' })
+                setCourseData({ ...data,
+                    startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
+                    endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
+                    enrolledStudents: data.enrolledStudents ?? 0,
+                })
                 setHalls(hls)
                 if (data.image) setImagePreview(getFileUrl(data.image) ?? "")
             } catch (err: any) {
@@ -267,6 +272,12 @@ export default function EditTrainerCoursePage() {
     if (!courseData) return null
 
     const isDraft = courseData.status === 'DRAFT' || courseData.status === 'draft'
+    const isPendingMinimum = courseData.status === 'PENDING_MINIMUM' || courseData.status === 'pending_minimum'
+    // For PENDING_MINIMUM courses, only unlock the schedule tab if minimum is reached
+    const minimumReached = isPendingMinimum
+        && Number(courseData.minStudents) > 0
+        && Number(courseData.enrolledStudents ?? 0) >= Number(courseData.minStudents)
+    const canSetupSchedule = isDraft || minimumReached
 
     return (
         <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12" dir="rtl">
@@ -281,6 +292,8 @@ export default function EditTrainerCoursePage() {
                     </Button>
                     <h1 className="text-3xl font-bold text-gray-900">تعديل الدورة: {courseData.title}</h1>
                     {isDraft && <Badge variant="secondary" className="mt-1">مسودة — أكمل الحجز والمواعيد لنشر الدورة</Badge>}
+                    {isPendingMinimum && !minimumReached && <Badge className="mt-1 bg-purple-100 text-purple-800">بانتظار اكتمال العدد</Badge>}
+                    {minimumReached && <Badge className="mt-1 bg-green-100 text-green-800">اكتمل العدد — أكمل الإعداد لتفعيل الدورة</Badge>}
                 </div>
                 <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                     <DialogTrigger asChild>
@@ -292,6 +305,23 @@ export default function EditTrainerCoursePage() {
                     </DialogContent>
                 </Dialog>
             </div>
+
+            {/* PENDING_MINIMUM instructional banner */}
+            {minimumReached && (
+                <div className="flex items-start gap-3 rounded-xl border border-green-400/40 bg-green-50 px-4 py-3 text-sm mb-6">
+                    <CheckCircle className="h-5 w-5 mt-0.5 shrink-0 text-green-600" />
+                    <div>
+                        <p className="font-semibold text-green-800">🎉 اكتمل الحد الأدنى من الطلاب!</p>
+                        <p className="text-green-700 text-xs mt-0.5">
+                            الدورة جاهزة للتفعيل. انتقل إلى تبويب <strong>"الحجز والمواعيد"</strong> لإضافة
+                            {courseData.deliveryType === 'online' ? ' الجلسات والرابط ثم اضغط "تفعيل الدورة".' : ' القاعة والمواعيد ورفع سند الدفع.'}
+                        </p>
+                        <Button size="sm" className="mt-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => setActiveTab('schedule')}>
+                            الانتقال للإعداد ←
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Rejection Alert */}
             {courseData.roomBooking?.status === 'rejected' && (
@@ -325,8 +355,8 @@ export default function EditTrainerCoursePage() {
                 <div className="w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100 sticky top-0 z-10">
                     <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-50/50">
                         <TabsTrigger value="info" className="data-[state=active]:bg-white h-10">1. بيانات الدورة</TabsTrigger>
-                        <TabsTrigger value="schedule" className="data-[state=active]:bg-white h-10" disabled={!isDraft}>
-                            {isDraft ? "2. الحجز والمواعيد (لنشر الدورة)" : "2. الحجز والمواعيد"}
+                        <TabsTrigger value="schedule" className="data-[state=active]:bg-white h-10" disabled={!canSetupSchedule}>
+                            {canSetupSchedule ? "2. الحجز والمواعيد (لتفعيل الدورة)" : "2. الحجز والمواعيد"}
                         </TabsTrigger>
                     </TabsList>
                 </div>
@@ -396,7 +426,7 @@ export default function EditTrainerCoursePage() {
                     <div className="flex gap-4 justify-between pb-4">
                         <Button variant="outline" type="button" onClick={() => router.back()}>إلغاء</Button>
                         <div className="flex gap-2">
-                            {isDraft && <Button variant="outline" onClick={() => setActiveTab("schedule")}>الحجز والمواعيد ←</Button>}
+                            {canSetupSchedule && <Button variant="outline" onClick={() => setActiveTab("schedule")}>الحجز والمواعيد ←</Button>}
                             <Button variant="outline" type="button" onClick={() => handleSubmit()} disabled={isSubmitting}><Save className="mr-2 h-4 w-4" />{isSubmitting ? 'جاري الحفظ...' : 'حفظ التغييرات'}</Button>
                         </div>
                     </div>
@@ -404,8 +434,13 @@ export default function EditTrainerCoursePage() {
 
                 {/* ---- Tab 2: Schedule (DRAFT only) ---- */}
                 <TabsContent value="schedule" className="space-y-6">
-                    {!isDraft ? (
-                        <Card><CardContent className="py-12 text-center text-gray-500"><AlertCircle className="h-8 w-8 mx-auto mb-3 text-gray-400" /><p>لا يمكن تعديل الحجز والمواعيد إلا للدورات في حالة المسودة.</p></CardContent></Card>
+                    {!canSetupSchedule ? (
+                        <Card><CardContent className="py-12 text-center text-gray-500">
+                            <AlertCircle className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+                            {isPendingMinimum
+                                ? <p>لا يمكن إعداد الجلسات حتى يكتمل الحد الأدنى من الطلاب المسجلين.</p>
+                                : <p>لا يمكن تعديل الحجز والمواعيد إلا للدورات في حالة المسودة.</p>}
+                        </CardContent></Card>
                     ) : (
                         <>
                             <Card>
@@ -578,7 +613,9 @@ export default function EditTrainerCoursePage() {
                                 <div className="flex gap-2">
                                     <Button onClick={() => handleSubmit('ACTIVE')} disabled={isSubmitting || !courseData.deliveryType}>
                                         {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                                        {courseData.deliveryType === 'in_person' ? 'إرسال للمراجعة' : 'نشر الدورة'}
+                                        {isPendingMinimum
+                                            ? 'تفعيل الدورة وإشعار الطلاب'
+                                            : courseData.deliveryType === 'in_person' ? 'إرسال للمراجعة' : 'نشر الدورة'}
                                     </Button>
                                 </div>
                             </div>

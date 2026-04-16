@@ -434,12 +434,31 @@ class InstituteController {
         } catch (error: any) { return sendError(res, error.message, 400); }
     }
 
+    /**
+     * Activate a PENDING_MINIMUM online course and notify all waiting students.
+     */
+    async activateCourse(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { id } = req.params;
+            const data = await instituteService.activatePendingMinimumCourse(req.user.userId, id);
+            return sendSuccess(res, 'تم تفعيل الدورة وإشعار الطلاب بنجاح', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
     async createCourse(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const payload = { ...req.body };
+            
+            // Normalize hallId properly
+            if (!payload.hallId && req.body.hallId && req.body.hallId !== "undefined" && req.body.hallId.trim() !== "") {
+                payload.hallId = req.body.hallId;
+            } else if (payload.hallId === "undefined" || payload.hallId === "") {
+                payload.hallId = undefined;
+            }
 
             // Parse JSON fields from formData
             if (typeof payload.sessions === 'string') {

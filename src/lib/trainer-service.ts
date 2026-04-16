@@ -44,6 +44,8 @@ export interface ExploreCourse {
     duration: number;
     trainer: { name: string; avatar: string | null };
     price: number;
+    minStudents: number;
+    courseStatus: 'ACTIVE' | 'PENDING_MINIMUM';
     startDate: string;
     createdAt: string;
     deliveryType: string;
@@ -63,6 +65,8 @@ export interface CourseDetail {
     image: string | null;
     surveyLink?: string | null;
     price: number;
+    minStudents: number; // min students needed to activate the course
+    courseStatus: 'ACTIVE' | 'PENDING_MINIMUM';
     startDate: string;
     endDate: string;
     maxStudents: number;

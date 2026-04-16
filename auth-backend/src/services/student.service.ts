@@ -82,6 +82,21 @@ class StudentService {
                     message = 'لديك درس قريب، يرجى الاستعداد';
                     type = 'reminder';
                     break;
+                case 'ENROLLMENT_REJECTED':
+                    title = 'تم رفض طلب التسجيل';
+                    message = 'تم رفض طلب تسجيلك في الدورة';
+                    type = 'warning';
+                    break;
+                case 'PRELIMINARY_ACCEPTED_WAITING':
+                    title = 'تم قبولك مبدئياً';
+                    message = 'الدورة بانتظار اكتمال العدد، سيتم إشعارك عند الجاهزية';
+                    type = 'info';
+                    break;
+                case 'COURSE_READY_FOR_PAYMENT':
+                    title = 'الدورة جاهزة! أكمل الدفع';
+                    message = 'اكتملت إعدادات الدورة، يرجى إكمال عملية الدفع';
+                    type = 'success';
+                    break;
                 case 'NEW_ANNOUNCEMENT':
                     title = 'إعلان جديد';
                     message = 'تم نشر إعلان جديد في إحدى دوراتك';
@@ -268,6 +283,8 @@ class StudentService {
         let status = 'NONE';
         if (enrollment.status === 'PRELIMINARY') {
             status = 'PENDING_APPROVAL';
+        } else if (enrollment.status === 'PRELIMINARY_APPROVED') {
+            status = 'PRELIMINARY_APPROVED';
         } else if (enrollment.status === 'PENDING_PAYMENT') {
             // Check if there is a payment under review
             const latestPayment = enrollment.payments[0];
@@ -549,6 +566,9 @@ class StudentService {
             shortDescription: course.shortDescription || '',
             description: course.description || '',
             image: course.image,
+            courseStatus: course.status,           // ← حالة الدورة (لمنطق PENDING_MINIMUM)
+            minStudents: course.minStudents,        // ← الحد الأدنى من الطلاب
+            bookingTrigger: (course as any).bookingTrigger,
             locationName: primarySession?.room?.name || primarySession?.location || null,
             deliveryType,
             onlinePlatform,

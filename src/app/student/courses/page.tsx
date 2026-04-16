@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, Heart, Loader2, Search, Users, AlertCircle } from "lucide-react"
+import { ArrowLeft, BookOpen, Clock, Heart, Loader2, Search, Users, AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -269,9 +269,17 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
 
                 <div className="flex flex-1 min-w-0 flex-col text-right h-[200px]">
                   <div className="space-y-1">
-                    <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-muted px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {course.category}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-muted px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {course.category}
+                      </span>
+                      {(course as any).courseStatus === 'PENDING_MINIMUM' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-700 px-3 py-1 text-xs font-semibold">
+                          <Users className="h-3 w-3" />
+                          بانتظار اكتمال العدد
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-2">
                       {course.title}
                     </h3>
@@ -335,6 +343,12 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
                     <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-sm font-bold text-blue-700 dark:text-blue-300">
                       {course.price === 0 ? "مجاني" : formatPrice(course.price)}
                     </span>
+                    {(course as any).courseStatus === 'PENDING_MINIMUM' && (
+                      <span className="text-xs text-purple-600 font-medium">
+                        <Clock className="inline h-3 w-3 ml-1" />
+                        يستلزم {(course as any).minStudents} طالب
+                      </span>
+                    )}
                     <Button
                       asChild
                       className="h-9 rounded-full bg-blue-600 px-5 text-sm text-white hover:bg-blue-700 flex items-center gap-2"

@@ -69,6 +69,7 @@ router.put(
 router.delete('/courses/:courseId', trainerController.deleteCourse);
 router.get('/courses/:courseId/students', trainerController.getCourseStudents);
 router.patch('/courses/:courseId/students/:enrollmentId/unenroll', trainerController.unenrollStudent);
+router.patch('/courses/:courseId/activate', trainerController.activateCourse);
 
 // Multer wrapper that converts multer errors into 400 responses instead of 500
 const uploadFields = upload.fields([

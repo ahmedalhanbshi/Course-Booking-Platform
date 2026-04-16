@@ -38,7 +38,8 @@ import {
   ImageIcon,
   Mail,
   Phone,
-  Building2
+  Building2,
+  CheckCircle
 } from "lucide-react"
 import { toast } from "sonner"
 import { trainerService, CourseDetail } from "@/lib/trainer-service"
@@ -73,6 +74,7 @@ type RegistrationStatus =
   | "PAYMENT_PENDING"
   | "PAYMENT_CONFIRMED"
   | "PAYMENT_REJECTED"
+  | "PRELIMINARY_APPROVED"
   | "ENROLLED"
   | "REJECTED"
 
@@ -371,6 +373,10 @@ export default function CourseDetailsPage() {
     if (registrationStatus === "PENDING_APPROVAL") {
       if (stepId === 1) return "completed"
       if (stepId === 2) return "active"
+      return "upcoming"
+    }
+    if (registrationStatus === "PRELIMINARY_APPROVED") {
+      if (stepId <= 2) return "completed"
       return "upcoming"
     }
     if (registrationStatus === "APPROVED") {
@@ -728,7 +734,7 @@ export default function CourseDetailsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  <span>المقاعد المتاحة: {course.maxStudents}</span>
+                  <span>المقاعد المتاحة: {(course.maxStudents && course.maxStudents > 0) ? Math.max(0, course.maxStudents - (course.enrolledCount || 0)) : 'غير محدد'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {course.deliveryType === "online" || course.deliveryType === "hybrid" ? <Globe className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
@@ -778,12 +784,25 @@ export default function CourseDetailsPage() {
                 ))}
               </div>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                {/* ── PENDING_MINIMUM info banner ── */}
+                {(course as any).courseStatus === 'PENDING_MINIMUM' && (
+                  <div className="flex items-start gap-3 rounded-xl border border-purple-400/40 bg-purple-500/20 px-4 py-3 text-sm text-purple-100 mb-1">
+                    <Users className="h-4 w-4 mt-0.5 shrink-0 text-purple-300" />
+                    <div className="text-right">
+                      <p className="font-semibold text-purple-200">دورة بانتظار اكتمال العدد</p>
+                      <p className="text-purple-200/80 text-xs mt-0.5">
+                        يحتاج تفعيل هذه الدورة إلى {(course as any).minStudents} طالب على الأقل.
+                        يمكنك التسجيل المبدئي الآن وستُبلَّغ عند جاهزية الدورة.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {registrationStatus === "NONE" && (
                   <Button
                     className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
                     onClick={() => openRegistrationDialog("create")}
                   >
-                    التسجيل
+                    {(course as any).courseStatus === 'PENDING_MINIMUM' ? 'التسجيل المبدئي' : 'التسجيل'}
                   </Button>
                 )}
                 {registrationStatus === "PENDING_APPROVAL" && (
@@ -792,7 +811,17 @@ export default function CourseDetailsPage() {
                     disabled
                     className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
                   >
-                    تم التسجيل مبدئيًا
+                    تم التسجيل — بانتظار المراجعة
+                  </Button>
+                )}
+                {registrationStatus === "PRELIMINARY_APPROVED" && (
+                  <Button
+                    variant="outline"
+                    disabled
+                    className="w-full rounded-full border-blue-400/50 bg-blue-500/10 text-white text-base font-semibold h-12 sm:w-auto sm:px-10 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                  >
+                    <CheckCircle className="ml-2 h-4 w-4 text-blue-400" />
+                    مقبول مبدئياً — بانتظار اكتمال العدد
                   </Button>
                 )}
                 {registrationStatus === "REJECTED" && (
@@ -952,6 +981,17 @@ export default function CourseDetailsPage() {
                 </DialogContent>
               </Dialog>
 
+              {registrationStatus === "PRELIMINARY_APPROVED" && (
+                <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4 text-right text-sm text-white/90 shadow-[0_8px_20px_rgba(15,23,42,0.18)] backdrop-blur">
+                  <p className="font-semibold text-blue-200 flex items-center gap-2 justify-end">
+                    تم قبول طلبك المبدئي بنجاح
+                    <CheckCircle className="h-4 w-4" />
+                  </p>
+                  <p className="mt-1 text-xs text-blue-100/80">
+                    الدورة الآن بانتظار اكتمال الحد الأدنى من الطلاب. سيتم إرسال إشعار لك فور تفعيل الدورة لبدء عملية الدفع.
+                  </p>
+                </div>
+              )}
               {registrationStatus === "PENDING_APPROVAL" && (
                 <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-right text-sm text-white/90 shadow-[0_8px_20px_rgba(15,23,42,0.18)] backdrop-blur">
                   <p className="font-semibold">طلبك قيد المراجعة</p>
@@ -981,7 +1021,7 @@ export default function CourseDetailsPage() {
                 <div
                   key={registrationStatus}
                   dir="rtl"
-                  className={`mt-4 rounded-2xl border p-4 text-right text-sm backdrop-blur animate-stepper-reveal ${registrationStatus === "PENDING_APPROVAL"
+                  className={`mt-4 rounded-2xl border p-4 text-right text-sm backdrop-blur animate-stepper-reveal ${registrationStatus === "PENDING_APPROVAL" || registrationStatus === "PRELIMINARY_APPROVED"
                     ? "border-white/10 bg-white/5 text-white/70 shadow-none opacity-75"
                     : "border-white/15 bg-white/10 text-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.2)]"
                     }`}

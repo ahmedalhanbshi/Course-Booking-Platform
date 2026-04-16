@@ -293,6 +293,85 @@ class MailerService {
             html: this.wrapHtml(title, body),
         });
     }
+
+    // ── Minimum Enrollment Threshold ───────────────────────────────
+
+    /**
+     * Notify course owner that minimum student count has been reached
+     */
+    async sendMinimumReachedEmail(
+        to: string,
+        ownerName: string,
+        courseTitle: string,
+        minStudents: number,
+        setupUrl: string,
+    ) {
+        await this.send({
+            to,
+            subject: `🎉 اكتمل الحد الأدنى في دورة "${courseTitle}"`,
+            html: this.wrapHtml('اكتمال الحد الأدنى', `
+                <p>مرحباً <strong>${ownerName}</strong>،</p>
+                <div class="card">
+                    <p>🎉 تهانينا! وصل عدد المسجلين المبدئيين في دورة <strong>${courseTitle}</strong> إلى الحد الأدنى المطلوب وهو <strong>${minStudents} طالب</strong>.</p>
+                </div>
+                <p>الخطوة التالية هي إكمال إعداد الدورة من خلال:</p>
+                <ul style="padding-right:20px; line-height:2">
+                    <li>إضافة القاعة والجلسات إذا كانت الدورة حضورية</li>
+                    <li>إضافة رابط الاجتماع والجلسات إذا كانت الدورة أونلاين</li>
+                </ul>
+                <p>بمجرد حفظ الإعداد وتفعيل الدورة، سيُشعَر جميع الطلاب المسجلين تلقائياً بإكمال عملية الدفع.</p>
+                <a class="btn" href="${setupUrl}">إكمال إعداد الدورة</a>
+            `),
+        });
+    }
+
+    /**
+     * Notify enrolled students that the course is fully set up and payment is now required
+     */
+    async sendCourseReadyForPaymentEmail(
+        to: string,
+        studentName: string,
+        courseTitle: string,
+        courseUrl: string,
+    ) {
+        await this.send({
+            to,
+            subject: `🎓 الدورة جاهزة! أكمل تسجيلك في "${courseTitle}"`,
+            html: this.wrapHtml('الدورة جاهزة للتسجيل', `
+                <p>مرحباً <strong>${studentName}</strong>،</p>
+                <div class="card">
+                    <p>🎉 تم الانتهاء من إعداد دورة <strong>${courseTitle}</strong> وأصبحت جاهزة للانطلاق!</p>
+                </div>
+                <p>لتأكيد مقعدك، يرجى إكمال عملية الدفع في أقرب وقت ممكن.</p>
+                <a class="btn" href="${courseUrl}">إكمال الدفع الآن</a>
+            `),
+        });
+    }
+
+    /**
+     * Notify student their preliminary enrollment was accepted but course is still awaiting minimum
+     */
+    async sendPreliminaryAcceptedWaitingEmail(
+        to: string,
+        studentName: string,
+        courseTitle: string,
+        minStudents: number,
+        courseUrl: string,
+    ) {
+        await this.send({
+            to,
+            subject: `✅ تم قبولك مبدئياً في دورة "${courseTitle}"`,
+            html: this.wrapHtml('قبول مبدئي — انتظار اكتمال العدد', `
+                <p>مرحباً <strong>${studentName}</strong>،</p>
+                <div class="card">
+                    <p>✅ يسعدنا إخبارك بقبول تسجيلك المبدئي في دورة <strong>${courseTitle}</strong>.</p>
+                </div>
+                <p>الدورة حالياً بانتظار اكتمال الحد الأدنى المطلوب من الطلاب وهو <strong>${minStudents} طالب</strong>.</p>
+                <p>سيتم إشعارك فور اكتمال العدد وجاهزية الدورة لإكمال عملية الدفع.</p>
+                <a class="btn" href="${courseUrl}">عرض تفاصيل الدورة</a>
+            `),
+        });
+    }
 }
 
 export const mailerService = new MailerService();

@@ -5,6 +5,8 @@ import notificationService from './notification.service';
 import { mailerService } from './mailer.service';
 import { whatsAppService } from './whatsapp.service';
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
 class TrainerService {
     /**
      * Get dashboard stats + upcoming sessions + pending room bookings for a trainer
@@ -123,7 +125,7 @@ class TrainerService {
      */
     async getExploreCourses() {
         const courses = await prisma.course.findMany({
-            where: { status: 'ACTIVE' },
+            where: { status: { in: ['ACTIVE', 'PENDING_MINIMUM'] } },
             orderBy: { createdAt: 'desc' },
             include: {
                 trainer: { select: { name: true, avatar: true } },
@@ -136,7 +138,7 @@ class TrainerService {
                 },
                 category: { select: { name: true } },
                 enrollments: {
-                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
+                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PRELIMINARY_APPROVED', 'PENDING_PAYMENT'] } },
                     select: { id: true },
                 },
                 sessions: { select: { id: true, type: true } },
@@ -177,8 +179,10 @@ class TrainerService {
                         name: c.trainer?.name ?? staffTrainers[0]?.name ?? c.institute?.name ?? '—',
                         avatar: c.trainer?.avatar ?? c.institute?.logo ?? c.institute?.user?.avatar ?? null,
                     },
-                    staffTrainers, // قائمة جميع المدربين
+                    staffTrainers,
                     price: Number(c.price),
+                    minStudents: c.minStudents,
+                    courseStatus: c.status, // 'ACTIVE' | 'PENDING_MINIMUM'
                     deliveryType: c.sessions[0]?.type === 'ONLINE' ? 'online'
                         : c.sessions[0]?.type === 'IN_PERSON' ? 'in_person'
                             : c.sessions.length > 0 ? 'hybrid' : 'online',
@@ -817,7 +821,7 @@ class TrainerService {
      */
     async getPublicCourseById(courseId: string) {
         const course = await prisma.course.findFirst({
-            where: { id: courseId, status: 'ACTIVE' },
+            where: { id: courseId, status: { in: ['ACTIVE', 'PENDING_MINIMUM'] } },
             include: {
                 trainer: {
                     select: {
@@ -847,7 +851,7 @@ class TrainerService {
                     include: { room: { select: { id: true, name: true, location: true } } },
                 },
                 enrollments: {
-                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
+                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PRELIMINARY_APPROVED', 'PENDING_PAYMENT'] } },
                     select: { id: true },
                 },
                 institute: {
@@ -874,7 +878,7 @@ class TrainerService {
             }
         });
 
-        if (!course) throw new Error('الدورة غير موجودة أو غير نشطة');
+        if (!course) throw new Error('الدورة غير موجودة أو غير متاحة للعرض');
 
         // Fetch all staff trainers if staffTrainerIds is set (now multi-trainer only)
         const staffTrainerIds = (course as any).staffTrainerIds as string[] | undefined;
@@ -895,6 +899,8 @@ class TrainerService {
             description: course.description ?? '',
             image: course.image ?? null,
             price: Number(course.price),
+            minStudents: course.minStudents,
+            courseStatus: course.status, // 'ACTIVE' | 'PENDING_MINIMUM'
             startDate: course.startDate,
             endDate: course.endDate,
             maxStudents: course.maxStudents,
@@ -1181,6 +1187,11 @@ class TrainerService {
         });
         if (!trainer) throw new Error("لم يتم العثور على المدرب");
 
+        // Validate required fields
+        if (data.minStudents === undefined || data.minStudents === '' || data.minStudents === null) {
+            throw new Error("يرجى تحديد الحد الأدنى لعدد الطلاب");
+        }
+
         const sessionType = data.deliveryType === "online" ? "ONLINE" : "IN_PERSON";
 
         const mappedSessions = (data.sessions || []).map((session: any) => ({
@@ -1221,7 +1232,7 @@ class TrainerService {
                 startDate: finalStartDate,
                 endDate: finalEndDate,
                 maxStudents: Number(data.maxStudents),
-                minStudents: Number(data.minStudents) || 1,
+                minStudents: Number(data.minStudents),
                 status: (data.status === 'ACTIVE' && sessionType === 'IN_PERSON') ? 'PENDING_REVIEW' : (data.status || 'DRAFT'),
                 image: data.image,
                 trainerId: trainer.id,
@@ -1610,153 +1621,225 @@ class TrainerService {
     }
 
     /**
-     * Update enrollment status (Accept/Reject)
+     * Update enrollment status (Accept/Reject preliminary, Reject payment)
+     * For PENDING_MINIMUM courses: accepted students are kept in PRELIMINARY and notified to wait.
      */
     async updateEnrollmentStatus(trainerId: string, enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string) {
         const enrollment = await prisma.enrollment.findFirst({
             where: {
                 id: enrollmentId,
-                course: {
-                    trainerId: trainerId
-                }
+                course: { trainerId }
             },
             include: {
                 payments: true,
-                course: true
-            }
+                course: true,
+                student: { select: { id: true, name: true, email: true, phone: true } },
+            },
         });
 
         if (!enrollment) {
             throw new Error('التسجيل غير موجود أو لا تنتمي لدوراتك');
         }
 
+        const courseTitle = enrollment.course.title;
+        const student = enrollment.student;
+
+        // ── Reject Payment ─────────────────────────────────────────────────────
         if (status === 'REJECT_PAYMENT') {
             const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
             if (!latestPayment || latestPayment.status !== 'PENDING_REVIEW') {
                 throw new Error('لا يوجد دفعة معلقة للمراجعة');
             }
-
             await prisma.payment.update({
                 where: { id: latestPayment.id },
-                data: {
-                    status: 'REJECTED',
-                    reviewedBy: trainerId,
-                    reviewedAt: new Date(),
-                    rejectionReason: reason || 'تم الرفض من قبل المدرب'
-                }
+                data: { status: 'REJECTED', reviewedBy: trainerId, reviewedAt: new Date(), rejectionReason: reason || 'تم الرفض من قبل المدرب' },
             });
-
             return { ...enrollment, status: enrollment.status, paymentStatus: 'REJECTED' };
         }
 
-        let targetStatus: EnrollmentStatus = status;
-        // If trainer accepts a PRELIMINARY enrollment, move it to PENDING_PAYMENT if course is not free
-        if (status === 'ACTIVE' && enrollment.status === 'PRELIMINARY') {
-            const price = Number(enrollment.course.price);
-            if (price > 0) {
+        // ── Determine target enrollment status ────────────────────────────────────────
+        const isPendingMinimumCourse = enrollment.course.status === 'PENDING_MINIMUM';
+        const price = Number(enrollment.course.price);
+
+        let targetStatus: EnrollmentStatus;
+        if (status === 'CANCELLED') {
+            targetStatus = 'CANCELLED';
+        } else if (enrollment.status === 'PRELIMINARY') {
+            if (isPendingMinimumCourse) {
+                // Transition to PRELIMINARY_APPROVED - student must wait for minimum threshold + owner setup
+                targetStatus = 'PRELIMINARY_APPROVED';
+            } else if (price > 0) {
                 targetStatus = 'PENDING_PAYMENT';
+            } else {
+                targetStatus = 'ACTIVE';
             }
+        } else if (status === 'ACTIVE' && enrollment.payments.length > 0) {
+            targetStatus = 'ACTIVE';
+        } else {
+            targetStatus = status as EnrollmentStatus;
         }
 
         const updateData: any = { status: targetStatus };
-        if (reason) {
-            updateData.cancellationReason = reason;
+        if (reason) updateData.cancellationReason = reason;
+
+        if (targetStatus === 'CANCELLED') {
+            // Delete associated payments when cancelling
+            await prisma.payment.deleteMany({ where: { enrollmentId } });
         }
 
         const updatedEnrollment = await prisma.enrollment.update({
             where: { id: enrollmentId },
-            data: updateData
+            data: updateData,
         });
 
-        // If status is ACTIVE, approve the latest payment as well if it's pending review
-        if (status === 'ACTIVE' && enrollment.payments.length > 0) {
+        // Approve latest payment if moving to ACTIVE
+        if (targetStatus === 'ACTIVE' && enrollment.payments.length > 0) {
             const latestPayment = enrollment.payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-
-            if (latestPayment && latestPayment.status === 'PENDING_REVIEW') {
+            if (latestPayment?.status === 'PENDING_REVIEW') {
                 await prisma.payment.update({
                     where: { id: latestPayment.id },
-                    data: {
-                        status: 'APPROVED',
-                        reviewedBy: trainerId,
-                        reviewedAt: new Date(),
-                        notes: 'تم القبول من قبل المدرب'
-                    }
+                    data: { status: 'APPROVED', reviewedBy: trainerId, reviewedAt: new Date(), notes: 'تم القبول من قبل المدرب' },
                 });
             }
         }
 
-        // ── Notify student about the enrollment status change ──────────────
-        const student = await prisma.user.findUnique({ where: { id: enrollment.studentId }, select: { name: true, email: true, phone: true } });
-        const courseTitle = enrollment.course.title;
-
-        if (student) {
-            if (targetStatus === 'PENDING_PAYMENT') {
-                // Preliminary acceptance
-                await notificationService.createNotification({
-                    userId: enrollment.studentId,
-                    type: 'ENROLLMENT_PRELIMINARY_ACCEPTED',
-                    title: 'تم قبولك مبدئياً',
-                    message: `تم قبول طلبك مبدئياً في دورة "${courseTitle}". يرجى إكمال عملية الدفع.`,
-                    relatedEntityId: enrollmentId,
-                    actionUrl: '/student/my-courses',
-                    emailFn: student.email ? () => mailerService.sendEnrollmentPreliminaryAccepted(student.email!, student.name, courseTitle) : undefined,
-                    whaFn: student.phone ? () => whatsAppService.notifyEnrollmentPreliminaryAccepted(student.phone!, student.name, courseTitle) : undefined,
-                });
-            } else if (targetStatus === 'ACTIVE') {
-                // Final acceptance (free course direct)
-                await notificationService.createNotification({
-                    userId: enrollment.studentId,
-                    type: 'ENROLLMENT_FINAL_ACCEPTED',
-                    title: 'تم قبولك نهائياً',
-                    message: `تهانينا! تم تأكيد تسجيلك في دورة "${courseTitle}".`,
-                    relatedEntityId: enrollmentId,
-                    actionUrl: '/student/my-courses',
-                    emailFn: student.email ? () => mailerService.sendEnrollmentFinalAccepted(student.email!, student.name, courseTitle) : undefined,
-                    whaFn: student.phone ? () => whatsAppService.notifyEnrollmentFinalAccepted(student.phone!, student.name, courseTitle) : undefined,
-                });
-                // Also notify payment approval if there was a payment
-                if (enrollment.payments.length > 0) {
+        // ── Notifications (fire-and-forget) ──────────────────────────────────────────
+        setImmediate(async () => {
+            try {
+                if (isPendingMinimumCourse && targetStatus === 'PRELIMINARY_APPROVED') {
+                    // Notify student: accepted but waiting for minimum
+                    const courseUrl = `${FRONTEND_URL}/student/courses/${enrollment.courseId}`;
                     await notificationService.createNotification({
-                        userId: enrollment.studentId,
-                        type: 'PAYMENT_APPROVED',
-                        title: 'تم قبول دفعتك',
-                        message: `تم التحقق من دفعتك لدورة "${courseTitle}" والموافقة عليها.`,
+                        userId: student.id,
+                        type: 'PRELIMINARY_ACCEPTED_WAITING',
+                        title: 'تم قبول تسجيلك المبدئي ✓',
+                        message: `قُبل طلبك في دورة "${courseTitle}". الدورة بانتظار اكتمال الحد الأدنى (${enrollment.course.minStudents} طالب). سيتم إشعارك عند جاهزية الدورة.`,
+                        actionUrl: `/student/courses/${enrollment.courseId}`,
                         relatedEntityId: enrollmentId,
-                        actionUrl: '/student/my-courses',
-                        emailFn: student.email ? () => mailerService.sendPaymentApproved(student.email!, student.name, courseTitle) : undefined,
-                        whaFn: student.phone ? () => whatsAppService.notifyPaymentApproved(student.phone!, student.name, courseTitle) : undefined,
+                        emailFn: student.email
+                            ? () => mailerService.sendPreliminaryAcceptedWaitingEmail(
+                                student.email!, student.name, courseTitle, enrollment.course.minStudents, courseUrl
+                            ) : undefined,
+                        whaFn: student.phone
+                            ? () => whatsAppService.notifyEnrollmentPreliminaryAccepted(student.phone!, student.name, courseTitle)
+                            : undefined,
+                    });
+
+                    // Check if minimum is now reached — notify the trainer (owner)
+                    await this.checkAndTriggerMinimumThreshold(enrollment.courseId, trainerId);
+
+                } else if (targetStatus === 'PENDING_PAYMENT') {
+                    await notificationService.createNotification({
+                        userId: student.id,
+                        type: 'ENROLLMENT_PRELIMINARY_ACCEPTED',
+                        title: 'تم قبولك مبدئياً',
+                        message: `تم قبول طلبك مبدئياً في دورة "${courseTitle}". يرجى إكمال عملية الدفع.`,
+                        relatedEntityId: enrollmentId,
+                        actionUrl: `/student/my-courses`,
+                        emailFn: student.email ? () => mailerService.sendEnrollmentPreliminaryAccepted(student.email!, student.name, courseTitle) : undefined,
+                        whaFn: student.phone ? () => whatsAppService.notifyEnrollmentPreliminaryAccepted(student.phone!, student.name, courseTitle) : undefined,
+                    });
+                } else if (targetStatus === 'ACTIVE') {
+                    await notificationService.createNotification({
+                        userId: student.id,
+                        type: enrollment.payments.length > 0 ? 'PAYMENT_APPROVED' : 'ENROLLMENT_FINAL_ACCEPTED',
+                        title: enrollment.payments.length > 0 ? 'تم قبول الدفع ✓' : 'تم قبولك نهائياً',
+                        message: enrollment.payments.length > 0
+                            ? `تم التحقق من دفعتك لدورة "${courseTitle}" والموافقة عليها.`
+                            : `تهانينا! تم تأكيد تسجيلك في دورة "${courseTitle}".`,
+                        relatedEntityId: enrollmentId,
+                        actionUrl: `/student/my-courses`,
+                        emailFn: student.email
+                            ? () => (enrollment.payments.length > 0
+                                ? mailerService.sendPaymentApproved(student.email!, student.name, courseTitle)
+                                : mailerService.sendEnrollmentFinalAccepted(student.email!, student.name, courseTitle))
+                            : undefined,
+                        whaFn: student.phone
+                            ? () => (enrollment.payments.length > 0
+                                ? whatsAppService.notifyPaymentApproved(student.phone!, student.name, courseTitle)
+                                : whatsAppService.notifyEnrollmentFinalAccepted(student.phone!, student.name, courseTitle))
+                            : undefined,
+                    });
+                } else if (targetStatus === 'CANCELLED') {
+                    await notificationService.createNotification({
+                        userId: student.id,
+                        type: 'ENROLLMENT_REJECTED',
+                        title: 'تم رفض تسجيلك',
+                        message: `نأسف، تم رفض تسجيلك في دورة "${courseTitle}".${reason ? ` السبب: ${reason}` : ''}`,
+                        relatedEntityId: enrollmentId,
+                        actionUrl: `/student/my-courses`,
+                        emailFn: student.email ? () => mailerService.sendEnrollmentRejected(student.email!, student.name, courseTitle, reason) : undefined,
+                        whaFn: student.phone ? () => whatsAppService.notifyEnrollmentRejected(student.phone!, student.name, courseTitle, reason) : undefined,
                     });
                 }
-            } else if (targetStatus === 'CANCELLED') {
-                // Enrollment rejected/cancelled
-                await notificationService.createNotification({
-                    userId: enrollment.studentId,
-                    type: 'ENROLLMENT_REJECTED',
-                    title: 'تم رفض تسجيلك',
-                    message: `نأسف، تم رفض تسجيلك في دورة "${courseTitle}".${reason ? ` السبب: ${reason}` : ''}`,
-                    relatedEntityId: enrollmentId,
-                    actionUrl: '/student/my-courses',
-                    emailFn: student.email ? () => mailerService.sendEnrollmentRejected(student.email!, student.name, courseTitle, reason) : undefined,
-                    whaFn: student.phone ? () => whatsAppService.notifyEnrollmentRejected(student.phone!, student.name, courseTitle, reason) : undefined,
-                });
+            } catch (e) {
+                console.error('[TrainerService] updateEnrollmentStatus notification error:', e);
             }
-        }
-
-        // Handle payment rejection notification
-        if ((status as string) === 'REJECT_PAYMENT' && student) {
-            await notificationService.createNotification({
-                userId: enrollment.studentId,
-                type: 'PAYMENT_REJECTED',
-                title: 'تم رفض إيصال الدفع',
-                message: `تم رفض سند الدفع لدورة "${courseTitle}".${reason ? ` السبب: ${reason}` : ''} يرجى إعادة الرفع.`,
-                relatedEntityId: enrollmentId,
-                actionUrl: '/student/my-courses',
-                emailFn: student.email ? () => mailerService.sendPaymentRejected(student.email!, student.name, courseTitle, reason) : undefined,
-                whaFn: student.phone ? () => whatsAppService.notifyPaymentRejected(student.phone!, student.name, courseTitle, reason) : undefined,
-            });
-        }
+        });
 
         return updatedEnrollment;
+    }
+
+    /**
+     * Check if a PENDING_MINIMUM trainer course has reached its minimum threshold.
+     * If yes, notify the trainer ONLY (students still wait for sessions to be added).
+     */
+    private async checkAndTriggerMinimumThreshold(courseId: string, trainerUserId: string): Promise<void> {
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (!course || course.status !== 'PENDING_MINIMUM') return;
+
+        const acceptedCount = await prisma.enrollment.count({
+            where: { courseId, status: 'PRELIMINARY_APPROVED', deletedAt: null },
+        });
+        if (acceptedCount < course.minStudents) return;
+
+        const alreadyNotified = await prisma.notification.findFirst({
+            where: { userId: trainerUserId, type: 'MINIMUM_REACHED' as any, relatedEntityId: courseId },
+        });
+        if (alreadyNotified) return;
+
+        const trainer = await prisma.user.findUnique({ where: { id: trainerUserId }, select: { name: true, email: true } });
+        const setupPath = `/trainer/courses/${courseId}/edit?tab=schedule`;
+        const setupUrl = `${FRONTEND_URL}${setupPath}`;
+
+        await notificationService.createNotification({
+            userId: trainerUserId,
+            type: 'MINIMUM_REACHED',
+            title: `🎉 اكتمل الحد الأدنى في دورة "${course.title}"`,
+            message: `وصل عدد الطلاب المقبولين مبدئياً إلى ${course.minStudents}. يرجى إكمال إعداد الدورة (الجلسات + المواعيد) لتفعيلها.`,
+            actionUrl: setupPath,
+            relatedEntityId: courseId,
+            emailFn: trainer?.email
+                ? () => mailerService.sendMinimumReachedEmail(trainer.email!, trainer?.name ?? 'المدرب', course.title, course.minStudents, setupUrl)
+                : undefined,
+        });
+    }
+
+    /**
+     * Manually activate a PENDING_MINIMUM online course (trainer flow).
+     * Validates ownership and threshold, then calls institute service shared logic.
+     */
+    async activatePendingMinimumCourse(trainerUserId: string, courseId: string): Promise<{ courseId: string }> {
+        const trainer = await (prisma as any).trainer.findUnique({ where: { userId: trainerUserId } });
+        if (!trainer) throw new Error('المدرب غير موجود');
+
+        const course = await (prisma.course as any).findFirst({
+            where: { id: courseId, trainerId: trainer.id },
+            include: { _count: { select: { enrollments: { where: { status: 'PRELIMINARY_APPROVED', deletedAt: null } } } } }
+        });
+
+        if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لك');
+        if (course.status !== 'PENDING_MINIMUM') throw new Error('هذه الدورة لا تحتاج إلى تفعيل يدوي');
+
+        const acceptedCount = course._count.enrollments;
+        if (acceptedCount < course.minStudents) {
+            throw new Error(`لم يكتمل الحد الأدنى بعد (${acceptedCount}/${course.minStudents})`);
+        }
+
+        // Delegate to institute service which has the full notify logic
+        const instituteService = (await import('./institute.service')).default;
+        await instituteService.activatePendingMinimumCourse(trainerUserId, courseId);
+        return { courseId };
     }
 
     /**

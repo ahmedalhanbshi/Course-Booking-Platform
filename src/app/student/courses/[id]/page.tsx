@@ -183,7 +183,13 @@ export default function StudentCourseDashboard() {
   const isPendingPayment = courseData.enrollmentStatus === 'PENDING_PAYMENT' || courseData.enrollmentStatus === 'pending_payment'
   const isPending = isPreliminary || isPendingPayment
   const isActive = courseData.enrollmentStatus === 'ACTIVE' || courseData.enrollmentStatus === 'active'
-  const shouldLockContent = isCancelled || isPending
+
+  // Minimum enrollment threshold states
+  const isPendingMinimum = courseData.courseStatus === 'PENDING_MINIMUM' || courseData.courseStatus === 'pending_minimum'
+  // Student is accepted (PRELIMINARY) but course is still waiting for minimum threshold
+  const isWaitingForMinimum = isPreliminary && isPendingMinimum
+
+  const shouldLockContent = isCancelled || isPreliminary
 
   const safeText = (value: string | undefined | null, fallback: string) => {
     if (typeof value !== "string") return fallback
@@ -361,6 +367,26 @@ export default function StudentCourseDashboard() {
                   <div className="text-right">
                     <h3 className="font-bold text-xl text-red-900 mb-2">عذراً، تم إلغاء اشتراكك في هذه الدورة</h3>
                     <p className="text-red-700">لم يعد بإمكانك الوصول لمحتوى الدورة أو الجدول الدراسي. يرجى مراجعة الإدارة.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : isWaitingForMinimum ? (
+              // Student is accepted but course is PENDING_MINIMUM — waiting for threshold
+              <Card className="rounded-2xl border border-purple-100 bg-purple-50 shadow-sm">
+                <CardContent className="p-8 flex items-center gap-6">
+                  <div className="p-4 bg-white rounded-full shadow-sm text-purple-500 border border-purple-100 shrink-0">
+                    <Users className="w-10 h-10" />
+                  </div>
+                  <div className="text-right">
+                    <h3 className="font-bold text-xl text-purple-900 mb-2">
+                      تم قبول تسجيلك المبدئي ✓
+                    </h3>
+                    <p className="text-purple-700 leading-relaxed">
+                      الدورة حالياً بانتظار اكتمال الحد الأدنى من الطلاب
+                      {courseData.minStudents > 1 ? ` (${courseData.minStudents} طالب)` : ''}،
+                      ثم سيُكمل مالك الدورة إعدادها.
+                      سيتم إشعارك فور جاهزية الدورة لإكمال عملية الدفع وتأكيد مقعدك.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

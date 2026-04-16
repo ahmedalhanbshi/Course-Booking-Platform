@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import Image from "next/image"
@@ -107,6 +107,8 @@ export default function TrainerEnrollmentsPage() {
             case "PRELIMINARY":
             case "PENDING_PAYMENT":
                 return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">قيد المراجعة</Badge>
+            case "PRELIMINARY_APPROVED":
+                return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">مقبول مبدئياً</Badge>
             default:
                 return <Badge variant="outline">{status}</Badge>
         }
@@ -140,6 +142,7 @@ export default function TrainerEnrollmentsPage() {
                         const course = enrollment.course;
                         const latestPayment = enrollment.payments?.[0];
                         const isPreliminary = enrollment.status === "PRELIMINARY";
+                        const isPreliminaryApproved = enrollment.status === "PRELIMINARY_APPROVED";
                         const isPendingReview = enrollment.status === "PENDING_PAYMENT" && latestPayment?.status === "PENDING_REVIEW";
 
                         return (
@@ -364,6 +367,7 @@ export default function TrainerEnrollmentsPage() {
                                 {(() => {
                                     const latestPayment = selectedEnrollment.payments?.[0];
                                     const isPreliminary = selectedEnrollment.status === "PRELIMINARY";
+                                    const isPreliminaryApproved = selectedEnrollment.status === "PRELIMINARY_APPROVED";
                                     const isPendingReview = selectedEnrollment.status === "PENDING_PAYMENT" && latestPayment?.status === "PENDING_REVIEW";
 
                                     if (isPreliminary) {
