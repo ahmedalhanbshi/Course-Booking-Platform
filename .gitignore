@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+*.log
+dist
+build
+.cache
+.edge-profile-inspect
+.edge-profile-visible
+*.tsbuildinfo
