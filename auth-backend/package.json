@@ -7,7 +7,7 @@
         "dev": "nodemon --exec \"ts-node --transpile-only\" src/server.ts",
         "build": "tsc",
         "start": "node dist/server.js",
-        "start:render": "cd auth-backend && prisma db push --schema prisma/schema.prisma --skip-generate && ts-node --transpile-only src/server.ts",
+        "start:render": "prisma db push --schema prisma/schema.prisma --skip-generate && ts-node --transpile-only src/server.ts",
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
         "prisma:studio": "prisma studio",
