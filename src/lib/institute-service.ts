@@ -159,8 +159,10 @@ class InstituteService {
         return response.data.data;
     }
 
-    async addStaff(data: { name: string; email?: string; phone?: string; bio?: string; specialties?: string[]; notes?: string }): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/staff', data);
+    async addStaff(data: FormData): Promise<any> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/staff', data, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         return response.data.data;
     }
 
@@ -168,8 +170,10 @@ class InstituteService {
         await apiClient.delete(`/api/institute/staff/${staffId}`);
     }
 
-    async updateStaff(staffId: string, data: { name?: string; email?: string | null; phone?: string | null; bio?: string | null; notes?: string | null }): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/staff/${staffId}`, data);
+    async updateStaff(staffId: string, data: FormData): Promise<any> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/staff/${staffId}`, data, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         return response.data.data;
     }
 

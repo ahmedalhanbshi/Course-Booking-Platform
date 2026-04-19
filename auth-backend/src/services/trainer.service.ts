@@ -1654,8 +1654,28 @@ class TrainerService {
                 where: { id: latestPayment.id },
                 data: { status: 'REJECTED', reviewedBy: trainerId, reviewedAt: new Date(), rejectionReason: reason || 'تم الرفض من قبل المدرب' },
             });
+
+            // Notify student about payment rejection
+            await notificationService.createNotification({
+                userId: student.id,
+                type: 'PAYMENT_REJECTED',
+                title: 'تم رفض سند الدفع',
+                message: `تم رفض سند الدفع الخاص بك في دورة "${courseTitle}".${reason ? ` السبب: ${reason}` : ''} يرجى إعادة رفع سند الدفع الصحيح.`,
+                actionUrl: `/student/courses/${enrollment.courseId}`,
+                relatedEntityId: enrollmentId,
+                emailFn: student.email
+                    ? () => mailerService.sendPaymentRejected(student.email!, student.name, courseTitle, reason)
+                    : undefined,
+                whaFn: student.phone
+                    ? () => whatsAppService.notifyPaymentRejected
+                        ? (whatsAppService as any).notifyPaymentRejected(student.phone!, student.name, courseTitle, reason)
+                        : Promise.resolve()
+                    : undefined,
+            });
+
             return { ...enrollment, status: enrollment.status, paymentStatus: 'REJECTED' };
         }
+
 
         // ── Determine target enrollment status ────────────────────────────────────────
         const isPendingMinimumCourse = enrollment.course.status === 'PENDING_MINIMUM';

@@ -181,7 +181,10 @@ class StudentService {
                             orderBy: {
                                 startTime: 'asc'
                             },
-                            take: 1
+                            take: 1,
+                            include: {
+                                room: { select: { id: true, name: true } }
+                            }
                         }
                     }
                 }
@@ -241,7 +244,9 @@ class StudentService {
                     category: e.course.category?.name || 'عام',
                     startDate: e.course.startDate,
                     endDate: e.course.endDate,
-                    price: e.course.price
+                    price: e.course.price,
+                    roomId: (e.course.sessions[0] as any)?.room?.id ?? null,
+                    roomName: (e.course.sessions[0] as any)?.room?.name ?? null
                 },
                 nextSession: e.course.sessions[0] ? {
                     id: e.course.sessions[0].id,
@@ -523,6 +528,11 @@ class StudentService {
                             }
                         }
                     }
+                },
+                payments: {
+                    where: { status: 'PENDING_REVIEW' },
+                    select: { id: true },
+                    take: 1
                 }
             }
         });
@@ -573,6 +583,7 @@ class StudentService {
             deliveryType,
             onlinePlatform,
             enrollmentStatus: enrollment.status,
+            hasPaymentUnderReview: (enrollment as any).payments?.length > 0,
             nextSession: nextSession ? {
                 id: nextSession.id,
                 topic: nextSession.topic,

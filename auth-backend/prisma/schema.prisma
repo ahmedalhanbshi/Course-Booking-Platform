@@ -119,6 +119,7 @@ model InstituteStaff {
   email       String?
   phone       String?
   bio         String?
+  avatar      String?
   specialties String[]
   status      StaffStatus @default(ACTIVE)
   joinedAt    DateTime    @default(now()) @map("joined_at")

@@ -592,7 +592,11 @@ class InstituteController {
     async addStaff(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
-            const data = await instituteService.addInstituteStaff(req.user.userId, req.body);
+            const payload = { ...req.body };
+            if (req.file) {
+                payload.avatar = `/uploads/${req.file.filename}`;
+            }
+            const data = await instituteService.addInstituteStaff(req.user.userId, payload);
             return sendSuccess(res, 'تمت إضافة عضو الطاقم بنجاح', data, 201);
         } catch (error: any) { return sendError(res, error.message, 400); }
     }
@@ -616,7 +620,11 @@ class InstituteController {
     async updateStaff(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
-            const data = await instituteService.updateInstituteStaff(req.user.userId, req.params.staffId, req.body);
+            const payload = { ...req.body };
+            if (req.file) {
+                payload.avatar = `/uploads/${req.file.filename}`;
+            }
+            const data = await instituteService.updateInstituteStaff(req.user.userId, req.params.staffId, payload);
             return sendSuccess(res, 'تم تحديث بيانات المدرب', data);
         } catch (error: any) { return sendError(res, error.message, 400); }
     }

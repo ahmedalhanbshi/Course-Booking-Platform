@@ -6,21 +6,59 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BookOpen, Calendar, Clock, Award, FileText, Download, X, CheckCircle, AlertCircle, Play, ArrowLeft, Users, CreditCard, CheckCircle2, Info } from "lucide-react"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog"
+
+import {
+  BookOpen,
+  Calendar,
+  Clock,
+  Award,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Play,
+  Users,
+  CreditCard,
+  CheckCircle2,
+  Info,
+  MapPin,
+  ImageIcon,
+  Loader2
+} from "lucide-react"
 import { Course, Enrollment, User } from "@/types"
 import { studentService } from "@/lib/student-service"
+
 import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
 import { toast } from "sonner"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+function resolveImage(src: string | null | undefined): string {
+  if (!src) return "/images/course-web.png"
+  if (src.startsWith("http")) return src
+  const cleanSrc = src.replace(/\\/g, "/")
+  const separator = cleanSrc.startsWith("/") ? "" : "/"
+  return `${API_BASE}${separator}${cleanSrc}`
+}
 
 type EnrollmentWithCourse = {
   id: string
   status: string
   progress: number
   enrolledAt: Date
-  course: Course & { 
-    image: string,
-    trainers?: { id: string, name: string, avatar: string | null }[]
+  course: Course & {
+    image: string
+    trainers?: { id: string; name: string; avatar: string | null }[]
+    roomId?: string | null
+    roomName?: string | null
   }
   nextSession?: {
     startTime: string
@@ -99,11 +137,18 @@ export default function MyCoursesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
 
+  // ── Hall Modal ──────────────────────────────────────────────────────────────
+  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
+  const [hallData, setHallData] = useState<any>(null)
+  const [isLoadingHall, setIsLoadingHall] = useState(false)
+  const [hallImageError, setHallImageError] = useState(false)
+
+
+
   const fetchCourses = async () => {
     try {
       setIsLoading(true)
       const data = await studentService.getMyCourses()
-      // Map backend responses if necessary (naming conventions)
       const mapped = data.map((e: any) => ({
         ...e,
         enrolledAt: new Date(e.enrolledAt),
@@ -127,7 +172,9 @@ export default function MyCoursesPage() {
       return enrollments.filter(e => e.status === 'active')
     }
     if (status === 'pending') {
-      return enrollments.filter(e => ['pending_payment', 'preliminary'].includes(e.status))
+      return enrollments.filter(e =>
+        ['pending_payment', 'preliminary', 'preliminary_approved'].includes(e.status)
+      )
     }
     return enrollments.filter(enrollment => enrollment.status === status)
   }
@@ -139,7 +186,6 @@ export default function MyCoursesPage() {
 
   const confirmCancellation = async () => {
     if (!selectedEnrollment) return
-
     try {
       setIsUpdating(true)
       await studentService.cancelEnrollment(selectedEnrollment)
@@ -155,40 +201,63 @@ export default function MyCoursesPage() {
     }
   }
 
-    const renderCourseCard = (enrollment: EnrollmentWithCourse) => {
-    const courseLink = `/student/courses/${enrollment.course.id}`
+  // ── Hall Modal Functions ────────────────────────────────────────────────────
+  const openHallModal = async (hallId: string) => {
+    try {
+      setIsLoadingHall(true)
+      setHallImageError(false)
+      setHallData(null)
+      const data = await studentService.getHallById(hallId)
+      setHallData(data)
+      setIsHallModalOpen(true)
+    } catch (err: any) {
+      toast.error(err.message || "فشل تحميل بيانات القاعة")
+    } finally {
+      setIsLoadingHall(false)
+    }
+  }
 
+
+
+  const renderCourseCard = (enrollment: EnrollmentWithCourse) => {
+    const courseLink = `/student/courses/${enrollment.course.id}`
     const isActive = enrollment.status === 'active'
     const hasUpcomingSession = isActive && enrollment.nextSession
     const nextDate = hasUpcomingSession ? new Date(enrollment.nextSession!.startTime) : null
 
-    // Status Message Config
-    const statusInfo: Record<string, { icon: any, message: string, color: string, textColor: string, iconColor: string }> = {
-      preliminary: { 
-        icon: Info, 
-        message: "طلب التسجيل قيد المراجعة الجارية من قبل الإدارة وسيتم إشعارك عند القبول", 
-        color: "bg-amber-50/50", 
+    const statusInfo: Record<string, { icon: any; message: string; color: string; textColor: string; iconColor: string }> = {
+      preliminary: {
+        icon: Info,
+        message: "طلب التسجيل قيد المراجعة الجارية من قبل الإدارة وسيتم إشعارك عند القبول",
+        color: "bg-amber-50/50",
         textColor: "text-amber-800",
         iconColor: "text-amber-600"
       },
-      pending_payment: { 
-        icon: CreditCard, 
-        message: "تم طلب التسجيل بنجاح! يرجى إتمام عملية الدفع لتفعيل الدورة والمباشرة", 
-        color: "bg-indigo-50/50", 
+      preliminary_approved: {
+        icon: CheckCircle2,
+        message: "تم قبول طلبك المبدئي بنجاح! الدورة في انتظار اكتمال الحد الأدنى من الطلاب. ستتلقى إشعاراً عند بدء مرحلة الدفع.",
+        color: "bg-blue-50/60",
+        textColor: "text-blue-800",
+        iconColor: "text-blue-600"
+      },
+      pending_payment: {
+        icon: CreditCard,
+        message: "تمت الموافقة على طلبك! يرجى رفع سند التحويل لإتمام التسجيل والدخول للدورة.",
+        color: "bg-indigo-50/50",
         textColor: "text-indigo-800",
         iconColor: "text-indigo-600"
       },
-      completed: { 
-        icon: CheckCircle2, 
-        message: "لقد أكملت هذه الدورة بنجاح وتحصيل نتائجك التعليمية", 
-        color: "bg-green-50/50", 
+      completed: {
+        icon: CheckCircle2,
+        message: "لقد أكملت هذه الدورة بنجاح وتحصيل نتائجك التعليمية",
+        color: "bg-green-50/50",
         textColor: "text-green-800",
         iconColor: "text-green-600"
       },
-      cancelled: { 
-        icon: AlertCircle, 
-        message: "تم إلغاء هذا الالتحاق، يمكنك التواصل مع الدعم للمزيد من المعلومات", 
-        color: "bg-red-50/50", 
+      cancelled: {
+        icon: AlertCircle,
+        message: "تم إلغاء هذا الالتحاق، يمكنك التواصل مع الدعم للمزيد من المعلومات",
+        color: "bg-red-50/50",
         textColor: "text-red-800",
         iconColor: "text-red-600"
       }
@@ -222,13 +291,15 @@ export default function MyCoursesPage() {
                 <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
                   {enrollment.course.shortDescription || enrollment.course.description}
                 </p>
+
+                {/* المدربون */}
                 <div className="flex flex-wrap items-center justify-start gap-2 pt-1" dir="rtl">
                   <div className="flex items-center gap-1.5 text-muted-foreground ml-1">
                     <Users className="h-3.5 w-3.5" />
                     <span className="text-[11px] font-bold uppercase tracking-wider">المدربين:</span>
                   </div>
                   {(enrollment.course.trainers || [enrollment.course.trainer]).map((t, idx) => (
-                    <div 
+                    <div
                       key={t.id + idx}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100/50 text-blue-700 text-xs font-bold shadow-sm"
                     >
@@ -245,8 +316,24 @@ export default function MyCoursesPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* اسم القاعة — قابل للنقر */}
+                {enrollment.course.roomName && enrollment.course.roomId && (
+                  <div className="flex items-center gap-1.5 pt-0.5" dir="rtl">
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => openHallModal(enrollment.course.roomId!)}
+                      disabled={isLoadingHall}
+                      className="text-xs text-primary hover:underline transition-colors font-medium focus:outline-none"
+                    >
+                      {isLoadingHall ? "جاري التحميل..." : enrollment.course.roomName}
+                    </button>
+                  </div>
+                )}
               </div>
 
+              {/* معلومات الجلسة القادمة أو رسالة الحالة */}
               {isActive ? (
                 <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm space-y-1">
                   <div className="flex items-center justify-end gap-2 text-primary">
@@ -274,12 +361,16 @@ export default function MyCoursesPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-col sm:flex-row-reverse gap-2 pt-1">
+              {/* أزرار الإجراءات */}
+              <div className="flex flex-col sm:flex-row-reverse gap-2 pt-1 flex-wrap">
                 <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
                   <Link href={courseLink}>تفاصيل الدورة</Link>
                 </Button>
 
-                {['active', 'preliminary', 'pending_payment'].includes(enrollment.status) && (
+
+
+                {/* زر الإلغاء */}
+                {['active', 'preliminary', 'preliminary_approved', 'pending_payment'].includes(enrollment.status) && (
                   <Dialog open={showCancelDialog && selectedEnrollment === enrollment.id} onOpenChange={(open) => {
                     setShowCancelDialog(open)
                     if (!open) setSelectedEnrollment(null)
@@ -392,26 +483,10 @@ export default function MyCoursesPage() {
       {/* Courses Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="grid w-full grid-cols-4 gap-2 rounded-full bg-muted/50 p-1 mb-8">
-          <StatusPill
-            status="active"
-            isActive={activeTab === "active"}
-            onClick={() => setActiveTab("active")}
-          />
-          <StatusPill
-            status="pending"
-            isActive={activeTab === "pending"}
-            onClick={() => setActiveTab("pending")}
-          />
-          <StatusPill
-            status="completed"
-            isActive={activeTab === "completed"}
-            onClick={() => setActiveTab("completed")}
-          />
-          <StatusPill
-            status="cancelled"
-            isActive={activeTab === "cancelled"}
-            onClick={() => setActiveTab("cancelled")}
-          />
+          <StatusPill status="active" isActive={activeTab === "active"} onClick={() => setActiveTab("active")} />
+          <StatusPill status="pending" isActive={activeTab === "pending"} onClick={() => setActiveTab("pending")} />
+          <StatusPill status="completed" isActive={activeTab === "completed"} onClick={() => setActiveTab("completed")} />
+          <StatusPill status="cancelled" isActive={activeTab === "cancelled"} onClick={() => setActiveTab("cancelled")} />
         </div>
 
         <TabsContent value="active" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -464,6 +539,113 @@ export default function MyCoursesPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ═══════════ Hall Modal ═══════════ */}
+      <Dialog open={isHallModalOpen} onOpenChange={setIsHallModalOpen}>
+        <DialogContent className="max-w-md overflow-hidden p-0 rounded-2xl border-none shadow-2xl [&>button[data-dialog-close='default']]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>معلومات القاعة التدريبية</DialogTitle>
+          </DialogHeader>
+
+          {isLoadingHall && (
+            <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>جاري تحميل بيانات القاعة...</span>
+            </div>
+          )}
+
+          {hallData && !isLoadingHall && (
+            <div className="flex flex-col text-right" dir="rtl">
+              {/* Hall Header/Image */}
+              <div className="relative h-48 w-full bg-slate-100">
+                {hallData.image && !hallImageError ? (
+                  <Image
+                    src={resolveImage(hallData.image)}
+                    alt={hallData.name}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                    onError={() => setHallImageError(true)}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300">
+                    <ImageIcon className="h-12 w-12" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 right-4 text-white">
+                  <h3 className="text-xl font-bold mb-0">{hallData.name}</h3>
+                </div>
+                <DialogClose className="absolute left-4 top-4 rounded-full bg-black/20 p-2 text-white hover:bg-black/40 transition-colors">
+                  <X className="h-4 w-4" />
+                </DialogClose>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="text-[10px] text-slate-500 mb-1">نوع القاعة</p>
+                    <p className="text-sm font-bold text-slate-900">{hallData.type || "—"}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="text-[10px] text-slate-500 mb-1">السعة الاستيعابية</p>
+                    <p className="text-sm font-bold text-slate-900">{hallData.capacity} مقعد</p>
+                  </div>
+                </div>
+
+                {/* Location Info */}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 mb-0.5">الموقع</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {hallData.location || "الموقع غير محدد بدقة"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {hallData.instituteName && (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <p className="text-[10px] text-slate-500 mb-0.5">الجهة المالكة</p>
+                        <p className="text-sm font-bold text-slate-900">{hallData.instituteName}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {hallData.description && (
+                    <p className="text-xs text-slate-500 leading-relaxed">{hallData.description}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="pt-2 flex gap-3 text-right" dir="rtl">
+                  {hallData.locationUrl && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-slate-200 h-11"
+                      asChild
+                    >
+                      <a href={hallData.locationUrl} target="_blank" rel="noopener noreferrer">
+                        خرائط جوجل
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+    
     </div>
   )
 }
@@ -488,5 +670,3 @@ function EmptyState({ icon: Icon, title, description, actionLabel, actionLink }:
     </Card>
   )
 }
-
-

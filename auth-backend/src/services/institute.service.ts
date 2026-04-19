@@ -881,7 +881,12 @@ class InstituteService {
                 name: true,
                 email: true,
                 phone: true,
+                bio: true,
+                avatar: true,
                 specialties: true,
+                status: true,
+                joinedAt: true,
+                notes: true,
             },
             orderBy: { name: "asc" },
         });
@@ -897,6 +902,7 @@ class InstituteService {
             email?: string;
             phone?: string;
             bio?: string;
+            avatar?: string;
             specialties?: string[];
             notes?: string;
         },
@@ -912,6 +918,7 @@ class InstituteService {
                 email: data.email,
                 phone: data.phone,
                 bio: data.bio,
+                avatar: data.avatar,
                 specialties: data.specialties ?? [],
                 notes: data.notes,
             },
@@ -966,6 +973,7 @@ class InstituteService {
             email?: string | null;
             phone?: string | null;
             bio?: string | null;
+            avatar?: string | null;
             notes?: string | null;
         },
     ) {
@@ -981,10 +989,11 @@ class InstituteService {
             where: { id: staffId },
             data: {
                 ...(data.name !== undefined && { name: data.name }),
-                email: data.email,
-                phone: data.phone,
-                bio: data.bio,
-                notes: data.notes,
+                email: data.email !== undefined ? data.email : undefined,
+                phone: data.phone !== undefined ? data.phone : undefined,
+                bio: data.bio !== undefined ? data.bio : undefined,
+                ...(data.avatar !== undefined && { avatar: data.avatar }),
+                notes: data.notes !== undefined ? data.notes : undefined,
             },
         });
     }

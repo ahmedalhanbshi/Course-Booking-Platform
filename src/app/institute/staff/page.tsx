@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Plus, Mail, UserCheck, Users, Loader2, Phone, ToggleLeft, Trash2, MoreVertical, Pencil } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getFileUrl } from "@/lib/utils"
 import { instituteService } from "@/lib/institute-service"
 
 interface StaffMember {
@@ -20,6 +21,7 @@ interface StaffMember {
   email: string | null
   phone: string | null
   bio: string | null
+  avatar: string | null
   specialties: string[]
   status: "ACTIVE" | "INACTIVE"
   joinedAt: string
@@ -32,9 +34,11 @@ interface StaffForm {
   phone: string
   bio: string
   notes: string
+  avatarFile: File | null
+  avatarPreview: string | null
 }
 
-const emptyForm: StaffForm = { name: "", email: "", phone: "", bio: "", notes: "" }
+const emptyForm: StaffForm = { name: "", email: "", phone: "", bio: "", notes: "", avatarFile: null, avatarPreview: null }
 
 export default function InstituteStaff() {
   const [staff, setStaff] = useState<StaffMember[]>([])
@@ -74,13 +78,15 @@ export default function InstituteStaff() {
     setAddLoading(true)
     setAddError(null)
     try {
-      await instituteService.addStaff({
-        name: addForm.name,
-        email: addForm.email || undefined,
-        phone: addForm.phone || undefined,
-        bio: addForm.bio || undefined,
-        notes: addForm.notes || undefined,
-      })
+      const formData = new FormData()
+      formData.append("name", addForm.name)
+      if (addForm.email) formData.append("email", addForm.email)
+      if (addForm.phone) formData.append("phone", addForm.phone)
+      if (addForm.bio) formData.append("bio", addForm.bio)
+      if (addForm.notes) formData.append("notes", addForm.notes)
+      if (addForm.avatarFile) formData.append("avatar", addForm.avatarFile)
+
+      await instituteService.addStaff(formData)
       setIsAddOpen(false)
       setAddForm(emptyForm)
       loadStaff()
@@ -100,6 +106,8 @@ export default function InstituteStaff() {
       phone: member.phone ?? "",
       bio: member.bio ?? "",
       notes: member.notes ?? "",
+      avatarFile: null,
+      avatarPreview: member.avatar ? getFileUrl(member.avatar) || null : null,
     })
     setEditError(null)
   }
@@ -109,13 +117,15 @@ export default function InstituteStaff() {
     setEditLoading(true)
     setEditError(null)
     try {
-      const updated: StaffMember = await instituteService.updateStaff(editTarget.id, {
-        name: editForm.name,
-        email: editForm.email || null,
-        phone: editForm.phone || null,
-        bio: editForm.bio || null,
-        notes: editForm.notes || null,
-      })
+      const formData = new FormData()
+      formData.append("name", editForm.name)
+      if (editForm.email) formData.append("email", editForm.email)
+      if (editForm.phone) formData.append("phone", editForm.phone)
+      if (editForm.bio) formData.append("bio", editForm.bio)
+      if (editForm.notes) formData.append("notes", editForm.notes)
+      if (editForm.avatarFile) formData.append("avatar", editForm.avatarFile)
+
+      const updated: StaffMember = await instituteService.updateStaff(editTarget.id, formData)
       setStaff(prev => prev.map(s => s.id === editTarget.id ? { ...s, ...updated } : s))
       setEditTarget(null)
     } catch (e: any) {
@@ -250,6 +260,7 @@ export default function InstituteStaff() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
+                          <AvatarImage src={member.avatar ? getFileUrl(member.avatar) : undefined} />
                           <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <p className="font-medium">{member.name}</p>
@@ -332,6 +343,32 @@ export default function InstituteStaff() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
+              <Label>صورة المدرب</Label>
+              <div className="flex items-center gap-4 mt-1">
+                <Avatar className="h-14 w-14 border shadow-sm">
+                  <AvatarImage src={addForm.avatarPreview || undefined} />
+                  <AvatarFallback className="bg-primary/5">صورة</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <Input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setAddForm(f => ({
+                          ...f,
+                          avatarFile: file,
+                          avatarPreview: URL.createObjectURL(file)
+                        }))
+                      }
+                    }} 
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">اختياري: صورة شخصية للمدرب</p>
+                </div>
+              </div>
+            </div>
+            <div>
               <Label htmlFor="add-name">الاسم الكامل *</Label>
               <Input id="add-name" placeholder="اسم المدرب" value={addForm.name}
                 onChange={(e) => setAddForm(f => ({ ...f, name: e.target.value }))} />
@@ -377,6 +414,32 @@ export default function InstituteStaff() {
             <DialogDescription>عدّل بيانات {editTarget?.name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            <div>
+              <Label>صورة المدرب</Label>
+              <div className="flex items-center gap-4 mt-1">
+                <Avatar className="h-14 w-14 border shadow-sm">
+                  <AvatarImage src={editForm.avatarPreview || undefined} />
+                  <AvatarFallback className="bg-primary/5">صورة</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <Input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setEditForm(f => ({
+                          ...f,
+                          avatarFile: file,
+                          avatarPreview: URL.createObjectURL(file)
+                        }))
+                      }
+                    }} 
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">اختياري: قم باختيار صورة جديدة لتغيير صورتك الحالية</p>
+                </div>
+              </div>
+            </div>
             <div>
               <Label htmlFor="edit-name">الاسم الكامل *</Label>
               <Input id="edit-name" placeholder="اسم المدرب" value={editForm.name}

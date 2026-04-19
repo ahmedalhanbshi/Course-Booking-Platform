@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Cairo } from "next/font/google"
@@ -70,7 +70,9 @@ import {
   PieChart,
   Home,
   Briefcase,
-  CreditCard
+  CreditCard,
+  UploadCloud,
+  Loader2
 } from "lucide-react"
 import {
   Dialog,
@@ -79,6 +81,8 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { trainerService } from "@/lib/trainer-service"
 
 const cairo = Cairo({
   subsets: ["arabic"],
@@ -101,7 +105,18 @@ export default function StudentCourseDashboard() {
   const [hallData, setHallData] = useState<any>(null)
   const [isLoadingHall, setIsLoadingHall] = useState(false)
   const [hallImageError, setHallImageError] = useState(false)
-  
+
+  // Payment Dialog
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+  const [courseForPayment, setCourseForPayment] = useState<any>(null)
+  const [isLoadingPaymentData, setIsLoadingPaymentData] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
+  const [paymentError, setPaymentError] = useState("")
+  const [expandedBankId, setExpandedBankId] = useState<string | null>(null)
+  const paymentFileRef = useRef<HTMLInputElement | null>(null)
+
   const formatWhatsAppLink = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, "")
     return `https://wa.me/${cleanPhone}`
@@ -120,6 +135,78 @@ export default function StudentCourseDashboard() {
       setIsLoadingHall(false)
     }
   }
+
+  const openPaymentDialog = async () => {
+    setReceiptFile(null)
+    setPaymentError("")
+    setExpandedBankId(null)
+    setCourseForPayment(null)
+    setIsPaymentDialogOpen(true)
+    try {
+      setIsLoadingPaymentData(true)
+      const data = await trainerService.getPublicCourseById(courseId)
+      setCourseForPayment(data)
+      const activeAccounts = data?.instructor?.bankAccounts?.filter((b: any) => b.isActive) || []
+      if (activeAccounts.length > 0) setExpandedBankId(activeAccounts[0].id)
+    } catch {
+      // proceed without bank accounts
+    } finally {
+      setIsLoadingPaymentData(false)
+    }
+  }
+
+  const formatFileSize = (size?: number) => {
+    if (!size || Number.isNaN(size)) return ""
+    if (size < 1024) return `${size} B`
+    const kb = size / 1024
+    if (kb < 1024) return `${kb.toFixed(1)} KB`
+    return `${(kb / 1024).toFixed(1)} MB`
+  }
+
+  const handleCopyValue = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`تم نسخ ${label}`)
+    } catch {
+      toast.error(`تعذر نسخ ${label}`)
+    }
+  }
+
+  const handlePaymentConfirmation = async () => {
+    if (!receiptFile) { setPaymentError("يرجى رفع سند الدفع أولاً."); return }
+    setPaymentError("")
+    setIsSubmittingPayment(true)
+    try {
+      await studentService.submitPaymentProof(courseId, receiptFile)
+      toast.success("تم رفع سند الدفع وسيتم مراجعته قريباً.")
+      setIsPaymentDialogOpen(false)
+      // Refresh course data
+      const data = await studentService.getCourseDetails(courseId)
+      setCourseData(data)
+    } catch (error: any) {
+      toast.error(error.message || "فشل رفع السند. حاول مرة أخرى.")
+    } finally {
+      setIsSubmittingPayment(false)
+    }
+  }
+
+  const formatYER = (value: number) =>
+    `${new Intl.NumberFormat("en-US").format(value)} ر.ي`
+
+  const bankAccounts = (() => {
+    if (courseForPayment?.instructor?.bankAccounts?.length > 0) {
+      return courseForPayment.instructor.bankAccounts
+        .filter((b: any) => b.isActive)
+        .map((b: any) => ({
+          id: b.id,
+          bankName: b.bankName,
+          iban: b.iban,
+          accountNumber: b.accountNumber,
+          beneficiary: b.accountName || courseForPayment.instructor.name,
+        }))
+    }
+    return []
+  })()
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -183,6 +270,8 @@ export default function StudentCourseDashboard() {
   const isPendingPayment = courseData.enrollmentStatus === 'PENDING_PAYMENT' || courseData.enrollmentStatus === 'pending_payment'
   const isPending = isPreliminary || isPendingPayment
   const isActive = courseData.enrollmentStatus === 'ACTIVE' || courseData.enrollmentStatus === 'active'
+  // True when student already submitted a receipt and it's awaiting admin review
+  const hasPaymentUnderReview = Boolean(courseData.hasPaymentUnderReview)
 
   // Minimum enrollment threshold states
   const isPendingMinimum = courseData.courseStatus === 'PENDING_MINIMUM' || courseData.courseStatus === 'pending_minimum'
@@ -201,7 +290,7 @@ export default function StudentCourseDashboard() {
   const courseDescription = safeText(courseData.description, "لا يوجد وصف للدورة حالياً.")
   const courseShortDescription = safeText(courseData.shortDescription, courseDescription)
   const courseDeliveryType = safeText(courseData.deliveryType, "أونلاين")
-  const coursePlatform = courseDeliveryType === "حضوري" 
+  const coursePlatform = courseDeliveryType === "حضوري"
     ? safeText(courseData.locationName, "القاعة التدريبية")
     : safeText(courseData.onlinePlatform, "Zoom")
   const courseImage = getFileUrl(courseData.image) || "/images/course-abstract.svg"
@@ -405,12 +494,30 @@ export default function StudentCourseDashboard() {
             ) : isPendingPayment ? (
               <Card className="rounded-2xl border border-indigo-100 bg-indigo-50 shadow-sm">
                 <CardContent className="p-8 flex items-center gap-6">
-                  <div className="p-4 bg-white rounded-full shadow-sm text-indigo-500 border border-indigo-100">
+                  <div className="p-4 bg-white rounded-full shadow-sm text-indigo-500 border border-indigo-100 shrink-0">
                     <CreditCard className="w-10 h-10" />
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-1">
                     <h3 className="font-bold text-xl text-indigo-900 mb-2">بانتظار إتمام عملية الدفع</h3>
-                    <p className="text-indigo-700">تم قبول طلبك المبدئي! يرجى سداد رسوم الدورة لتتمكن من الوصول للجدول والإعلانات.</p>
+                    {hasPaymentUnderReview ? (
+                      // Receipt already submitted — waiting for review
+                      <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 w-fit">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span className="font-medium">تم رفع سند الدفع بنجاح — بانتظار مراجعته من الإدارة</span>
+                      </div>
+                    ) : (
+                      // No receipt yet (or was rejected and cleared) — show upload button
+                      <>
+                        <p className="text-indigo-700 mb-4">تم قبول طلبك المبدئي! يرجى سداد رسوم الدورة لتتمكن من الوصول للجدول والإعلانات.</p>
+                        <Button
+                          onClick={openPaymentDialog}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-full px-6"
+                        >
+                          <UploadCloud className="h-4 w-4" />
+                          رفع سند الدفع
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -551,234 +658,402 @@ export default function StudentCourseDashboard() {
                 <div className={shouldLockContent ? "opacity-40 pointer-events-none blur-sm h-[200px]" : "space-y-4"}>
                   {courseData.announcements?.length > 0 ? (
                     courseData.announcements.map((announcement: any) => (
-                    <Card key={announcement.id} className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                      <CardHeader className="bg-slate-50/50 py-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-bold flex items-center gap-2 text-slate-900">
-                            <AlertCircle className="w-4 h-4 text-primary" />
-                            {announcement.title}
-                          </h3>
-                          <span className="text-xs text-slate-500 font-medium" dir="rtl">
-                            {formatDate(announcement.createdAt)}
-                          </span>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="py-4">
-                        <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
-                          {announcement.content}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  <div className="py-12 text-center text-slate-500">لا توجد إعلانات حالياً</div>
-                )}
+                      <Card key={announcement.id} className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-slate-50/50 py-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-bold flex items-center gap-2 text-slate-900">
+                              <AlertCircle className="w-4 h-4 text-primary" />
+                              {announcement.title}
+                            </h3>
+                            <span className="text-xs text-slate-500 font-medium" dir="rtl">
+                              {formatDate(announcement.createdAt)}
+                            </span>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="py-4">
+                          <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                            {announcement.content}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center text-slate-500">لا توجد إعلانات حالياً</div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
           </div>
 
-            {/* Trainer & Institute Info - Redesigned Sidebar */}
-            <div className="space-y-6">
-              {/* Instructor Card */}
-              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-blue-600" />
-                    مدرب الدور
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-5 space-y-6">
-                  {/* Master Instructor or Multiple Staff */}
-                  {courseData.staffTrainers?.length > 0 ? (
-                    <div className="space-y-6">
-                      {courseData.staffTrainers.map((t: any) => (
-                        <div key={t.id} className="space-y-3 group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shrink-0 group-hover:bg-blue-100 transition-colors">
-                              {t.name?.charAt(0) || "م"}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 truncate">{t.name}</p>
-                              {t.specialties?.length > 0 && (
-                                <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md inline-block">
-                                  {t.specialties[0]}
-                                </p>
-                              )}
-                            </div>
+          {/* Trainer & Institute Info - Redesigned Sidebar */}
+          <div className="space-y-6">
+            {/* Instructor Card */}
+            <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-blue-600" />
+                  مدرب الدور
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-5 space-y-6">
+                {/* Master Instructor or Multiple Staff */}
+                {courseData.staffTrainers?.length > 0 ? (
+                  <div className="space-y-6">
+                    {courseData.staffTrainers.map((t: any) => (
+                      <div key={t.id} className="space-y-3 group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shrink-0 group-hover:bg-blue-100 transition-colors">
+                            {t.name?.charAt(0) || "م"}
                           </div>
-                          
-                          {t.bio && (
-                            <p className="text-xs text-slate-600 leading-relaxed border-r-2 border-blue-200 pr-2 mr-1 line-clamp-3">
-                              {t.bio}
-                            </p>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 truncate">{t.name}</p>
+                            {t.specialties?.length > 0 && (
+                              <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md inline-block">
+                                {t.specialties[0]}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {t.bio && (
+                          <p className="text-xs text-slate-600 leading-relaxed border-r-2 border-blue-200 pr-2 mr-1 line-clamp-3">
+                            {t.bio}
+                          </p>
+                        )}
+
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          {t.phone && (
+                            <a
+                              href={formatWhatsAppLink(t.phone)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors group/link"
+                            >
+                              <div className="rounded-full bg-emerald-50 p-1 group-hover/link:bg-emerald-100">
+                                <Phone className="h-3 w-3" />
+                              </div>
+                              <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{t.phone}</span>
+                            </a>
                           )}
-
-                          <div className="flex flex-col gap-1.5 pt-1">
-                            {t.phone && (
-                              <a
-                                href={formatWhatsAppLink(t.phone)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors group/link"
-                              >
-                                <div className="rounded-full bg-emerald-50 p-1 group-hover/link:bg-emerald-100">
-                                  <Phone className="h-3 w-3" />
-                                </div>
-                                <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{t.phone}</span>
-                              </a>
-                            )}
-                            {t.email && (
-                              <a
-                                href={`mailto:${t.email}`}
-                                className="flex items-center gap-2 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors group/link"
-                              >
-                                <div className="rounded-full bg-blue-50 p-1 group-hover/link:bg-blue-100">
-                                  <Mail className="h-3 w-3" />
-                                </div>
-                                <span className="truncate hover:underline decoration-blue-200 underline-offset-4">{t.email}</span>
-                              </a>
-                            )}
-                          </div>
-                          {courseData.staffTrainers.length > 1 && <Separator className="mt-4 opacity-50" />}
+                          {t.email && (
+                            <a
+                              href={`mailto:${t.email}`}
+                              className="flex items-center gap-2 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors group/link"
+                            >
+                              <div className="rounded-full bg-blue-50 p-1 group-hover/link:bg-blue-100">
+                                <Mail className="h-3 w-3" />
+                              </div>
+                              <span className="truncate hover:underline decoration-blue-200 underline-offset-4">{t.email}</span>
+                            </a>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    /* Single Instructor View */
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 relative rounded-2xl overflow-hidden border-2 border-white shadow-sm ring-1 ring-slate-100">
-                          <Image
-                            src={instructorAvatar}
-                            alt={instructorName}
-                            fill
-                            className="object-cover"
-                            unoptimized={true}
-                          />
-                        </div>
-                        <div>
-                          <p className="font-bold text-lg text-slate-900">{instructorName}</p>
-                          <p className="text-xs text-blue-600 font-bold">{instructorRole}</p>
-                        </div>
+                        {courseData.staffTrainers.length > 1 && <Separator className="mt-4 opacity-50" />}
                       </div>
-
-                      {instructor.bio && (
-                        <p className="text-xs text-slate-600 leading-relaxed bg-slate-100/30 p-3 rounded-xl border border-slate-200">
-                          {instructor.bio}
-                        </p>
-                      )}
-
-                      {instructor.specialties?.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {instructor.specialties.map((s: string) => (
-                            <span key={s} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold border border-blue-100">
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <Separator className="my-2 opacity-50" />
-
-                      <div className="space-y-2.5">
-                        {instructor.phone && (
-                          <a
-                            href={formatWhatsAppLink(instructor.phone)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
-                          >
-                            <div className="rounded-full bg-emerald-50 p-2 group-hover/link:bg-emerald-100">
-                              <Phone className="h-4 w-4" />
-                            </div>
-                            <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{instructor.phone}</span>
-                          </a>
-                        )}
-                        {instructor.email && (
-                          <a
-                            href={`mailto:${instructor.email}`}
-                            className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
-                          >
-                            <div className="rounded-full bg-blue-50 p-2 group-hover/link:bg-blue-100">
-                              <Mail className="h-4 w-4" />
-                            </div>
-                            <span className="hover:underline decoration-blue-200 underline-offset-4">{instructor.email}</span>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Institute Card */}
-              {courseData.institute && (
-                <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-bl-full -mr-12 -mt-12 transition-all group-hover:bg-blue-100/50" />
-                  <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 relative">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900">
-                      <ShieldCheck className="w-4 h-4 text-blue-600" />
-                      المعهد المستضيف
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-5 space-y-4 relative">
+                    ))}
+                  </div>
+                ) : (
+                  /* Single Instructor View */
+                  <div className="space-y-4">
                     <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-sm p-1">
+                      <div className="w-16 h-16 relative rounded-2xl overflow-hidden border-2 border-white shadow-sm ring-1 ring-slate-100">
                         <Image
-                          src={getFileUrl(courseData.institute.logo) || "/images/institute-logo.png"}
-                          alt={courseData.institute.name}
+                          src={instructorAvatar}
+                          alt={instructorName}
                           fill
-                          className="object-contain"
+                          className="object-cover"
                           unoptimized={true}
                         />
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-slate-900 truncate">{courseData.institute.name}</h4>
-                        <p className="text-[10px] text-slate-500 font-medium">مؤسسة تعليمية معتمدة</p>
+                      <div>
+                        <p className="font-bold text-lg text-slate-900">{instructorName}</p>
+                        <p className="text-xs text-blue-600 font-bold">{instructorRole}</p>
                       </div>
                     </div>
 
-                    {courseData.institute.description && (
-                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        {courseData.institute.description}
+                    {instructor.bio && (
+                      <p className="text-xs text-slate-600 leading-relaxed bg-slate-100/30 p-3 rounded-xl border border-slate-200">
+                        {instructor.bio}
                       </p>
                     )}
 
-                    <Separator className="my-2 opacity-30" />
+                    {instructor.specialties?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {instructor.specialties.map((s: string) => (
+                          <span key={s} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold border border-blue-100">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <Separator className="my-2 opacity-50" />
 
                     <div className="space-y-2.5">
-                      {courseData.institute.phone && (
+                      {instructor.phone && (
                         <a
-                          href={formatWhatsAppLink(courseData.institute.phone)}
+                          href={formatWhatsAppLink(instructor.phone)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
+                          className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
                         >
-                          <div className="rounded-full bg-emerald-50 p-1.5 group-hover/link:bg-emerald-100">
-                            <Phone className="h-3.5 w-3.5" />
+                          <div className="rounded-full bg-emerald-50 p-2 group-hover/link:bg-emerald-100">
+                            <Phone className="h-4 w-4" />
                           </div>
-                          <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{courseData.institute.phone}</span>
+                          <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{instructor.phone}</span>
                         </a>
                       )}
-                      {courseData.institute.email && (
+                      {instructor.email && (
                         <a
-                          href={`mailto:${courseData.institute.email}`}
-                          className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
+                          href={`mailto:${instructor.email}`}
+                          className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
                         >
-                          <div className="rounded-full bg-blue-50 p-1.5 group-hover/link:bg-blue-100">
-                            <Mail className="h-3.5 w-3.5" />
+                          <div className="rounded-full bg-blue-50 p-2 group-hover/link:bg-blue-100">
+                            <Mail className="h-4 w-4" />
                           </div>
-                          <span className="hover:underline decoration-blue-200 underline-offset-4">{courseData.institute.email}</span>
+                          <span className="hover:underline decoration-blue-200 underline-offset-4">{instructor.email}</span>
                         </a>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Institute Card */}
+            {courseData.institute && (
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-bl-full -mr-12 -mt-12 transition-all group-hover:bg-blue-100/50" />
+                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 relative">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    المعهد المستضيف
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-5 space-y-4 relative">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 relative rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shadow-sm p-1">
+                      <Image
+                        src={getFileUrl(courseData.institute.logo) || "/images/institute-logo.png"}
+                        alt={courseData.institute.name}
+                        fill
+                        className="object-contain"
+                        unoptimized={true}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-slate-900 truncate">{courseData.institute.name}</h4>
+                      <p className="text-[10px] text-slate-500 font-medium">مؤسسة تعليمية معتمدة</p>
+                    </div>
+                  </div>
+
+                  {courseData.institute.description && (
+                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      {courseData.institute.description}
+                    </p>
+                  )}
+
+                  <Separator className="my-2 opacity-30" />
+
+                  <div className="space-y-2.5">
+                    {courseData.institute.phone && (
+                      <a
+                        href={formatWhatsAppLink(courseData.institute.phone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-all group/link"
+                      >
+                        <div className="rounded-full bg-emerald-50 p-1.5 group-hover/link:bg-emerald-100">
+                          <Phone className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="dir-ltr hover:underline decoration-emerald-200 underline-offset-4">{courseData.institute.phone}</span>
+                      </a>
+                    )}
+                    {courseData.institute.email && (
+                      <a
+                        href={`mailto:${courseData.institute.email}`}
+                        className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-all group/link"
+                      >
+                        <div className="rounded-full bg-blue-50 p-1.5 group-hover/link:bg-blue-100">
+                          <Mail className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="hover:underline decoration-blue-200 underline-offset-4">{courseData.institute.email}</span>
+                      </a>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
+      {/* Payment Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => {
+        setIsPaymentDialogOpen(open)
+        if (!open) { setReceiptFile(null); setPaymentError("") }
+      }}>
+        <DialogContent dir="rtl" className="max-w-2xl max-h-[90vh] overflow-y-auto [&>button[data-dialog-close='default']]:hidden">
+          <DialogHeader className="space-y-1 text-right">
+            <div className="flex items-center justify-between">
+              <DialogClose className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition">
+                <X className="h-4 w-4" />
+              </DialogClose>
+              <DialogTitle className="text-xl font-bold">رفع سند الدفع</DialogTitle>
+            </div>
+          </DialogHeader>
+
+          {/* Amount */}
+          {courseData?.price > 0 && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-right">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-blue-600 font-medium">المبلغ المطلوب سداده</span>
+                  <span className="text-2xl font-bold text-blue-900">{formatYER(courseData.price)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 block mb-1">بيانات الدورة</span>
+                  <span className="text-sm font-semibold text-slate-900 truncate max-w-[200px] block">{courseTitle}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-5">
+            {/* Bank Accounts */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs text-slate-500">اختر بنكًا لعرض التفاصيل</span>
+                <h4 className="text-base font-semibold text-slate-900">الحسابات البنكية</h4>
+              </div>
+              {isLoadingPaymentData ? (
+                <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">جاري تحميل بيانات الحسابات...</span>
+                </div>
+              ) : bankAccounts.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">لا توجد حسابات بنكية، تواصل مع الجهة المنظِّمة مباشرةً.</p>
+              ) : (
+                <div className="space-y-3">
+                  {bankAccounts.map((bank: any) => {
+                    const isOpen = expandedBankId === bank.id
+                    return (
+                      <div key={bank.id} className="rounded-xl border border-slate-200 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedBankId(prev => prev === bank.id ? null : bank.id)}
+                          className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-right transition-colors ${isOpen ? "bg-slate-50" : "hover:bg-slate-50/50"}`}
+                        >
+                          <span className="text-sm font-semibold text-slate-900">{bank.bankName}</span>
+                          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                        </button>
+                        {isOpen && (
+                          <div className="border-t border-slate-200 px-4 py-4 text-right text-sm space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex flex-col gap-1">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">اسم المستفيد</p>
+                              <p className="text-sm font-bold text-slate-900">{bank.beneficiary}</p>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              {bank.accountNumber && (
+                                <div className="space-y-1.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">رقم الحساب</p>
+                                  <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                    <span className="font-mono text-xs font-bold text-slate-700">{bank.accountNumber}</span>
+                                    <button type="button" onClick={() => handleCopyValue(bank.accountNumber, "رقم الحساب")} className="text-blue-600 hover:text-blue-700">
+                                      <Check className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              {bank.iban && (
+                                <div className="space-y-1.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">رقم IBAN</p>
+                                  <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                    <span className="font-mono text-xs font-bold text-slate-700">{bank.iban}</span>
+                                    <button type="button" onClick={() => handleCopyValue(bank.iban, "رقم الآيبان")} className="text-blue-600 hover:text-blue-700">
+                                      <Check className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Upload Receipt */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs text-slate-500 font-medium">صور أو ملفات PDF</span>
+                <h4 className="text-base font-semibold text-slate-900">رفع سند الدفع</h4>
+              </div>
+              <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true) }}
+                  onDragLeave={() => setIsDraggingFile(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsDraggingFile(false); const f = e.dataTransfer.files?.[0] ?? null; setReceiptFile(f); setPaymentError("") }}
+                  onClick={() => paymentFileRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-sm transition-all duration-200 ${isDraggingFile ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-slate-50/50 hover:bg-slate-50"}`}
+                >
+                  <div className="rounded-full bg-blue-100 p-3 text-blue-600"><UploadCloud className="h-6 w-6" /></div>
+                  <div className="text-center">
+                    <p className="font-bold text-slate-700">اسحب الملف هنا</p>
+                    <p className="text-xs text-slate-400 mt-1">أو انقر لاختيار ملف</p>
+                  </div>
+                  <Input ref={paymentFileRef} type="file" accept="image/*,.pdf" className="hidden"
+                    onChange={(e) => { setReceiptFile(e.target.files?.[0] ?? null); setPaymentError("") }} />
+                </div>
+                <div className="relative aspect-[4/5] md:aspect-auto overflow-hidden rounded-xl border border-slate-200 bg-slate-100 flex items-center justify-center">
+                  {receiptFile && receiptFile.type.startsWith('image/') ? (
+                    <img src={URL.createObjectURL(receiptFile)} alt="Preview" className="h-full w-full object-cover" />
+                  ) : receiptFile ? (
+                    <div className="flex flex-col items-center gap-2 p-4 text-center">
+                      <FileText className="h-8 w-8 text-slate-400" />
+                      <span className="text-[10px] font-medium text-slate-500 break-all">{receiptFile.name}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-slate-300">
+                      <ImageIcon className="h-8 w-8 opacity-20" />
+                      <span className="text-[10px] font-medium">لا يوجد معاينة</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {receiptFile && (
+                <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/30 p-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-white p-2 border border-blue-100"><FileText className="h-4 w-4 text-blue-500" /></div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900 truncate max-w-[200px]">{receiptFile.name}</p>
+                      <p className="text-[10px] text-slate-500">{receiptFile.type.split('/')[1]?.toUpperCase()} · {formatFileSize(receiptFile.size)}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setReceiptFile(null)} className="h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {!receiptFile && (
+                <div className="mt-4 flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                  <Loader2 className="h-4 w-4" />
+                  <p className="text-xs font-medium">بانتظار رفع سند الدفع...</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {paymentError && <p className="text-sm font-bold text-red-500 text-right">{paymentError}</p>}
+
+          <Button onClick={handlePaymentConfirmation} disabled={isSubmittingPayment || !receiptFile} className="w-full" size="lg">
+            {isSubmittingPayment ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" />جاري الإرسال...</> : "تأكيد الدفع"}
+          </Button>
+          {!receiptFile && <p className="text-xs text-red-500 text-right">ارفع السند أولاً لتفعيل زر التأكيد.</p>}
+        </DialogContent>
+      </Dialog>
+
       {/* Hall Information Modal */}
       <Dialog open={isHallModalOpen} onOpenChange={setIsHallModalOpen}>
         <DialogContent className="max-w-md overflow-hidden p-0 rounded-2xl border-none shadow-2xl">

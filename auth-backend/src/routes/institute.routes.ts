@@ -67,8 +67,8 @@ router.patch('/enrollments/:enrollmentId/status', instituteController.updateEnro
 
 // Staff (institute-scoped, uses InstituteStaff model)
 router.get('/staff', instituteController.getStaff);
-router.post('/staff', instituteController.addStaff);
-router.patch('/staff/:staffId', instituteController.updateStaff);
+router.post('/staff', upload.single('avatar'), instituteController.addStaff);
+router.patch('/staff/:staffId', upload.single('avatar'), instituteController.updateStaff);
 router.delete('/staff/:staffId', instituteController.removeStaff);
 router.patch('/staff/:staffId/status', instituteController.updateStaffStatus);
 
