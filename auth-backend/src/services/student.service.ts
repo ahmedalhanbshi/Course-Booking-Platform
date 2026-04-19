@@ -197,13 +197,13 @@ class StudentService {
             enrollments.flatMap(e => (e.course.staffTrainerIds as string[]) || [])
         ));
 
-        const staffNamesMap = new Map();
+        const staffDetailsMap = new Map<string, {name: string, avatar: string | null}>();
         if (allStaffIds.length > 0) {
             const staff = await prisma.instituteStaff.findMany({
                 where: { id: { in: allStaffIds } },
-                select: { id: true, name: true }
+                select: { id: true, name: true, avatar: true }
             });
-            staff.forEach(s => staffNamesMap.set(s.id, s.name));
+            staff.forEach(s => staffDetailsMap.set(s.id, { name: s.name, avatar: s.avatar }));
         }
 
         return enrollments.map((e: any) => {
@@ -211,11 +211,14 @@ class StudentService {
 
             // Detailed trainers list for flexible UI rendering
             const trainersList = staffIds.length > 0 
-                ? staffIds.map(id => ({
-                    id,
-                    name: staffNamesMap.get(id) || 'مدرب المعهد',
-                    avatar: null
-                }))
+                ? staffIds.map(id => {
+                    const details = staffDetailsMap.get(id);
+                    return {
+                        id,
+                        name: details?.name || 'مدرب المعهد',
+                        avatar: details?.avatar || null
+                    }
+                })
                 : [{
                     id: e.course.trainer?.id || 'unknown',
                     name: e.course.trainer?.name || 'مدرب',

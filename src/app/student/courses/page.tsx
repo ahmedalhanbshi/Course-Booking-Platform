@@ -298,9 +298,20 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
                             key={i}
                             className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
                           >
-                            <span className="h-4 w-4 rounded-full bg-blue-200 flex items-center justify-center text-[9px] font-bold text-blue-800 shrink-0">
-                              {t.name.charAt(0)}
-                            </span>
+                            {t.avatar ? (
+                              <Image 
+                                src={resolveImage(t.avatar)} 
+                                alt={t.name} 
+                                className="h-4 w-4 rounded-full object-cover shrink-0"
+                                width={16}
+                                height={16}
+                                unoptimized={true}
+                              />
+                            ) : (
+                              <span className="h-4 w-4 rounded-full bg-blue-200 flex items-center justify-center text-[9px] font-bold text-blue-800 shrink-0">
+                                {t.name.charAt(0)}
+                              </span>
+                            )}
                             {t.name}
                           </span>
                         ))}

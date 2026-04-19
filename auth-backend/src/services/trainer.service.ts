@@ -147,11 +147,11 @@ class TrainerService {
 
         // Gather all staffTrainerIds to fetch in a single query
         const allStaffIds = [...new Set(courses.flatMap(c => (c as any).staffTrainerIds as string[] || []))];
-        const staffMap = new Map<string, { name: string }>();
+        const staffMap = new Map<string, { name: string, avatar: string | null }>();
         if (allStaffIds.length > 0) {
             const staffList = await prisma.instituteStaff.findMany({
                 where: { id: { in: allStaffIds } },
-                select: { id: true, name: true }
+                select: { id: true, name: true, avatar: true }
             });
             staffList.forEach(s => staffMap.set(s.id, s));
         }
@@ -163,7 +163,10 @@ class TrainerService {
         return {
             courses: courses.map(c => {
                 const staffTrainerIds = (c as any).staffTrainerIds as string[] || [];
-                const staffTrainers = staffTrainerIds.map(id => ({ name: staffMap.get(id)?.name ?? '—' }));
+                const staffTrainers = staffTrainerIds.map(id => ({ 
+                    name: staffMap.get(id)?.name ?? '—', 
+                    avatar: staffMap.get(id)?.avatar ?? null 
+                }));
 
                 return {
                     id: c.id,
@@ -177,7 +180,7 @@ class TrainerService {
                     duration: `${c.duration} ساعة`,
                     trainer: {
                         name: c.trainer?.name ?? staffTrainers[0]?.name ?? c.institute?.name ?? '—',
-                        avatar: c.trainer?.avatar ?? c.institute?.logo ?? c.institute?.user?.avatar ?? null,
+                        avatar: c.trainer?.avatar ?? staffTrainers[0]?.avatar ?? c.institute?.logo ?? c.institute?.user?.avatar ?? null,
                     },
                     staffTrainers,
                     price: Number(c.price),

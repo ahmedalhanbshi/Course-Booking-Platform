@@ -284,7 +284,7 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                     avatar: resolveImage(course.trainer.avatar)
                   }}
                   instructors={(course as any).staffTrainers?.length > 1
-                    ? (course as any).staffTrainers.map((t: any) => ({ name: t.name, avatar: null }))
+                    ? (course as any).staffTrainers.map((t: any) => ({ name: t.name, avatar: resolveImage(t.avatar) }))
                     : undefined
                   }
                   basePath={basePath}

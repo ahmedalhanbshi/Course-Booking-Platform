@@ -152,9 +152,13 @@ export function CourseCard({
                             <div className="flex items-center gap-1">
                                 {instructors.slice(0, 3).map((t, i) => (
                                     <div key={i} className="relative w-6 h-6 rounded-full overflow-hidden border-2 border-white -ml-2 first:ml-0 shadow-sm" style={{ zIndex: 10 - i }}>
-                                        <div className="w-full h-full bg-blue-100 flex items-center justify-center text-[9px] font-bold text-blue-600">
-                                            {t.name.charAt(0)}
-                                        </div>
+                                        {t.avatar ? (
+                                            <Image src={t.avatar} alt={t.name} fill className="object-cover" unoptimized={true} />
+                                        ) : (
+                                            <div className="w-full h-full bg-blue-100 flex items-center justify-center text-[9px] font-bold text-blue-600">
+                                                {t.name.charAt(0)}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                                 {instructors.length > 3 && (
