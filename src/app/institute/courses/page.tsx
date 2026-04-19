@@ -79,7 +79,7 @@ export default function InstituteCourses() {
   const filteredCourses = courses.filter(course => {
     const normalizedTitle = normalizeText(course.title)
     // Support both trainer (single) and trainers (multi)
-    const trainerNames = (course.trainers as any[] | undefined)?.map((t: any) => normalizeText(t.name ?? '')).join(' ') 
+    const trainerNames = (course.trainers as any[] | undefined)?.map((t: any) => normalizeText(t.name ?? '')).join(' ')
       || normalizeText(course.trainer?.name ?? '')
     const matchesStatus = statusFilter === "all" || course.status === statusFilter
     const matchesTrainer = trainerFilter === "all" || trainerNames.includes(trainerFilter)
@@ -141,12 +141,8 @@ export default function InstituteCourses() {
         return <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">مكتمل</Badge>
       case 'draft':
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">مسودة</Badge>
-      case 'pending_review':
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">بانتظار الموافقة على الدفع</Badge>
       case 'cancelled':
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">ملغي</Badge>
-      case 'rejected':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">مرفوض</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -154,7 +150,7 @@ export default function InstituteCourses() {
 
   // Collect unique trainer names from trainers[] or trainer
   const uniqueTrainers = Array.from(new Set(
-    courses.flatMap(course => 
+    courses.flatMap(course =>
       (course as any).trainers?.length > 0
         ? (course as any).trainers.map((t: any) => normalizeText(t.name ?? ''))
         : [normalizeText(course.trainer?.name ?? '')]
@@ -215,7 +211,6 @@ export default function InstituteCourses() {
             <SelectContent>
               <SelectItem value="all">جميع الحالات</SelectItem>
               <SelectItem value="active">مستمر</SelectItem>
-              <SelectItem value="pending_review">بانتظار الموافقة على الدفع</SelectItem>
               <SelectItem value="draft">مسودة</SelectItem>
               <SelectItem value="completed">مكتمل</SelectItem>
             </SelectContent>

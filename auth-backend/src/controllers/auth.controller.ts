@@ -8,6 +8,7 @@ import {
     VerifyEmailInput,
     ForgotPasswordInput,
     ResetPasswordInput,
+    VerifyResetCodeInput,
 } from '../validators/auth.validator';
 
 export class AuthController {
@@ -117,6 +118,16 @@ export class AuthController {
         try {
             const data: ForgotPasswordInput = req.body;
             const result = await authService.forgotPassword(data);
+            return sendSuccess(res, result.message);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    async verifyResetCode(req: Request, res: Response, _next: NextFunction) {
+        try {
+            const data: VerifyResetCodeInput = req.body;
+            const result = await authService.verifyResetToken(data.token);
             return sendSuccess(res, result.message);
         } catch (error: any) {
             return sendError(res, error.message, 400);

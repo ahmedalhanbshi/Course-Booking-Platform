@@ -465,6 +465,27 @@ export class AuthService {
         return { message: 'If the email exists, a reset code will be sent.' };
     }
 
+    // Verify reset token
+    async verifyResetToken(token: string) {
+        const tokenHash = hashToken(token);
+
+        const tokenRecord = await prisma.token.findFirst({
+            where: {
+                tokenHash,
+                type: 'PASSWORD_RESET',
+                expiresAt: {
+                    gt: new Date(),
+                },
+            },
+        });
+
+        if (!tokenRecord) {
+            throw new Error('رمز التحقق غير صحيح أو منتهي الصلاحية');
+        }
+
+        return { message: 'Token verified' };
+    }
+
     // Reset password
     async resetPassword(data: ResetPasswordInput) {
         const { token, newPassword } = data;

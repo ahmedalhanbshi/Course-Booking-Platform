@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,10 +12,13 @@ import { authService } from "@/lib/auth-service"
 import { toast } from "sonner"
 
 export default function ResetPasswordPage() {
+  const searchParams = useSearchParams()
+  const urlCode = searchParams.get('code') || ""
+  
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [step, setStep] = useState<'verify' | 'success'>('verify')
-  const [code, setCode] = useState("")
+  const [code, setCode] = useState(urlCode)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -22,7 +26,8 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!code || code.length < 4) {
+    const finalCode = code || urlCode
+    if (!finalCode || finalCode.length < 4) {
       toast.error("خطأ", {
         description: "يرجى إدخال رمز التحقق بشكل صحيح"
       })
@@ -103,19 +108,21 @@ export default function ResetPasswordPage() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="space-y-2 text-right">
-              <Label htmlFor="code">رمز التحقق</Label>
-              <Input
-                id="code"
-                type="text"
-                placeholder="أدخل رمز التحقق"
-                className="text-center text-lg tracking-widest"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                dir="ltr"
-                required
-              />
-            </div>
+            {!urlCode && (
+              <div className="space-y-2 text-right">
+                <Label htmlFor="code">رمز التحقق</Label>
+                <Input
+                  id="code"
+                  type="text"
+                  placeholder="أدخل رمز التحقق"
+                  className="text-center text-lg tracking-widest"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  dir="ltr"
+                  required
+                />
+              </div>
+            )}
 
             <div className="space-y-2 text-right">
               <Label htmlFor="password">كلمة المرور الجديدة</Label>

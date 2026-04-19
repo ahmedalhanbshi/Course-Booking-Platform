@@ -15,6 +15,7 @@ import {
     refreshTokenSchema,
     forgotPasswordSchema,
     resetPasswordSchema,
+    verifyResetCodeSchema,
 } from '../validators/auth.validator';
 
 const router = Router();
@@ -55,6 +56,12 @@ router.post(
     passwordResetLimiter,
     validate(forgotPasswordSchema),
     authController.forgotPassword
+);
+
+router.post(
+    '/verify-reset-code',
+    validate(verifyResetCodeSchema),
+    authController.verifyResetCode
 );
 
 router.post(

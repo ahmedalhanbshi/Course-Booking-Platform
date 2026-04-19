@@ -131,6 +131,16 @@ class AuthService {
     }
 
     /**
+     * Verify reset code
+     */
+    async verifyResetCode(token: string): Promise<{ message: string }> {
+        const response = await apiClient.post<{ message: string }>('/api/auth/verify-reset-code', {
+            token,
+        });
+        return response.data;
+    }
+
+    /**
      * Reset password with token
      */
     async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {

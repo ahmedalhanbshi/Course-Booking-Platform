@@ -2,32 +2,25 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Mail, Phone, ArrowRight, CheckCircle, Loader2 } from "lucide-react"
+import { Mail, ArrowRight, Loader2, KeyRound } from "lucide-react"
 import { authService } from "@/lib/auth-service"
 import { toast } from "sonner"
 
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState<'request' | 'sent'>('request')
-  const [method, setMethod] = useState<'email' | 'phone'>('email')
+  const router = useRouter()
+  const [step, setStep] = useState<'request' | 'verify'>('request')
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
+  const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitEmail = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (method === 'phone') {
-      toast.error("غير مدعوم حالياً", {
-        description: "إعادة تعيين كلمة المرور عبر رقم الهاتف غير مدعومة حالياً. يرجى استخدام البريد الإلكتروني."
-      })
-      return
-    }
-
     if (!email || !email.includes('@')) {
       toast.error("خطأ", {
         description: "يرجى إدخال بريد إلكتروني صحيح"
@@ -38,145 +31,162 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     try {
       await authService.forgotPassword(email)
-      setStep('sent')
+      setStep('verify')
+      toast.success("تم إرسال رمز التحقق", {
+        description: "يرجى التحقق من بريدك الإلكتروني"
+      })
     } catch (error: any) {
       toast.error("حدث خطأ", {
-        description: error.response?.data?.message || "فشل إرسال رابط إعادة التعيين. يرجى المحاولة لاحقاً."
+        description: error.response?.data?.message || "فشل إرسال رمز التحقق. يرجى المحاولة لاحقاً."
       })
     } finally {
       setLoading(false)
     }
   }
 
-  if (step === 'sent') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl">تم إرسال الرمز</CardTitle>
-            <CardDescription>
-              {method === 'email'
-                ? 'تم إرسال رمز إعادة تعيين كلمة المرور إلى بريدك الإلكتروني'
-                : 'تم إرسال رمز إعادة تعيين كلمة المرور إلى رقم هاتفك'
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center text-sm text-gray-600">
-              يرجى التحقق من {method === 'email' ? 'بريدك الإلكتروني' : 'رسائلك النصية'} والنقر على الرابط لإعادة تعيين كلمة المرور
-            </div>
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/auth/reset-password">
-                انتقل إلى صفحة إعادة التعيين
-              </Link>
-            </Button>
+    if (!code || code.length < 4) {
+      toast.error("خطأ", {
+        description: "يرجى إدخال رمز التحقق بشكل صحيح"
+      })
+      return
+    }
 
-            <Button
-              className="w-full"
-              onClick={() => setStep('request')}
-            >
-              إرسال رمز آخر
-            </Button>
-
-            <div className="text-center">
-              <Link href="/auth/login" className="text-primary hover:underline text-sm">
-                العودة إلى تسجيل الدخول
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    setLoading(true)
+    try {
+      await authService.verifyResetCode(code)
+      // Redirect to reset password page with the code
+      router.push(`/auth/reset-password?code=${code}`)
+    } catch (error: any) {
+      toast.error("فشل التحقق", {
+        description: error.response?.data?.message || "رمز التحقق غير صحيح أو منتهي الصلاحية"
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">نسيت كلمة المرور؟</CardTitle>
+          <CardTitle className="text-2xl">
+            {step === 'request' ? 'نسيت كلمة المرور؟' : 'تأكيد الرمز'}
+          </CardTitle>
           <CardDescription>
-            أدخل بريدك الإلكتروني أو رقم هاتفك وسنرسل لك رمز إعادة التعيين
+            {step === 'request' 
+              ? 'أدخل بريدك الإلكتروني وسنرسل لك رمز إعادة التعيين' 
+              : 'أدخل رمز التحقق المكون من 6 أرقام المرسل إلى بريدك الإلكتروني'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form onSubmit={handleSubmit}>
-            <Tabs value={method} onValueChange={(value) => setMethod(value as 'email' | 'phone')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="email">البريد الإلكتروني</TabsTrigger>
-              <TabsTrigger value="phone">رقم الهاتف</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="email" className="space-y-4 mt-6">
-              <div className="space-y-2 text-right">
-                <Label htmlFor="email">البريد الإلكتروني</Label>
-                <div className="relative">
-                  <Mail className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="أدخل بريدك الإلكتروني"
-                    className="pr-10"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    dir="ltr"
-                    required={method === 'email'}
-                  />
+          {step === 'request' ? (
+            <form onSubmit={handleSubmitEmail}>
+              <div className="space-y-4">
+                <div className="space-y-2 text-right">
+                  <Label htmlFor="email">البريد الإلكتروني</Label>
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="أدخل بريدك الإلكتروني"
+                      className="pr-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      dir="ltr"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
-            </TabsContent>
 
-            <TabsContent value="phone" className="space-y-4 mt-6">
-              <div className="space-y-2 text-right">
-                <Label htmlFor="phone">رقم الهاتف</Label>
-                <div className="relative">
-                  <Phone className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="أدخل رقم هاتفك"
-                    className="pr-10"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    dir="ltr"
-                    required={method === 'phone'}
-                  />
+              <div className="space-y-4 pt-4 border-t border-gray-100 mt-6 text-right">
+                <Button
+                  className="w-full"
+                  size="lg"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      جاري الإرسال...
+                    </>
+                  ) : (
+                    <>
+                      إرسال رمز إعادة التعيين
+                      <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
+                    </>
+                  )}
+                </Button>
+
+                <div className="text-center text-sm text-gray-600">
+                  تذكرت كلمة المرور؟{" "}
+                  <Link href="/auth/login" className="text-primary font-bold hover:underline">
+                    تسجيل الدخول
+                  </Link>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyCode}>
+              <div className="space-y-4">
+                <div className="space-y-2 text-right">
+                  <Label htmlFor="code">رمز التحقق</Label>
+                  <div className="relative">
+                    <KeyRound className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="code"
+                      type="text"
+                      placeholder="أدخل الرمز (6 أرقام)"
+                      className="pr-10 text-center text-lg tracking-widest font-bold"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      dir="ltr"
+                      required
+                      maxLength={6}
+                    />
+                  </div>
+                </div>
+              </div>
 
-          <div className="space-y-4 pt-4 border-t border-gray-100 mt-6">
-            <Button
-              className="w-full"
-              size="lg"
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  جاري الإرسال...
-                </>
-              ) : (
-                <>
-                  إرسال رمز إعادة التعيين
-                  <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
-                </>
-              )}
-            </Button>
+              <div className="space-y-4 pt-4 border-t border-gray-100 mt-6 text-right">
+                <Button
+                  className="w-full"
+                  size="lg"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      جاري التحقق...
+                    </>
+                  ) : (
+                    <>
+                      تحقق واستمرار
+                      <ArrowRight className="mr-2 h-4 w-4 rotate-180" />
+                    </>
+                  )}
+                </Button>
 
-            <div className="text-center text-sm text-gray-600">
-              تذكرت كلمة المرور؟{" "}
-              <Link href="/auth/login" className="text-primary font-bold hover:underline">
-                تسجيل الدخول
-              </Link>
-            </div>
-          </div>
-          </form>
+                <div className="text-center text-sm text-gray-600">
+                  لم يصلك الرمز؟{" "}
+                  <button 
+                    type="button" 
+                    onClick={() => setStep('request')} 
+                    className="text-primary font-bold hover:underline"
+                  >
+                    أعد المحاولة
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

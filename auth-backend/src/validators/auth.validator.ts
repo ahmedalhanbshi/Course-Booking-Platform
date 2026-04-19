@@ -52,9 +52,16 @@ export const resetPasswordSchema = z.object({
     }),
 });
 
+export const verifyResetCodeSchema = z.object({
+    body: z.object({
+        token: z.string().min(1, 'Token is required'),
+    }),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>['body'];
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>['body'];
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>['body'];
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>['body'];
+export type VerifyResetCodeInput = z.infer<typeof verifyResetCodeSchema>['body'];

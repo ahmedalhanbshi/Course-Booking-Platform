@@ -267,18 +267,19 @@ export default function StudentCourseDashboard() {
   const isCompleted = courseData.enrollmentStatus === 'COMPLETED' || courseData.enrollmentStatus === 'completed' || searchParams.get('status') === 'completed'
   const isCancelled = courseData.enrollmentStatus === 'CANCELLED' || courseData.enrollmentStatus === 'cancelled' || searchParams.get('status') === 'cancelled'
   const isPreliminary = courseData.enrollmentStatus === 'PRELIMINARY' || courseData.enrollmentStatus === 'preliminary'
+  const isPreliminaryApproved = courseData.enrollmentStatus === 'PRELIMINARY_APPROVED' || courseData.enrollmentStatus === 'preliminary_approved'
   const isPendingPayment = courseData.enrollmentStatus === 'PENDING_PAYMENT' || courseData.enrollmentStatus === 'pending_payment'
-  const isPending = isPreliminary || isPendingPayment
+  const isPending = isPreliminary || isPreliminaryApproved || isPendingPayment
   const isActive = courseData.enrollmentStatus === 'ACTIVE' || courseData.enrollmentStatus === 'active'
   // True when student already submitted a receipt and it's awaiting admin review
   const hasPaymentUnderReview = Boolean(courseData.hasPaymentUnderReview)
 
   // Minimum enrollment threshold states
   const isPendingMinimum = courseData.courseStatus === 'PENDING_MINIMUM' || courseData.courseStatus === 'pending_minimum'
-  // Student is accepted (PRELIMINARY) but course is still waiting for minimum threshold
-  const isWaitingForMinimum = isPreliminary && isPendingMinimum
+  // Student is accepted (PRELIMINARY_APPROVED) but course is still waiting for minimum threshold
+  const isWaitingForMinimum = isPreliminaryApproved && isPendingMinimum
 
-  const shouldLockContent = isCancelled || isPreliminary
+  const shouldLockContent = isCancelled || isPreliminary || isPreliminaryApproved
 
   const safeText = (value: string | undefined | null, fallback: string) => {
     if (typeof value !== "string") return fallback
@@ -692,7 +693,7 @@ export default function StudentCourseDashboard() {
               <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
                   <GraduationCap className="w-4 h-4 text-blue-600" />
-                  مدرب الدور
+                  مدربو الدورة
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-5 space-y-6">
@@ -702,8 +703,18 @@ export default function StudentCourseDashboard() {
                     {courseData.staffTrainers.map((t: any) => (
                       <div key={t.id} className="space-y-3 group">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shrink-0 group-hover:bg-blue-100 transition-colors">
-                            {t.name?.charAt(0) || "م"}
+                          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 overflow-hidden flex items-center justify-center text-blue-700 font-bold text-lg shrink-0 group-hover:bg-blue-100 transition-colors relative">
+                            {t.avatar ? (
+                              <Image 
+                                src={getFileUrl(t.avatar) || ""} 
+                                alt={t.name} 
+                                fill 
+                                className="object-cover"
+                                unoptimized={true}
+                              />
+                            ) : (
+                              t.name?.charAt(0) || "م"
+                            )}
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 truncate">{t.name}</p>
