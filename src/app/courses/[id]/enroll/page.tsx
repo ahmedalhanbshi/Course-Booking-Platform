@@ -13,7 +13,8 @@ import { Stepper } from "@/components/ui/stepper"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, CreditCard, AlertCircle, ArrowRight, ArrowLeft } from "lucide-react"
 import { Course } from "@/types"
-import { formatDate } from "@/lib/utils"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { formatDate, getFileUrl } from "@/lib/utils"
 
 // Mock course data
 const mockCourse: Course = {
@@ -127,9 +128,15 @@ export default function EnrollmentPage() {
                     <span className="text-gray-600">اسم الدورة:</span>
                     <span className="font-medium">{course.title}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">المدرب:</span>
-                    <span>{course.trainer.name}</span>
+                    <div className="flex items-center flex-row-reverse gap-2">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={course.trainer.avatar ? getFileUrl(course.trainer.avatar) : undefined} />
+                        <AvatarFallback>{course.trainer.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span>{course.trainer.name}</span>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">المدة:</span>

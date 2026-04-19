@@ -1116,9 +1116,19 @@ export default function CourseDetailsPage() {
                   <div key={t.id} className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all duration-300 hover:bg-white hover:shadow-md hover:border-blue-200 shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-slate-200 shadow-sm transition-transform group-hover:scale-105">
-                        <div className="flex h-full w-full items-center justify-center text-xl font-black text-blue-600 bg-blue-50">
-                          {t.name?.charAt(0) ?? "م"}
-                        </div>
+                        {t.avatar ? (
+                          <Image
+                            src={resolveImage(t.avatar)}
+                            alt={t.name ?? "المدرب"}
+                            fill
+                            className="object-cover"
+                            unoptimized={true}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xl font-black text-blue-600 bg-blue-50">
+                            {t.name?.charAt(0) ?? "م"}
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0 flex-1 space-y-1">
                         <h4 className="text-base font-bold text-slate-900 truncate">{t.name}</h4>

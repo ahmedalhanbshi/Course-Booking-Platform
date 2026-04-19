@@ -565,7 +565,7 @@ class StudentService {
         if (staffTrainerIds && staffTrainerIds.length > 0) {
             staffTrainers = await prisma.instituteStaff.findMany({
                 where: { id: { in: staffTrainerIds }, status: 'ACTIVE' },
-                select: { id: true, name: true, bio: true, email: true, phone: true, specialties: true }
+                select: { id: true, name: true, bio: true, avatar: true, email: true, phone: true, specialties: true }
             });
         }
 
@@ -596,7 +596,7 @@ class StudentService {
                 id: staffTrainers[0]?.id,
                 name: staffTrainers[0]?.name || 'مدرب المعهد',
                 role: 'مدرب معهد',
-                avatar: null,
+                avatar: staffTrainers[0]?.avatar || null,
                 email: staffTrainers[0]?.email,
                 phone: staffTrainers[0]?.phone,
                 bio: staffTrainers[0]?.bio,

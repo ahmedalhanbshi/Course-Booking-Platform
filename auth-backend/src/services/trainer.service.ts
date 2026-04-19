@@ -882,11 +882,11 @@ class TrainerService {
 
         // Fetch all staff trainers if staffTrainerIds is set (now multi-trainer only)
         const staffTrainerIds = (course as any).staffTrainerIds as string[] | undefined;
-        let staffTrainers: { id: string; name: string; bio: string | null; email: string | null; phone: string | null; specialties: string[] }[] = [];
+        let staffTrainers: { id: string; name: string; avatar: string | null; bio: string | null; email: string | null; phone: string | null; specialties: string[] }[] = [];
         if (staffTrainerIds && staffTrainerIds.length > 0) {
             const staffList = await prisma.instituteStaff.findMany({
                 where: { id: { in: staffTrainerIds } },
-                select: { id: true, name: true, bio: true, email: true, phone: true, specialties: true }
+                select: { id: true, name: true, avatar: true, bio: true, email: true, phone: true, specialties: true }
             });
             staffTrainers = staffList;
         }
