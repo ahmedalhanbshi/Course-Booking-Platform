@@ -15,6 +15,7 @@ import { User, Mail, Phone, Eye, EyeOff, Loader2, Camera, X, Plus, ShieldCheck, 
 import { toast } from "sonner"
 import { trainerService } from "@/lib/trainer-service"
 import { useAuth } from "@/contexts/auth-context"
+import { getFileUrl } from "@/lib/utils"
 
 type ProfileData = {
     id: string
@@ -241,7 +242,8 @@ export default function TrainerProfilePage() {
     const removeSpecialty = (s: string) =>
         setForm(prev => ({ ...prev, specialties: prev.specialties.filter(x => x !== s) }))
 
-    const avatarSrc = avatarPreview || (profile?.avatar ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${profile.avatar}?t=${avatarCacheKey}` : "")
+    const persistedAvatarSrc = getFileUrl(profile?.avatar)
+    const avatarSrc = avatarPreview || (persistedAvatarSrc ? `${persistedAvatarSrc}?t=${avatarCacheKey}` : "")
 
     if (loading) {
         return (
@@ -461,7 +463,7 @@ export default function TrainerProfilePage() {
                                         <p className="text-sm text-slate-500 mt-1">النسخة المرفوعة لملفك الشخصي كمدرب</p>
                                     </div>
                                     <Button variant="outline" asChild className="rounded-lg">
-                                        <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${profile.cvUrl}`} target="_blank" rel="noopener noreferrer">
+                                        <a href={getFileUrl(profile.cvUrl)} target="_blank" rel="noopener noreferrer">
                                             عرض السيرة الذاتية
                                         </a>
                                     </Button>

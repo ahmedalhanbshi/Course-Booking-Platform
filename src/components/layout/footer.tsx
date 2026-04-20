@@ -44,11 +44,6 @@ export function Footer() {
                   المعاهد
                 </Link>
               </li>
-              <li>
-                <Link href="/trainers" className="transition hover:text-white">
-                  المدربون
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -56,19 +51,19 @@ export function Footer() {
             <h3 className="text-base font-black text-white">الدعم</h3>
             <ul className="mt-4 space-y-3 text-sm font-semibold text-slate-400">
               <li>
-                <Link href="/faq" className="transition hover:text-white">
+                <span className="transition cursor-default">
                   الأسئلة الشائعة
-                </Link>
+                </span>
               </li>
               <li>
-                <Link href="/terms" className="transition hover:text-white">
+                <span className="transition cursor-default">
                   الشروط والأحكام
-                </Link>
+                </span>
               </li>
               <li>
-                <Link href="/privacy" className="transition hover:text-white">
+                <span className="transition cursor-default">
                   سياسة الخصوصية
-                </Link>
+                </span>
               </li>
             </ul>
           </div>
@@ -94,15 +89,6 @@ export function Footer() {
 
         <div className="flex flex-col items-start justify-between gap-4 border-t border-slate-800 py-5 text-sm font-semibold text-slate-500 md:flex-row md:items-center">
           <p>© {new Date().getFullYear()} منصة دال. جميع الحقوق محفوظة.</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 rounded-full border border-slate-800 bg-slate-900/50 px-4 text-slate-300 hover:bg-slate-800 hover:text-white"
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          >
-            العودة للأعلى
-            <ArrowLeft className="h-4 w-4 rotate-90" />
-          </Button>
         </div>
       </div>
     </footer>

@@ -1,159 +1,224 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { useSearchParams } from "next/navigation"
+import { BookOpen, Building2, MapPin, Users, Loader2 } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Search, MapPin, Users, BookOpen, Star, Building2, ArrowLeft } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Navbar } from "@/components/layout/navbar"
 import { instituteService } from "@/lib/institute-service"
 import { getFileUrl } from "@/lib/utils"
+
+type PublicInstitute = {
+  id: string
+  name: string
+  description?: string
+  location?: string
+  logo?: string | null
+  coverImage?: string | null
+  categories: string[]
+  studentsCount: number
+  coursesCount: number
+  staffCount?: number
+}
+
+const formatNumber = (value: number) => new Intl.NumberFormat("ar").format(value)
+
 export default function InstitutesPage() {
-    const [searchQuery, setSearchQuery] = useState("")
-    const [institutes, setInstitutes] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+  const searchParams = useSearchParams()
+  const searchFromUrl = searchParams.get("search")?.trim() ?? ""
+  const [institutes, setInstitutes] = useState<PublicInstitute[]>([])
+  const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        const fetchInstitutes = async () => {
-            try {
-                const data = await instituteService.getPublicInstitutes()
-                setInstitutes(data)
-            } catch (error) {
-                console.error("Failed to fetch institutes:", error)
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchInstitutes()
-    }, [])
+  useEffect(() => {
+    instituteService
+      .getPublicInstitutes()
+      .then((data: PublicInstitute[]) => setInstitutes(data))
+      .catch((error) => console.error("Failed to fetch institutes:", error))
+      .finally(() => setLoading(false))
+  }, [])
 
-    const filteredInstitutes = institutes.filter(institute =>
-        institute.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        institute.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredInstitutes = useMemo(() => {
+    const query = searchFromUrl.toLowerCase()
+    if (!query) return institutes
+
+    return institutes.filter((institute) => {
+      const name = institute.name?.toLowerCase() ?? ""
+      const description = institute.description?.toLowerCase() ?? ""
+      const location = institute.location?.toLowerCase() ?? ""
+      return name.includes(query) || description.includes(query) || location.includes(query)
+    })
+  }, [institutes, searchFromUrl])
+
+  const summary = useMemo(() => {
+    return filteredInstitutes.reduce(
+      (acc, institute) => {
+        acc.courses += institute.coursesCount || 0
+        acc.students += institute.studentsCount || 0
+        return acc
+      },
+      { courses: 0, students: 0 }
     )
+  }, [filteredInstitutes])
 
-    return (
-        <div className="min-h-screen bg-gray-50" dir="rtl">
-            <Navbar />
+  return (
+    <div className="min-h-screen bg-white dark:bg-slate-950" dir="rtl">
+      <Navbar />
+      
+      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8">
+        {/* Literal copy of student institutes header */}
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-l from-slate-50 via-white to-blue-50 p-5 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/30">
+          <div className="pointer-events-none absolute -top-16 left-0 h-40 w-40 rounded-full bg-blue-200/30 blur-3xl dark:bg-blue-500/20" />
+          <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">استكشف المعاهد المعتمدة</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                اختر الجهة التدريبية المناسبة حسب عدد الدورات، عدد المتدربين، ومجالات التخصص المتاحة.
+              </p>
+              {searchFromUrl && (
+                <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300">
+                  نتائج البحث عن: <span className="font-bold">{searchFromUrl}</span>
+                </p>
+              )}
+            </div>
 
-            <main className="container mx-auto max-w-7xl px-4 py-8">
-                {/* Header Section */}
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">المعاهد المعتمدة</h1>
-                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                        تصفح أفضل المعاهد والمراكز التدريبية المعتمدة لدينا، واختر المكان الأنسب لبدء رحلتك التعليمية.
-                    </p>
-                </div>
-
-                {/* Search Section */}
-                <div className="max-w-2xl mx-auto mb-12 relative">
-                    <div className="relative">
-                        <Search className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
-                        <Input
-                            placeholder="ابحث عن معهد..."
-                            className="pr-12 h-12 text-lg shadow-sm border-gray-200 focus:border-primary focus:ring-primary rounded-full"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                {/* Institutes Grid */}
-                {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {[1, 2, 3].map((n) => (
-                            <Card key={n} className="overflow-hidden border-gray-100 flex flex-col h-[400px] animate-pulse">
-                                <div className="h-32 bg-gray-200"></div>
-                                <div className="mt-12 px-6 flex-1 space-y-4">
-                                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                                    <div className="space-y-2 mt-4">
-                                        <div className="h-3 bg-gray-200 rounded w-full"></div>
-                                        <div className="h-3 bg-gray-200 rounded w-5/6"></div>
-                                    </div>
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {filteredInstitutes.length > 0 ? (
-                        filteredInstitutes.map((institute) => (
-                            <Card key={institute.id} className="group overflow-hidden border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col h-full">
-                                {/* Cover Image */}
-                                <div className="h-32 bg-gray-100 relative overflow-hidden">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={institute.logo ? getFileUrl(institute.logo) : institute.coverImage}
-                                        alt={institute.name}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                </div>
-
-                                <CardHeader className="relative pt-6 pb-4 px-6">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="text-xl font-bold text-gray-900 group-hover:text-primary transition-colors">
-                                                {institute.name}
-                                            </h3>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-sm text-gray-500 mb-3">
-                                            <MapPin className="h-3.5 w-3.5" />
-                                            {institute.location}
-                                        </div>
-                                </CardHeader>
-
-                                <CardContent className="px-6 flex-1">
-                                    <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
-                                        {institute.description}
-                                    </p>
-
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        {institute.categories.slice(0, 3).map((cat: string) => (
-                                            <Badge key={cat} variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 font-normal">
-                                                {cat}
-                                            </Badge>
-                                        ))}
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4 py-3 border-t border-gray-50">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Users className="h-4 w-4 text-primary/70" />
-                                            <span>{institute.studentsCount} طالب</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <BookOpen className="h-4 w-4 text-primary/70" />
-                                            <span>{institute.coursesCount} دورة</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-
-                                <CardFooter className="px-6 pb-6 pt-0">
-                                    <Button className="w-full bg-gray-900 hover:bg-primary text-white transition-colors" asChild>
-                                        <Link href={`/institutes/${institute.id}`}>
-                                            عرض التفاصيل
-                                            <ArrowLeft className="mr-2 h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </CardFooter>
-                            </Card>
-                        ))
-                    ) : (
-                        <div className="col-span-full text-center py-12">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Search className="h-8 w-8 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد نتائج</h3>
-                            <p className="text-gray-500">
-                                {searchQuery ? "جرب البحث بكلمات مختلفة" : "لا توجد معاهد مقبولة حالياً."}
-                            </p>
-                        </div>
-                    )}
-                </div>
-                )}
-            </main>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                <p className="text-[11px] font-semibold text-slate-500">المعاهد المعروضة</p>
+                <p className="mt-1 text-xl font-black text-slate-900 dark:text-slate-100">{formatNumber(filteredInstitutes.length)}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                <p className="text-[11px] font-semibold text-slate-500">إجمالي الدورات</p>
+                <p className="mt-1 text-xl font-black text-slate-900 dark:text-slate-100">{formatNumber(summary.courses)}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                <p className="text-[11px] font-semibold text-slate-500">إجمالي المتدربين</p>
+                <p className="mt-1 text-xl font-black text-slate-900 dark:text-slate-100">{formatNumber(summary.students)}</p>
+              </div>
+            </div>
+          </div>
         </div>
-    )
+
+        {loading ? (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <Card key={n} className="overflow-hidden rounded-3xl border-slate-200">
+                <div className="h-24 animate-pulse bg-slate-200 dark:bg-slate-800" />
+                <CardContent className="space-y-3 p-5">
+                  <div className="h-5 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-4 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="h-16 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-16 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                  <div className="h-10 w-full animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {filteredInstitutes.length > 0 ? (
+              filteredInstitutes.map((institute) => {
+                const description = institute.description?.trim() || "لم تتم إضافة وصف للمعهد بعد"
+                const categories = institute.categories?.filter(Boolean) ?? []
+                const primaryImage = institute.logo || institute.coverImage
+
+                return (
+                  <Card
+                    key={institute.id}
+                    className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900 dark:hover:shadow-black/20"
+                  >
+                    <div className="relative h-24 overflow-hidden border-b border-slate-100 bg-gradient-to-l from-slate-100 via-blue-50 to-slate-100 dark:border-slate-800 dark:from-slate-800 dark:via-blue-950/40 dark:to-slate-800">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.2),transparent_55%)]" />
+                    </div>
+
+                    <div className="absolute right-4 top-12 z-10 h-20 w-20 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-md dark:border-slate-900 dark:bg-slate-800">
+                      {primaryImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={getFileUrl(primaryImage)}
+                          alt={institute.name}
+                          className="h-full w-full object-contain p-1.5"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-slate-400">
+                          <Building2 className="h-6 w-6" />
+                        </div>
+                      )}
+                    </div>
+
+                    <CardContent className="space-y-4 p-5 pt-10">
+                      <div className="space-y-2">
+                        <h3 className="line-clamp-2 pl-24 text-xl font-black leading-tight text-slate-900 dark:text-slate-100">
+                          {institute.name}
+                        </h3>
+                        <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+                          <MapPin className="h-4 w-4 text-blue-500" />
+                          <span className="line-clamp-1">{institute.location || "غير محدد"}</span>
+                        </div>
+                        <p className="line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                          <div className="mb-1 flex items-center gap-1.5 text-slate-500">
+                            <BookOpen className="h-4 w-4 text-blue-600" />
+                            <span className="text-[11px] font-semibold">الدورات</span>
+                          </div>
+                          <p className="text-lg font-black text-slate-900 dark:text-slate-100">{formatNumber(institute.coursesCount || 0)}</p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                          <div className="mb-1 flex items-center gap-1.5 text-slate-500">
+                            <Users className="h-4 w-4 text-emerald-600" />
+                            <span className="text-[11px] font-semibold">المتدربون</span>
+                          </div>
+                          <p className="text-lg font-black text-slate-900 dark:text-slate-100">{formatNumber(institute.studentsCount || 0)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex min-h-[34px] flex-wrap gap-1.5">
+                        {categories.length > 0 ? (
+                          <>
+                            {categories.slice(0, 3).map((category) => (
+                              <Badge key={category} variant="secondary" className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300">
+                                {category}
+                              </Badge>
+                            ))}
+                            {categories.length > 3 && (
+                              <Badge variant="secondary" className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                +{categories.length - 3}
+                              </Badge>
+                            )}
+                          </>
+                        ) : (
+                          <Badge variant="secondary" className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            بدون تصنيفات معلنة
+                          </Badge>
+                        )}
+                      </div>
+
+                      <Button asChild className="h-11 w-full rounded-2xl bg-slate-950 text-sm font-bold hover:bg-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                        <Link href={`/institutes/${institute.id}`} className="inline-flex items-center justify-center">
+                          عرض التفاصيل الكاملة
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )
+              })
+            ) : (
+              <div className="col-span-full rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-900">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">لا توجد نتائج مطابقة</h3>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">جرب تعديل كلمات البحث أو إزالة الفلتر الحالي.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  )
 }

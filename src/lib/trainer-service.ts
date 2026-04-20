@@ -142,7 +142,7 @@ class TrainerService {
     }
 
     async getPublicCourseById(courseId: string): Promise<CourseDetail> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: CourseDetail }>(`/api/trainer/explore/${courseId}`);
+        const response = await apiClient.get<{ success: boolean; message: string; data: CourseDetail }>(`/api/public/explore/${courseId}`);
         return response.data.data;
     }
 
@@ -153,7 +153,7 @@ class TrainerService {
         }
 
         const query = params.toString();
-        const url = query ? `/api/trainer/explore?${query}` : '/api/trainer/explore';
+        const url = query ? `/api/public/explore?${query}` : '/api/public/explore';
         const response = await apiClient.get<{ success: boolean; message: string; data: ExploreCoursesData }>(url);
         return response.data.data;
     }

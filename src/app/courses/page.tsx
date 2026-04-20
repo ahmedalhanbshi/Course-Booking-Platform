@@ -1,15 +1,14 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { AlertCircle, ArrowLeft, BookOpen, Heart, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Price } from "@/components/ui/price"
-import { Slider } from "@/components/ui/slider"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -17,288 +16,285 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Filter, AlertCircle, Loader2 } from "lucide-react"
-import { CourseCard } from "@/components/course-card"
-import { trainerService, ExploreCourse } from "@/lib/trainer-service"
-import { studentService } from "@/lib/student-service"
 import { useAuth } from "@/contexts/auth-context"
+import { studentService } from "@/lib/student-service"
+import { ExploreCourse, trainerService } from "@/lib/trainer-service"
+import { getFileUrl } from "@/lib/utils"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
+const sortOptions = ["الأحدث", "الأقدم", "الأعلى سعراً", "الأقل سعراً"]
+const priceOptions = [
+  "كل الأسعار",
+  "أقل من 25,000 ر.ي",
+  "25,000 - 50,000 ر.ي",
+  "50,000 - 100,000 ر.ي",
+  "أعلى من 100,000 ر.ي",
+]
+
 function resolveImage(src: string | null): string {
-  if (!src) return "/images/course-web.png"
-  if (src.startsWith("http")) return src
-  const cleanSrc = src.replace(/\\/g, "/")
-  const separator = cleanSrc.startsWith("/") ? "" : "/"
-  return `${API_BASE}${separator}${cleanSrc}`
+  return getFileUrl(src) || "/images/course-web.png"
 }
-
-const deliveryTypesMap: Record<string, string> = {
-  "أونلاين": "online",
-  "حضوري": "in_person",
-  "حضور وأونلاين": "hybrid"
-}
-
-const deliveryTypes = ["أونلاين", "حضوري", "حضور وأونلاين"]
 
 interface CoursesPageProps {
   basePath?: string
 }
 
 export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps) {
+  const searchParams = useSearchParams()
+  const { user } = useAuth() ?? {}
+
   const [courses, setCourses] = useState<ExploreCourse[]>([])
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: "all", name: "جميع الفئات" }])
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: "all", name: "الكل" }])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("جميع الفئات")
-  const [selectedDeliveryTypes, setSelectedDeliveryTypes] = useState<string[]>([])
-  const [priceRange, setPriceRange] = useState([0, 100000])
-  const [sortBy, setSortBy] = useState("newest")
+  const searchFromUrl = searchParams.get("search")?.trim() ?? ""
+  const [selectedCategory, setSelectedCategory] = useState("الكل")
+  const [selectedSort, setSelectedSort] = useState("الأحدث")
+  const [selectedPrice, setSelectedPrice] = useState("كل الأسعار")
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([])
 
-  const { user } = useAuth() ?? {}
-  const [wishlistIds, setWishlistIds] = useState<string[]>([])
-
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     setLoading(true)
     setError(null)
     trainerService
-      .getExploreCourses()
+      .getExploreCourses({ search: searchFromUrl })
       .then((data) => {
         setCourses(data.courses)
-        setCategories(
-          // Replace 'الكل' from API with 'جميع الفئات' to match existing UI
-          data.categories.map(c => c.id === 'all' ? { ...c, name: "جميع الفئات" } : c)
-        )
+        setCategories(data.categories)
       })
-      .catch((err) => {
-        console.error("Failed to load courses:", err)
-        setError("فشل تحميل الدورات. يرجى المحاولة مرة أخرى.")
-      })
+      .catch(() => setError("فشل تحميل الدورات. يرجى المحاولة مرة أخرى."))
       .finally(() => setLoading(false))
-  }
+  }, [searchFromUrl])
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   useEffect(() => {
-    if (user?.id) {
-      studentService.getWishlist()
-        .then((data) => {
-          setWishlistIds(data.map((item: any) => item.id))
-        })
-        .catch(() => { })
-    } else {
-      setWishlistIds([])
+    if (!user?.id) {
+        setFavoriteIds([])
+        return
     }
+    studentService
+      .getWishlist()
+      .then((data: Array<{ id: string }>) => {
+        setFavoriteIds(data.map((item) => item.id))
+      })
+      .catch(() => {})
   }, [user?.id])
 
-  const toggleDeliveryType = (typeLabel: string) => {
-    const typeValue = deliveryTypesMap[typeLabel]
-    if (selectedDeliveryTypes.includes(typeValue)) {
-      setSelectedDeliveryTypes(selectedDeliveryTypes.filter(t => t !== typeValue))
-    } else {
-      setSelectedDeliveryTypes([...selectedDeliveryTypes, typeValue])
+  const toggleFavorite = async (id: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!user?.id) {
+      router.push(`/auth/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
+
+    try {
+      const result = await studentService.toggleWishlist(id)
+      setFavoriteIds((prev) => (result.added ? [...prev, id] : prev.filter((item) => item !== id)))
+      toast.success(result.added ? "تمت إضافة الدورة إلى قائمة الرغبات" : "تمت إزالة الدورة من قائمة الرغبات")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "حدث خطأ أثناء تحديث قائمة الرغبات"
+      toast.error(message)
     }
   }
 
   const filteredCourses = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
+    return courses.filter((course) => {
+      const matchesCategory = selectedCategory === "الكل" || course.category === selectedCategory
 
-    return courses.filter(course => {
-      const matchesSearch = query.length === 0 ||
-        course.title.toLowerCase().includes(query) ||
-        course.description?.toLowerCase().includes(query)
+      const matchesPrice =
+        selectedPrice === "كل الأسعار" ||
+        (selectedPrice === "أقل من 25,000 ر.ي" && course.price < 25000) ||
+        (selectedPrice === "25,000 - 50,000 ر.ي" && course.price >= 25000 && course.price <= 50000) ||
+        (selectedPrice === "50,000 - 100,000 ر.ي" && course.price >= 50000 && course.price <= 100000) ||
+        (selectedPrice === "أعلى من 100,000 ر.ي" && course.price > 100000)
 
-      const matchesCategory = selectedCategory === "جميع الفئات" || course.category === selectedCategory
-
-      const matchesDelivery = selectedDeliveryTypes.length === 0 || selectedDeliveryTypes.includes(course.deliveryType)
-
-      const matchesPrice = course.price >= priceRange[0] && course.price <= priceRange[1]
-
-      return matchesSearch && matchesCategory && matchesDelivery && matchesPrice
+      return matchesCategory && matchesPrice
     })
-  }, [courses, searchQuery, selectedCategory, selectedDeliveryTypes, priceRange])
+  }, [courses, selectedCategory, selectedPrice])
 
   const visibleCourses = useMemo(() => {
     const sorted = [...filteredCourses]
-    if (sortBy === "price-low") {
-      sorted.sort((a, b) => a.price - b.price)
-    } else if (sortBy === "price-high") {
-      sorted.sort((a, b) => b.price - a.price)
-    } else {
+    if (selectedSort === "الأحدث") {
       sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    } else if (selectedSort === "الأقدم") {
+      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    } else if (selectedSort === "الأعلى سعراً") {
+      sorted.sort((a, b) => b.price - a.price)
+    } else if (selectedSort === "الأقل سعراً") {
+      sorted.sort((a, b) => a.price - b.price)
     }
     return sorted
-  }, [filteredCourses, sortBy])
+  }, [filteredCourses, selectedSort])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      <div className="bg-muted/30 py-12 mb-8">
-        <div className="container mx-auto px-4">
-          <h1 className="text-4xl font-bold mb-4">استكشف الدورات التدريبية</h1>
-          <p className="text-muted-foreground text-lg max-w-2xl">
-            تصفح مئات الدورات التدريبية في مختلف المجالات واكتسب مهارات جديدة
-          </p>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 pb-20">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar Filters */}
-          <div className="w-full lg:w-1/4 space-y-6">
-            <div className="glass-card p-6 rounded-xl sticky top-24">
-              <div className="flex items-center gap-2 mb-6">
-                <Filter className="h-5 w-5 text-primary" />
-                <h2 className="font-bold text-lg">تصفية النتائج</h2>
-              </div>
-
-              {/* Search */}
-              <div className="mb-6">
-                <div className="relative">
-                  <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="بحث..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pr-9 bg-white/50"
-                  />
-                </div>
-              </div>
-
-              {/* Categories */}
-              <div className="mb-6">
-                <h3 className="font-semibold mb-3">الفئة</h3>
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div key={category.id} className="flex items-center">
-                      <button
-                        onClick={() => setSelectedCategory(category.name)}
-                        className={`text-sm hover:text-primary transition-colors ${selectedCategory === category.name ? "text-primary font-bold" : "text-muted-foreground"
-                          }`}
-                      >
-                        {category.name}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Delivery Type */}
-              <div className="mb-6">
-                <h3 className="font-semibold mb-3">نوع الحضور</h3>
-                <div className="space-y-2">
-                  {deliveryTypes.map((type) => (
-                    <div key={type} className="flex items-center gap-2">
-                      <Checkbox
-                        id={type}
-                        checked={selectedDeliveryTypes.includes(type)}
-                        onCheckedChange={() => toggleDeliveryType(type)}
-                      />
-                      <label htmlFor={type} className="text-sm cursor-pointer select-none">
-                        {type}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Range */}
-              <div>
-                <h3 className="font-semibold mb-3">السعر</h3>
-                <Slider
-                  value={priceRange}
-                  onValueChange={setPriceRange}
-                  max={100000}
-                  min={0}
-                  step={50}
-                  className="mb-2"
-                />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <Price value={priceRange[0]} currency="ريال" />
-                  <Price value={priceRange[1]} currency="ريال" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full lg:w-3/4">
-            <div className="flex justify-between items-center mb-6">
-              <p className="text-muted-foreground">
-                تم العثور على <span className="font-bold text-foreground">{visibleCourses.length}</span> دورة
-              </p>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[180px] bg-white/50">
-                  <SelectValue placeholder="الترتيب حسب" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">الأحدث</SelectItem>
-                  <SelectItem value="price-low">السعر: الأقل</SelectItem>
-                  <SelectItem value="price-high">السعر: الأعلى</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {loading && (
-            <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
-              <Loader2 className="h-7 w-7 animate-spin" />
-              <span className="text-lg">جاري تحميل الدورات...</span>
-            </div>
-          )}
-
-          {!loading && error && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
-              <AlertCircle className="h-10 w-10" />
-              <p>{error}</p>
-              <Button variant="outline" onClick={fetchData}>إعادة المحاولة</Button>
-            </div>
-          )}
-
-          {!loading && !error && visibleCourses.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400 text-center">
-              <p className="text-lg">
-                {searchQuery || selectedCategory !== "جميع الفئات"
-                  ? "لا توجد نتائج تطابق بحثك"
-                  : "لا توجد دورات نشطة حالياً"}
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && visibleCourses.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {visibleCourses.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  id={course.id}
-                  title={course.title}
-                  description={course.shortDescription || course.description}
-                  level="عام" // Using a generic fallback for visually completing the design card
-                  price={course.price}
-                  studentsCount={course.studentsCount}
-                  duration={String(course.duration)}
-                  image={resolveImage(course.image)}
-                  category={course.category}
-                  instructor={{
-                    name: course.trainer.name,
-                    avatar: resolveImage(course.trainer.avatar)
-                  }}
-                  instructors={(course as any).staffTrainers?.length > 1
-                    ? (course as any).staffTrainers.map((t: any) => ({ name: t.name, avatar: null }))
-                    : undefined
-                  }
-                  basePath={basePath}
-                  isFavorite={wishlistIds.includes(course.id)}
-                />
+    <section dir="rtl" className="w-full text-right pt-2 pb-12">
+      <div className="w-full max-w-7xl mx-auto space-y-3 px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-center justify-start gap-3 text-right border-b border-slate-100 pb-4 dark:border-border">
+          <Select value={selectedSort} onValueChange={setSelectedSort}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="الأحدث" />
+            </SelectTrigger>
+            <SelectContent>
+              {sortOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
               ))}
-            </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+            </SelectContent>
+          </Select>
 
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="كل الفئات" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.name}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedPrice} onValueChange={setSelectedPrice}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="كل الأسعار" />
+            </SelectTrigger>
+            <SelectContent>
+              {priceOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {!loading && (
+            <span className="ml-auto flex-shrink-0 whitespace-nowrap text-right text-sm text-slate-500">
+              تم العثور على <span className="font-semibold text-slate-900 dark:text-white">{visibleCourses.length}</span> دورة
+            </span>
+          )}
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center gap-3 py-20 text-gray-400">
+            <Loader2 className="h-7 w-7 animate-spin" />
+            <span className="text-lg">جاري تحميل الدورات...</span>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center gap-4 py-20 text-red-500">
+            <AlertCircle className="h-10 w-10" />
+            <p>{error}</p>
+            <Button variant="outline" onClick={fetchData}>
+              إعادة المحاولة
+            </Button>
+          </div>
+        )}
+
+        {!loading && !error && visibleCourses.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-4 py-20 text-gray-400">
+            <BookOpen className="h-12 w-12" />
+            <p className="text-lg">{searchFromUrl || selectedCategory !== "الكل" ? "لا توجد نتائج تطابق بحثك" : "لا توجد دورات نشطة حالياً"}</p>
+          </div>
+        )}
+
+        {!loading && !error && visibleCourses.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {visibleCourses.map((course) => (
+              <article
+                key={course.id}
+                dir="rtl"
+                className="flex w-full items-start gap-5 rounded-2xl border border-slate-100 bg-white p-4 text-right shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-md dark:border-border dark:bg-card"
+              >
+                <div className="relative h-[200px] w-[200px] shrink-0 overflow-hidden rounded-2xl">
+                  <Image
+                    src={resolveImage(course.image)}
+                    alt={course.title}
+                    fill
+                    sizes="200px"
+                    className="h-full w-full object-cover"
+                    unoptimized
+                    onError={(e) => {
+                      ;(e.target as HTMLImageElement).src = "/images/course-web.png"
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => toggleFavorite(course.id, e)}
+                    aria-label="إضافة إلى المفضلة"
+                    className={`absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm ring-1 ring-slate-200/60 transition-transform duration-150 ${
+                      favoriteIds.includes(course.id) ? "scale-105 text-red-600" : "hover:text-red-600"
+                    }`}
+                  >
+                    <Heart className={`h-4 w-4 transition-opacity ${favoriteIds.includes(course.id) ? "fill-current" : ""}`} />
+                  </button>
+                </div>
+
+                <div className="flex h-[200px] min-w-0 flex-1 flex-col text-right">
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-muted dark:text-slate-300">
+                      {course.category}
+                    </span>
+                    <h3 className="line-clamp-2 text-base font-bold text-slate-900 dark:text-white">
+                      <Link href={`${basePath}/${course.id}`} className="hover:text-blue-600 transition-colors">
+                        {course.title}
+                      </Link>
+                    </h3>
+                    <p className="line-clamp-2 text-sm text-slate-500">{course.shortDescription || course.description}</p>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                      {course.trainer.avatar ? (
+                        <Image
+                          src={resolveImage(course.trainer.avatar)}
+                          alt={course.trainer.name}
+                          fill
+                          sizes="24px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-500">{course.trainer.name.charAt(0)}</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{course.trainer.name}</span>
+                  </div>
+
+                  <div className="mt-auto flex w-full flex-wrap items-center justify-start gap-2 pt-3">
+                    {course.price === 0 ? (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        مجاني
+                      </span>
+                    ) : (
+                      <Price
+                        data-testid="course-price-badge"
+                        value={course.price}
+                        className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      />
+                    )}
+                    <Button asChild className="h-9 rounded-full bg-blue-600 px-5 text-sm text-white hover:bg-blue-700">
+                      <Link href={`${basePath}/${course.id}`} className="inline-flex items-center gap-2">
+                        <span>عرض التفاصيل</span>
+                        <ArrowLeft className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
-

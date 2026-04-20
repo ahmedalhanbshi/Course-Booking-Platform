@@ -226,6 +226,10 @@ export default function CourseDetailsPage() {
   }
 
   const openRegistrationDialog = async (mode: "create" | "edit") => {
+    if (!user?.id) {
+      router.push(`/auth/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
     setIsEditMode(mode === "edit")
     setFormErrors({})
     setIsDialogOpen(true)
@@ -276,8 +280,8 @@ export default function CourseDetailsPage() {
 
   const toggleFavorite = async () => {
     if (!user?.id) {
-      toast.error("يرجى تسجيل الدخول لإضافة الدورة إلى قائمة الرغبات");
-      return;
+      router.push(`/auth/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`)
+      return
     }
 
     try {
