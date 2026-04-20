@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'api.example.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'i.pravatar.cc',
       },
     ],

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bell, LayoutDashboard, LogOut, Menu, Search, User, X } from "lucide-react";
 
@@ -28,7 +28,6 @@ interface NavbarProps {
 const mainLinks = [
   { href: "/courses", label: "تصفح الدورات" },
   { href: "/institutes", label: "المعاهد" },
-  { href: "/trainers", label: "المدربون" },
 ];
 
 function roleLabel(role: UserRole): string {
@@ -93,10 +92,30 @@ function notificationsLink(role: UserRole): string {
 
 export function Navbar({ onMenuClick }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get("search") || "");
+  }, [searchParams]);
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const targetPath = pathname?.startsWith("/institutes") ? "/institutes" : "/courses";
+      const params = new URLSearchParams(searchParams.toString());
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      } else {
+        params.delete("search");
+      }
+      router.push(`${targetPath}?${params.toString()}`);
+    }
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -180,7 +199,10 @@ export function Navbar({ onMenuClick }: NavbarProps) {
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-indigo-600" />
             <input
               type="text"
-              placeholder="ابحث عن دورة أو مهارة..."
+              placeholder="ابحث عن دورة أو معهد..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearch}
               className="h-10 w-full rounded-full border border-slate-200 bg-slate-50/95 pr-10 pl-3 text-sm outline-none transition-all duration-300 placeholder:font-medium placeholder:text-slate-400 focus:-translate-y-0.5 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:shadow-[0_14px_34px_-22px_rgba(79,70,229,0.55)] motion-reduce:transform-none"
             />
           </div>

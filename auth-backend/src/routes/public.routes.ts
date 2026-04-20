@@ -18,4 +18,8 @@ router.get('/stats', publicController.getStats);
 router.get('/categories', publicController.getCategories);
 router.get('/featured-courses', publicController.getFeaturedCourses);
 
+// Publicly accessible course explore endpoints
+router.get('/explore', trainerController.getExploreCourses);
+router.get('/explore/:courseId', trainerController.getPublicCourseById);
+
 export default router;

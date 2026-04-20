@@ -19,10 +19,6 @@ router.get('/schedule', trainerController.getSchedule);
 router.get('/categories', trainerController.getCategories);
 router.post('/categories', trainerController.createCategory);
 
-// Explore (public course catalog)
-router.get('/explore', trainerController.getExploreCourses);
-router.get('/explore/:courseId', trainerController.getPublicCourseById);
-
 // Halls
 router.get('/halls', trainerController.getHalls);
 router.get('/halls/:hallId', trainerController.getHallById);

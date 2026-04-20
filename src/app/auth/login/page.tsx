@@ -85,6 +85,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && !authLoading) {
+      const callbackUrl = searchParams.get("callbackUrl")
+      if (callbackUrl) {
+        router.push(callbackUrl)
+        return
+      }
+
       switch (user.role) {
         case "STUDENT":
           router.push("/student/dashboard")
@@ -102,7 +108,7 @@ export default function LoginPage() {
           router.push("/")
       }
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

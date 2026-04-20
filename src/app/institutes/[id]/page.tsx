@@ -1,253 +1,413 @@
 "use client"
 
+import { use, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  BookOpen,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  ExternalLink,
+  Globe,
+  Mail,
+  MapPin,
+  Phone,
+  Users,
+} from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Price } from "@/components/ui/price"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MapPin, Users, BookOpen, Star, Building2, Globe, Mail, Phone, Calendar, CheckCircle2 } from "lucide-react"
-import { Navbar } from "@/components/layout/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-import { useEffect, useState, use } from "react"
+import { Navbar } from "@/components/layout/navbar"
 import { instituteService } from "@/lib/institute-service"
 import { getFileUrl } from "@/lib/utils"
 
+type InstituteCourse = {
+  id: string
+  title: string
+  image?: string | null
+  category?: string
+  price: number
+  students?: number
+  trainer?: {
+    name: string
+  }
+}
+
+type InstituteTrainer = {
+  id: string
+  name: string
+  role?: string
+  avatar?: string | null
+}
+
+type PublicInstituteDetails = {
+  id: string
+  name: string
+  description?: string
+  location?: string
+  website?: string
+  email?: string
+  phone?: string
+  logo?: string | null
+  coverImage?: string | null
+  features: string[]
+  studentsCount: number
+  coursesCount: number
+  courses: InstituteCourse[]
+  trainers?: InstituteTrainer[]
+}
+
+const withProtocol = (value?: string) => {
+  if (!value) return ""
+  const normalized = value.trim().replace(/^\/+/, "")
+  if (!normalized) return ""
+  return /^https?:\/\//i.test(normalized) ? normalized : `https://${normalized}`
+}
+
+const toDomainLabel = (value?: string) => {
+  const href = withProtocol(value)
+  if (!href) return ""
+  try {
+    return new URL(href).hostname.replace(/^www\./i, "")
+  } catch {
+    return value?.replace(/^\/+/, "").replace(/^https?:\/\//i, "") ?? ""
+  }
+}
+
+const looksLikeUrl = (value?: string) => {
+  if (!value) return false
+  const testValue = value.trim()
+  return /^https?:\/\//i.test(testValue) || /^www\./i.test(testValue) || /maps\.app|google\.com\/maps|goo\.gl\/maps|%2f|%3a/i.test(testValue)
+}
+
+const toMapLabel = (value?: string) => {
+  if (!value) return ""
+  const cleaned = value.trim()
+  if (!cleaned) return ""
+  if (looksLikeUrl(cleaned) || cleaned.length > 70) return "عرض موقع المعهد على الخريطة"
+  return cleaned
+}
+
+const formatNumber = (value: number) => new Intl.NumberFormat("ar").format(value)
+
 export default function InstituteDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = use(params)
-    const [instituteData, setInstituteData] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+  const { id } = use(params)
+  const [instituteData, setInstituteData] = useState<PublicInstituteDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-    useEffect(() => {
-        const fetchInstitute = async () => {
-            try {
-                const data = await instituteService.getPublicInstituteById(id)
-                setInstituteData(data)
-            } catch (err: any) {
-                console.error("Failed to fetch institute:", err)
-                setError("لم يتم العثور على المعهد")
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchInstitute()
-    }, [id])
+  useEffect(() => {
+    instituteService
+      .getPublicInstituteById(id)
+      .then((data: PublicInstituteDetails) => setInstituteData(data))
+      .catch(() => setError("لم يتم العثور على المعهد"))
+      .finally(() => setLoading(false))
+  }, [id])
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-        )
-    }
+  const websiteHref = useMemo(() => withProtocol(instituteData?.website), [instituteData?.website])
+  const websiteLabel = useMemo(() => toDomainLabel(instituteData?.website), [instituteData?.website])
+  const locationHref = useMemo(
+    () => (looksLikeUrl(instituteData?.location) ? withProtocol(instituteData?.location) : ""),
+    [instituteData?.location]
+  )
+  const locationLabel = useMemo(() => toMapLabel(instituteData?.location), [instituteData?.location])
 
-    if (error || !instituteData) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8 text-center" dir="rtl">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">عذراً</h2>
-                    <p className="text-gray-500 mb-6">{error || "هذا المعهد غير موجود"}</p>
-                    <Button asChild>
-                        <Link href="/institutes">العودة لقائمة المعاهد</Link>
-                    </Button>
-                </div>
-            </div>
-        )
-    }
-
+  if (loading) {
     return (
-        <div className="min-h-screen bg-gray-50" dir="rtl">
-            <Navbar />
-
-            {/* Hero Banner */}
-            <div className="relative h-64 md:h-80 bg-gray-900">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={instituteData.logo ? getFileUrl(instituteData.logo) : instituteData.coverImage}
-                    alt={instituteData.name}
-                    className="w-full h-full object-cover opacity-60"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent" />
-
-                <div className="absolute bottom-0 left-0 right-0 container mx-auto max-w-7xl px-4 pb-8">
-                    <div className="flex flex-col md:flex-row items-end gap-6">
-                        <div className="h-24 w-24 md:h-32 md:w-32 rounded-2xl bg-white p-1 shadow-xl -mb-12 md:-mb-16 relative z-10 overflow-hidden flex items-center justify-center">
-                            {instituteData.logo ? (
-                                <img 
-                                    src={getFileUrl(instituteData.logo)} 
-                                    alt={`${instituteData.name} logo`} 
-                                    className="w-full h-full object-contain rounded-xl"
-                                />
-                            ) : (
-                                <div className="h-full w-full bg-gray-50 rounded-xl flex items-center justify-center text-primary">
-                                    <Building2 className="h-12 w-12" />
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex-1 text-white mb-2">
-                            <h1 className="text-3xl md:text-4xl font-bold mb-2">{instituteData.name}</h1>
-                            <div className="flex flex-wrap items-center gap-4 text-sm md:text-base text-gray-200">
-                                <div className="flex items-center gap-1">
-                                    <MapPin className="h-4 w-4" />
-                                    {instituteData.location}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    {/* Without rating in backend API for now. Hiding rating for consistency with institutes index page request */}
-                                    <span className="text-gray-400">({instituteData.coursesCount} دورة متاحة)</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mb-2">
-                            <Button className="bg-primary hover:bg-primary/90">تواصل معنا</Button>
-                            <Button variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-0 backdrop-blur-sm">مشاركة</Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <main className="container mx-auto max-w-7xl px-4 py-12 md:py-16">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                    {/* Right Column: Main Content */}
-                    <div className="lg:col-span-2 space-y-8">
-
-                        {/* About Section */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>عن المعهد</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <p className="text-gray-600 leading-relaxed">
-                                    {instituteData.description}
-                                </p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                                    {instituteData.features.map((feature: string, index: number) => (
-                                        <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
-                                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                            {feature}
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Tabs: Courses & Trainers */}
-                        <Tabs defaultValue="courses" className="w-full">
-                            <TabsList className="w-full justify-start h-12 bg-white p-1 border border-gray-200 rounded-xl mb-6">
-                                <TabsTrigger value="courses" className="flex-1 md:flex-none px-8 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg">الدورات المتاحة</TabsTrigger>
-                                <TabsTrigger value="trainers" className="flex-1 md:flex-none px-8 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg">المدربين</TabsTrigger>
-                                <TabsTrigger value="reviews" className="flex-1 md:flex-none px-8 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg">التقييمات</TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="courses" className="space-y-4">
-                                {instituteData.courses.map((course: any) => (
-                                    <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                                        <div className="flex flex-col md:flex-row">
-                                            <div className="w-full md:w-48 h-40 bg-gray-100 relative">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={course.image ? getFileUrl(course.image) : `https://placehold.co/600x400/2563eb/ffffff?text=${encodeURIComponent(course.title)}`} alt={course.title} className="w-full h-full object-cover" />
-                                                <Badge className="absolute top-2 right-2 bg-white/90 text-gray-800 hover:bg-white">{course.category}</Badge>
-                                            </div>
-                                            <div className="flex-1 p-5 flex flex-col justify-between">
-                                                <div>
-                                                    <div className="flex justify-between items-start">
-                                                        <h3 className="font-bold text-lg text-gray-900 mb-1">{course.title}</h3>
-                                                        <div className="flex items-center gap-1 text-sm font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
-                                                            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                                                            {course.rating}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
-                                                        <div className="flex items-center gap-1">
-                                                            <Users className="h-4 w-4" />
-                                                            {course.students} طالب
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <Calendar className="h-4 w-4" />
-                                                            يبدأ قريباً
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-between mt-4">
-                                                    <Price value={course.price} className="text-lg font-bold text-primary" />
-                                                    <Button size="sm" asChild>
-                                                        <Link href={`/courses/${course.id}`}>التفاصيل والتسجيل</Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                ))}
-                            </TabsContent>
-
-                            <TabsContent value="trainers">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {instituteData.trainers.map((trainer: any) => (
-                                        <Card key={trainer.id}>
-                                            <CardContent className="p-4 flex items-center gap-4">
-                                                <Avatar className="h-14 w-14 border border-gray-100">
-                                                    <AvatarImage src={trainer.avatar || undefined} />
-                                                    <AvatarFallback>{trainer.name.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <h4 className="font-bold text-gray-900">{trainer.name}</h4>
-                                                    <p className="text-sm text-gray-500">{trainer.role}</p>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-
-                    </div>
-
-                    {/* Left Column: Sidebar Info */}
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">معلومات التواصل</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex items-center gap-3 text-gray-600">
-                                    <Globe className="h-5 w-5 text-gray-400" />
-                                    <a href={`https://${instituteData.website}`} target="_blank" className="hover:text-primary transition-colors">{instituteData.website}</a>
-                                </div>
-                                <div className="flex items-center gap-3 text-gray-600">
-                                    <Mail className="h-5 w-5 text-gray-400" />
-                                    <a href={`mailto:${instituteData.email}`} className="hover:text-primary transition-colors">{instituteData.email}</a>
-                                </div>
-                                <div className="flex items-center gap-3 text-gray-600">
-                                    <Phone className="h-5 w-5 text-gray-400" />
-                                    <span dir="ltr">{instituteData.phone}</span>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">إحصائيات المعهد</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4">
-                                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                                    <div className="text-2xl font-bold text-primary mb-1">{instituteData.studentsCount}</div>
-                                    <div className="text-xs text-gray-500">طالب متخرج</div>
-                                </div>
-                                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                                    <div className="text-2xl font-bold text-primary mb-1">{instituteData.coursesCount}</div>
-                                    <div className="text-xs text-gray-500">دورة تدريبية</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                </div>
-            </main>
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950" dir="rtl">
+        <Navbar />
+        <div className="mx-auto mt-8 w-full max-w-7xl space-y-4 px-4">
+          <Card className="overflow-hidden rounded-3xl border-slate-200">
+            <div className="h-28 animate-pulse bg-slate-200 dark:bg-slate-800" />
+            <CardContent className="space-y-4 p-6">
+              <div className="h-7 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="h-5 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
+                {[1, 2].map((item) => (
+                  <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      </div>
     )
+  }
+
+  if (error || !instituteData) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950" dir="rtl">
+        <Navbar />
+        <div className="mx-auto mt-8 max-w-7xl px-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <h2 className="mb-2 text-2xl font-bold text-slate-900">عذرًا</h2>
+            <p className="mb-6 text-slate-500">{error || "هذا المعهد غير موجود"}</p>
+            <Button asChild>
+              <Link href="/institutes">العودة لقائمة المعاهد</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const description = instituteData.description?.trim() || "لم تتم إضافة وصف للمعهد بعد"
+  const hasLocation = Boolean(locationLabel)
+  const hasWebsite = Boolean(websiteHref)
+  const hasEmail = Boolean(instituteData.email)
+  const hasPhone = Boolean(instituteData.phone)
+  const trainers = instituteData.trainers ?? []
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950" dir="rtl">
+      <Navbar />
+      
+      <main className="mx-auto mt-8 w-full max-w-7xl space-y-6 px-4 pb-12">
+        <section className="space-y-6">
+          <Card className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="h-28 w-full bg-gradient-to-l from-slate-100 via-blue-50 to-slate-100 dark:from-slate-800 dark:via-blue-950/40 dark:to-slate-800" />
+
+            <CardContent className="relative p-5 pt-0 md:p-7 md:pt-0">
+              <div className="absolute left-4 top-0 -translate-y-1/2 md:left-7">
+                <div className="h-28 w-28 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-lg dark:border-slate-900 dark:bg-slate-800 md:h-36 md:w-36">
+                  {instituteData.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={getFileUrl(instituteData.logo)} alt={instituteData.name} className="h-full w-full object-contain p-0.5" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-slate-400">
+                      <Building2 className="h-7 w-7" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-5 pt-16 md:pt-6">
+                <div className="pl-0 md:pl-44">
+                  <h1 className="text-2xl font-bold leading-tight text-slate-900 md:text-4xl dark:text-white">{instituteData.name}</h1>
+                  <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 md:text-base dark:text-slate-300">{description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p className="text-[11px] font-semibold text-slate-500">الدورات</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{formatNumber(instituteData.coursesCount || 0)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p className="text-[11px] font-semibold text-slate-500">المتدربون</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{formatNumber(instituteData.studentsCount || 0)}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {hasLocation && (
+                    locationHref ? (
+                      <a
+                        href={locationHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        <span>{locationLabel}</span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <MapPin className="h-4 w-4" />
+                        {locationLabel}
+                      </span>
+                    )
+                  )}
+
+                  {hasWebsite && (
+                    <a
+                      href={websiteHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span dir="ltr">{websiteLabel || "الموقع الإلكتروني"}</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+
+                  {hasEmail && (
+                    <a
+                      href={`mailto:${instituteData.email}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
+                    >
+                      <Mail className="h-4 w-4" />
+                      <span dir="ltr">{instituteData.email}</span>
+                    </a>
+                  )}
+
+                  {hasPhone && (
+                    <a
+                      href={`tel:${instituteData.phone}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
+                    >
+                      <Phone className="h-4 w-4" />
+                      <span dir="ltr">{instituteData.phone}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Card className="rounded-3xl border-slate-200 lg:col-span-2 dark:border-slate-800">
+              <CardContent className="space-y-4 p-5 md:p-6">
+                <Tabs defaultValue="courses" className="w-full">
+                  <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800">
+                    <TabsTrigger value="courses" className="rounded-xl py-2 text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-slate-100">
+                      الدورات المتاحة
+                    </TabsTrigger>
+                    <TabsTrigger value="trainers" className="rounded-xl py-2 text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-slate-100">
+                      المدربون
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="courses" className="mt-4 space-y-3">
+                    <div className="mb-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      {formatNumber(instituteData.courses?.length || 0)} دورة
+                    </div>
+
+                    {instituteData.courses?.length ? (
+                      <div className="space-y-3">
+                        {instituteData.courses.map((course) => (
+                          <Card key={course.id} className="overflow-hidden rounded-2xl border-slate-200 dark:border-slate-800">
+                            <div className="flex flex-col md:flex-row-reverse md:items-stretch">
+                              <div className="relative h-44 w-full shrink-0 bg-slate-100 md:h-auto md:w-52">
+                                {course.image ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={getFileUrl(course.image)} alt={course.title} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-slate-400">
+                                    <Building2 className="h-9 w-9" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1 p-4 text-right flex flex-col">
+                                {course.category && (
+                                  <div className="mb-2">
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-muted dark:text-slate-300">
+                                      {course.category}
+                                    </span>
+                                  </div>
+                                )}
+                                <h3 className="line-clamp-2 text-base font-bold text-slate-900 dark:text-white">{course.title}</h3>
+                                {course.trainer && (
+                                  <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">المدرب: {course.trainer.name}</p>
+                                )}
+                                <div className="mt-3 flex flex-wrap items-center justify-end gap-3 text-xs text-slate-500 dark:text-slate-400">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Users className="h-3.5 w-3.5" />
+                                    {course.students ?? 0} طالب
+                                  </span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    يبدأ قريبًا
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-center justify-center gap-3 p-4 pt-0 md:w-[180px] md:border-r md:border-slate-100 md:p-4 dark:md:border-slate-800">
+                                <div className="flex w-full justify-center">
+                                  {course.price === 0 ? (
+                                    <span className="inline-flex items-center rounded-full bg-blue-50 px-4 py-1 text-base font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                      مجاني
+                                    </span>
+                                  ) : (
+                                    <Price
+                                      value={course.price || 0}
+                                      className="rounded-full bg-blue-50/80 px-4 py-1 text-base font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                    />
+                                  )}
+                                </div>
+                                <Button asChild className="h-10 w-full rounded-full bg-slate-900 px-6 text-sm font-semibold shadow-sm hover:opacity-90 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white text-white">
+                                  <Link href={`/courses/${course.id}`}>عرض الدورة</Link>
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        لا توجد دورات متاحة حاليًا.
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="trainers" className="mt-4 space-y-3">
+                    <div className="mb-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      {formatNumber(trainers.length)} مدرب
+                    </div>
+
+                    {trainers.length ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {trainers.map((trainer) => (
+                          <Card key={trainer.id} className="rounded-2xl border-slate-200 dark:border-slate-800">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12 border border-slate-200 dark:border-slate-700">
+                                  <AvatarImage src={trainer.avatar ? getFileUrl(trainer.avatar) : undefined} alt={trainer.name} />
+                                  <AvatarFallback className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                    {trainer.name?.charAt(0) || "م"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 flex-1 text-right">
+                                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{trainer.name}</p>
+                                  <p className="truncate text-sm text-slate-500 dark:text-slate-400">{trainer.role || "مدرب"}</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        لا يوجد مدربون معلنون حاليًا.
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-slate-200 dark:border-slate-800">
+              <CardContent className="space-y-4 p-5 md:p-6">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">مميزات المعهد</h2>
+
+                {instituteData.features?.length ? (
+                  <ul className="space-y-2.5">
+                    {instituteData.features.map((feature, index) => (
+                      <li
+                        key={`${feature}-${index}`}
+                        className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+                      >
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    لا توجد مميزات معلنة حاليًا.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
 }
