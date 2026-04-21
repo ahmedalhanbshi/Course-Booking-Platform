@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircle, ArrowLeft, BookOpen, Heart, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -40,8 +40,9 @@ interface CoursesPageProps {
   basePath?: string
 }
 
-export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps) {
+function CoursesContent({ basePath = "/courses" }: CoursesPageProps) {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { user } = useAuth() ?? {}
 
   const [courses, setCourses] = useState<ExploreCourse[]>([])
@@ -296,5 +297,13 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
         )}
       </div>
     </section>
+  )
+}
+
+export default function CoursesPage(props: CoursesPageProps) {
+  return (
+    <Suspense fallback={null}>
+      <CoursesContent {...props} />
+    </Suspense>
   )
 }

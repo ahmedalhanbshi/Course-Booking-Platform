@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Bell, LayoutDashboard, LogOut, Menu, Search, User, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -90,14 +90,9 @@ function notificationsLink(role: UserRole): string {
   }
 }
 
-export function Navbar({ onMenuClick }: NavbarProps) {
-  const pathname = usePathname();
-  const router = useRouter();
+// Inner component that calls useSearchParams – must be wrapped in Suspense
+function NavSearch({ pathname, router }: { pathname: string | null; router: ReturnType<typeof useRouter> }) {
   const searchParams = useSearchParams();
-  const { user, logout } = useAuth();
-  const { unreadCount } = useNotifications();
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
 
   useEffect(() => {
@@ -116,6 +111,29 @@ export function Navbar({ onMenuClick }: NavbarProps) {
       router.push(`${targetPath}?${params.toString()}`);
     }
   };
+
+  return (
+    <div className="relative mx-2 hidden max-w-[260px] flex-1 group lg:flex xl:max-w-[300px]">
+      <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-indigo-600" />
+      <input
+        type="text"
+        placeholder="ابحث عن دورة أو معهد..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={handleSearch}
+        className="h-10 w-full rounded-full border border-slate-200 bg-slate-50/95 pr-10 pl-3 text-sm outline-none transition-all duration-300 placeholder:font-medium placeholder:text-slate-400 focus:-translate-y-0.5 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:shadow-[0_14px_34px_-22px_rgba(79,70,229,0.55)] motion-reduce:transform-none"
+      />
+    </div>
+  );
+}
+
+export function Navbar({ onMenuClick }: NavbarProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -194,18 +212,10 @@ export function Navbar({ onMenuClick }: NavbarProps) {
             </div>
           </div>
 
-          {/* Search */}
-          <div className="relative mx-2 hidden max-w-[260px] flex-1 group lg:flex xl:max-w-[300px]">
-            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-indigo-600" />
-            <input
-              type="text"
-              placeholder="ابحث عن دورة أو معهد..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearch}
-              className="h-10 w-full rounded-full border border-slate-200 bg-slate-50/95 pr-10 pl-3 text-sm outline-none transition-all duration-300 placeholder:font-medium placeholder:text-slate-400 focus:-translate-y-0.5 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:shadow-[0_14px_34px_-22px_rgba(79,70,229,0.55)] motion-reduce:transform-none"
-            />
-          </div>
+          {/* Search – wrapped in Suspense because NavSearch calls useSearchParams */}
+          <Suspense fallback={<div className="relative mx-2 hidden max-w-[260px] flex-1 lg:flex xl:max-w-[300px]" />}>
+            <NavSearch pathname={pathname} router={router} />
+          </Suspense>
 
           {/* Left Cluster: Auth/User */}
           <div className="flex items-center gap-2.5">

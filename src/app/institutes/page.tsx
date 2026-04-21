@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { BookOpen, Building2, MapPin, Users, Loader2 } from "lucide-react"
@@ -27,7 +27,7 @@ type PublicInstitute = {
 
 const formatNumber = (value: number) => new Intl.NumberFormat("ar").format(value)
 
-export default function InstitutesPage() {
+function InstitutesContent() {
   const searchParams = useSearchParams()
   const searchFromUrl = searchParams.get("search")?.trim() ?? ""
   const [institutes, setInstitutes] = useState<PublicInstitute[]>([])
@@ -220,5 +220,13 @@ export default function InstitutesPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function InstitutesPage() {
+  return (
+    <Suspense fallback={null}>
+      <InstitutesContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent } from "react"
+import { FormEvent, Suspense } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -21,6 +21,45 @@ interface SharedTopBarProps {
   resolveSearchBase?: (pathname: string) => string
 }
 
+interface TopBarSearchProps {
+  searchPlaceholder: string
+  resolveSearchBase?: (pathname: string) => string
+}
+
+// Inner component that calls useSearchParams – must be wrapped in Suspense by its parent.
+function TopBarSearch({ searchPlaceholder, resolveSearchBase }: TopBarSearchProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const searchFromQuery = searchParams.get("search")?.trim() ?? ""
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!resolveSearchBase) return
+    const formData = new FormData(event.currentTarget)
+    const rawValue = formData.get("search")
+    const query = typeof rawValue === "string" ? rawValue.trim() : ""
+    const targetBase = resolveSearchBase(pathname)
+    router.push(query ? `${targetBase}?search=${encodeURIComponent(query)}` : targetBase)
+  }
+
+  return (
+    <form onSubmit={submitSearch} className="mx-auto w-full min-w-0 max-w-2xl">
+      <div className="relative group">
+        <Search className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-blue-500 dark:text-slate-400" />
+        <input
+          key={searchFromQuery}
+          name="search"
+          defaultValue={searchFromQuery}
+          type="search"
+          placeholder={searchPlaceholder}
+          className="h-10 w-full rounded-full border border-slate-300 bg-slate-50 shadow-sm pr-11 pl-4 text-sm text-slate-900 placeholder:text-slate-500 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:hover:border-slate-600 dark:focus:border-blue-500 dark:focus:bg-slate-950 dark:focus:ring-blue-500/20"
+        />
+      </div>
+    </form>
+  )
+}
+
 export function SharedTopBar({
   onMenuClick,
   homeHref = "/",
@@ -29,15 +68,11 @@ export function SharedTopBar({
   searchPlaceholder = "ابحث في المنصة",
   resolveSearchBase,
 }: SharedTopBarProps) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const { user, logout } = useAuth()
   const { unreadCount } = useNotifications()
 
   const avatarSrc = getFileUrl(user?.avatar) || "/images/placeholder.png"
   const unreadLabel = unreadCount > 9 ? "9+" : String(unreadCount)
-  const searchFromQuery = searchParams.get("search")?.trim() ?? ""
 
   const getRoleLabel = (role?: UserRole) => {
     switch (role) {
@@ -52,16 +87,6 @@ export function SharedTopBar({
       default:
         return "حساب"
     }
-  }
-
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!resolveSearchBase) return
-    const formData = new FormData(event.currentTarget)
-    const rawValue = formData.get("search")
-    const query = typeof rawValue === "string" ? rawValue.trim() : ""
-    const targetBase = resolveSearchBase(pathname)
-    router.push(query ? `${targetBase}?search=${encodeURIComponent(query)}` : targetBase)
   }
 
   return (
@@ -88,19 +113,13 @@ export function SharedTopBar({
           </Link>
         </div>
 
-        <form onSubmit={submitSearch} className="mx-auto w-full min-w-0 max-w-2xl">
-          <div className="relative group">
-            <Search className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-blue-500 dark:text-slate-400" />
-            <input
-              key={searchFromQuery}
-              name="search"
-              defaultValue={searchFromQuery}
-              type="search"
-              placeholder={searchPlaceholder}
-              className="h-10 w-full rounded-full border border-slate-300 bg-slate-50 shadow-sm pr-11 pl-4 text-sm text-slate-900 placeholder:text-slate-500 outline-none transition hover:border-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:hover:border-slate-600 dark:focus:border-blue-500 dark:focus:bg-slate-950 dark:focus:ring-blue-500/20"
-            />
-          </div>
-        </form>
+        {/* Search – wrapped in Suspense because TopBarSearch calls useSearchParams */}
+        <Suspense fallback={<div className="mx-auto w-full min-w-0 max-w-2xl" />}>
+          <TopBarSearch
+            searchPlaceholder={searchPlaceholder}
+            resolveSearchBase={resolveSearchBase}
+          />
+        </Suspense>
 
         <div className="flex shrink-0 items-center gap-1 md:gap-2">
           <Button

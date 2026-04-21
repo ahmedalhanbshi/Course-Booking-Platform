@@ -73,7 +73,6 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
   }, [searchFromUrl])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
   }, [fetchData])
 
