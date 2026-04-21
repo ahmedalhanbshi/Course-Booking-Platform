@@ -8,6 +8,7 @@ import adminRoutes from './routes/admin.routes';
 import instituteRoutes from './routes/institute.routes';
 import trainerRoutes from './routes/trainer.routes';
 import studentRoutes from './routes/student.routes';
+import bootstrapAdminRoutes from './routes/bootstrap-admin.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 import prisma from './config/database';
@@ -93,6 +94,7 @@ app.use('/api/trainer', trainerRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/internal', bootstrapAdminRoutes);
 
 
 // 404 handler
