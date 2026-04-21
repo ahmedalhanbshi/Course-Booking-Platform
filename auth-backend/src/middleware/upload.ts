@@ -1,11 +1,26 @@
 import multer from 'multer';
+import fs from 'fs';
 import path from 'path';
 import { Request } from 'express';
+
+// Always resolve uploads to <project-root>/uploads in both src (ts-node) and dist builds.
+const uploadsDir = path.resolve(__dirname, '../../uploads');
+
+function ensureUploadsDir() {
+    if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+}
+
+// Ensure the directory exists as soon as middleware is loaded.
+ensureUploadsDir();
 
 // Configure storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/');
+        // Guard against ephemeral file systems or cold starts where folder is missing.
+        ensureUploadsDir();
+        cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {
         // Generate unique filename: timestamp-randomstring-originalname
