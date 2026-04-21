@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState, useEffect, ReactNode } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Search, Loader2 } from "lucide-react"
@@ -41,21 +41,23 @@ const locationOptions = [
     "الجناح الغربي"
 ]
 
-export default function TrainerHallsPage({
-    hideTitle = false,
-    basePath = "/trainer/halls",
-    actionLabel = "عرض التفاصيل",
-    onSelectHall,
-    hallsData,
-    stickyHeader = false,
-}: {
+type TrainerHallsPageProps = {
     hideTitle?: boolean
     basePath?: string
     actionLabel?: string
     onSelectHall?: (hallId: string) => void
     hallsData?: any[]
     stickyHeader?: boolean
-}) {
+}
+
+function TrainerHallsPageContent({
+    hideTitle = false,
+    basePath = "/trainer/halls",
+    actionLabel = "عرض التفاصيل",
+    onSelectHall,
+    hallsData,
+    stickyHeader = false,
+}: TrainerHallsPageProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedType, setSelectedType] = useState("الكل")
     const [selectedCapacity, setSelectedCapacity] = useState("كل السعات")
@@ -239,5 +241,13 @@ export default function TrainerHallsPage({
                 )}
             </div>
         </section>
+    )
+}
+
+export default function TrainerHallsPage(props: TrainerHallsPageProps) {
+    return (
+        <Suspense fallback={null}>
+            <TrainerHallsPageContent {...props} />
+        </Suspense>
     )
 }

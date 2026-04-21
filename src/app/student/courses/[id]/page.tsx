@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Cairo } from "next/font/google"
@@ -86,7 +86,7 @@ const cairo = Cairo({
   display: "swap"
 })
 
-export default function StudentCourseDashboard() {
+function StudentCourseDashboardContent() {
   const params = useParams()
   const courseId = params.id as string
   const router = useRouter()
@@ -847,5 +847,13 @@ export default function StudentCourseDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function StudentCourseDashboard() {
+  return (
+    <Suspense fallback={null}>
+      <StudentCourseDashboardContent />
+    </Suspense>
   )
 }

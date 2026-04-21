@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
@@ -43,7 +43,7 @@ interface StudentCoursesPageProps {
   basePath?: string
 }
 
-export default function StudentCoursesPage(props: StudentCoursesPageProps) {
+function StudentCoursesPageContent(props: StudentCoursesPageProps) {
   const basePath = props.basePath ?? "/student/explore/course"
   const searchParams = useSearchParams()
   const { user } = useAuth() ?? {}
@@ -293,5 +293,13 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
         )}
       </div>
     </section>
+  )
+}
+
+export default function StudentCoursesPage(props: StudentCoursesPageProps) {
+  return (
+    <Suspense fallback={null}>
+      <StudentCoursesPageContent {...props} />
+    </Suspense>
   )
 }

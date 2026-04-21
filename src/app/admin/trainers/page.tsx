@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,7 +41,7 @@ interface TrainerData {
 
 import { useSearchParams } from "next/navigation"
 
-export default function AdminTrainers() {
+function AdminTrainersContent() {
   const searchParams = useSearchParams()
   const viewId = searchParams.get('view')
 
@@ -565,5 +565,13 @@ export default function AdminTrainers() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function AdminTrainers() {
+  return (
+    <Suspense fallback={null}>
+      <AdminTrainersContent />
+    </Suspense>
   )
 }
