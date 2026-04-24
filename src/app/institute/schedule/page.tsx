@@ -112,8 +112,12 @@ export default function InstituteSchedulePage() {
             const data = await instituteService.getHallAvailability(selectedSession.roomId, dateKey)
             const [y, m, d] = dateKey.split("-").map(Number)
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(y, m - 1, d).getDay()]
-            const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
-            const hasAvail = (data.availability?.length ?? 0) > 0
+            const availabilitySlots = Array.isArray(data.availability)
+                ? data.availability
+                : (data.availability?.slots ?? [])
+
+            const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
+            const hasAvail = availabilitySlots.length > 0
             const booked: any[] = data.bookedSessions || []
 
             const open = TIME_SLOTS.filter(slot => {

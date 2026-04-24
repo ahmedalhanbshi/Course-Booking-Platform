@@ -1042,6 +1042,44 @@ class TrainerService {
     }
 
     /**
+     * Parse room availability — supports both legacy array format and new object format
+     */
+    private parseRoomAvailability(availability: any): { 
+        slots: { day: string; startTime: string; endTime: string }[]; 
+        blackoutPeriods: { id: string; label: string; startDate: string; endDate: string }[] 
+    } {
+        if (!availability) return { slots: [], blackoutPeriods: [] };
+        if (Array.isArray(availability)) return { slots: availability, blackoutPeriods: [] };
+        return {
+            slots: availability.slots ?? [],
+            blackoutPeriods: availability.blackoutPeriods ?? []
+        };
+    }
+
+    /**
+     * Expand blackout periods into per-day full-day blocked ranges
+     */
+    private expandBlackoutPeriods(
+        blackoutPeriods: { id: string; label: string; startDate: string; endDate: string }[]
+    ): { startTime: Date; endTime: Date }[] {
+        const blocked: { startTime: Date; endTime: Date }[] = [];
+        for (const bp of blackoutPeriods) {
+            // Use noon UTC to prevent date-boundary shifts across server timezones
+            const cursor = new Date(bp.startDate + 'T12:00:00Z');
+            const end = new Date(bp.endDate + 'T12:00:00Z');
+            while (cursor <= end) {
+                const dateStr = cursor.toISOString().substring(0, 10);
+                blocked.push({
+                    startTime: new Date(`${dateStr}T00:00:00Z`),
+                    endTime: new Date(`${dateStr}T23:59:59Z`),
+                });
+                cursor.setUTCDate(cursor.getUTCDate() + 1);
+            }
+        }
+        return blocked;
+    }
+
+    /**
      * Get availability for a specific hall (no ownership check)
      * Returns:
      *   - availability: the hall's defined working hours schedule
@@ -1110,9 +1148,12 @@ class TrainerService {
             }
         }
 
+        const parsed = this.parseRoomAvailability((room as any).availability);
+        const blackoutBlocks = this.expandBlackoutPeriods(parsed.blackoutPeriods);
+
         return {
-            availability: (room as any).availability,
-            bookedSessions: [...sessions, ...extraBlocked]
+            availability: parsed,
+            bookedSessions: [...sessions, ...extraBlocked, ...blackoutBlocks]
         };
     }
 

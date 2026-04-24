@@ -125,18 +125,29 @@ export default function EditTrainerCoursePage() {
             const [y, m, d] = dateKey.split("-").map(Number)
             const dateObj = new Date(y, m - 1, d)
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][dateObj.getDay()]
-            const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
-            const hasAvailability = data.availability?.length > 0
+            const availabilitySlots = Array.isArray(data.availability)
+                ? data.availability
+                : (data.availability?.slots ?? [])
+
+            const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
+            const hasAvailability = availabilitySlots.length > 0
             const booked = data.bookedSessions || []
-            const open = timeSlots.filter(slot => {
+            const openSlots = timeSlots.filter(slot => {
                 const [s, e] = slot.split(" - ")
-                if (hasAvailability && !allowedPeriods.some((p: any) => s >= p.startTime.substring(0, 5) && e <= p.endTime.substring(0, 5))) return false
+                if (hasAvailability) {
+                    if (!allowedPeriods.some((p: any) => s >= p.startTime.substring(0, 5) && e <= p.endTime.substring(0, 5))) return false
+                }
                 const slotStart = new Date(`${dateKey}T${s}:00`)
                 const slotEnd = new Date(`${dateKey}T${e}:00`)
-                return !booked.some((b: any) => slotStart < new Date(b.endTime) && slotEnd > new Date(b.startTime))
+                return !booked.some((b: any) => {
+                    const bStart = new Date(b.startTime)
+                    const bEnd = new Date(b.endTime)
+                    return slotStart < bEnd && slotEnd > bStart
+                })
             })
-            setAvailableSlots(open)
-            if (!open.length) setUnavailableMessage("لا يوجد أوقات متاحة في هذا اليوم أو القاعة مغلقة")
+
+            setAvailableSlots(openSlots)
+            if (openSlots.length === 0) setUnavailableMessage("لا يوجد أوقات متاحة في هذا اليوم أو القاعة مغلقة")
         } catch { toast.error("فشل جلب أوقات القاعة المتاحة") }
         finally { setIsSlotsLoading(false) }
     }

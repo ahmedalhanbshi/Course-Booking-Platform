@@ -1,6 +1,6 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,12 +8,24 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { Plus, X, Loader2 } from "lucide-react"
+import { Plus, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 
 import InstituteRoomBookings from "@/app/institute/room-bookings/page"
 import { instituteService } from "@/lib/institute-service"
 import { getFileUrl } from "@/lib/utils"
+
+interface BlackoutPeriod {
+  id: string
+  label: string
+  startDate: string // "YYYY-MM-DD"
+  endDate: string   // "YYYY-MM-DD"
+}
+
+interface HallAvailability {
+  slots: { day: string; startTime: string; endTime: string }[]
+  blackoutPeriods: BlackoutPeriod[]
+}
 
 interface Hall {
   id: string
@@ -22,11 +34,196 @@ interface Hall {
   location: string | null
   locationUrl: string | null
   type: string
-  hourlyRate: number | string // from backend pricePerHour Decimal
+  hourlyRate: number | string
   description: string | null
   image: string | null
-  features: string[] // from backend facilities[]
-  availability: { day: string; startTime: string; endTime: string }[]
+  features: string[]
+  availability: HallAvailability
+}
+
+// ── Blackout Calendar ─────────────────────────────────────
+const ARABIC_DAYS = ["أح", "إث", "ثل", "أر", "خم", "جم", "سب"]
+const ARABIC_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+
+function toDateStr(d: Date) {
+  return d.toISOString().substring(0, 10)
+}
+
+function isInBlackout(dateStr: string, periods: BlackoutPeriod[]) {
+  return periods.some(p => dateStr >= p.startDate && dateStr <= p.endDate)
+}
+
+function HallBlackoutCalendar({
+  blackoutPeriods,
+  onChange,
+}: {
+  blackoutPeriods: BlackoutPeriod[]
+  onChange: (periods: BlackoutPeriod[]) => void
+}) {
+  const today = new Date()
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth())
+  const [selStart, setSelStart] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false)
+  const [pendingRange, setPendingRange] = useState<{ start: string; end: string } | null>(null)
+  const [labelInput, setLabelInput] = useState("")
+
+  const firstDay = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startOffset = firstDay.getDay() // 0=Sun
+
+  const cells: (string | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => {
+      const d = new Date(year, month, i + 1)
+      return toDateStr(d)
+    })
+  ]
+
+  const prevMonth = () => {
+    if (month === 0) { setYear(y => y - 1); setMonth(11) }
+    else setMonth(m => m - 1)
+  }
+  const nextMonth = () => {
+    if (month === 11) { setYear(y => y + 1); setMonth(0) }
+    else setMonth(m => m + 1)
+  }
+
+  const handleDayClick = (d: string) => {
+    if (!selStart) {
+      setSelStart(d)
+    } else {
+      const start = selStart < d ? selStart : d
+      const end = selStart < d ? d : selStart
+      setSelStart(null)
+      setHovered(null)
+      setPendingRange({ start, end })
+      setLabelInput("")
+      setLabelDialogOpen(true)
+    }
+  }
+
+  const confirmAdd = () => {
+    if (!pendingRange) return
+    const newP: BlackoutPeriod = {
+      id: `bp-${Date.now()}`,
+      label: labelInput.trim() || "فترة عدم الإتاحة",
+      startDate: pendingRange.start,
+      endDate: pendingRange.end,
+    }
+    onChange([...blackoutPeriods, newP])
+    setLabelDialogOpen(false)
+    setPendingRange(null)
+  }
+
+  const removeBlackout = (id: string) => {
+    onChange(blackoutPeriods.filter(p => p.id !== id))
+  }
+
+  const isInSelection = (d: string) => {
+    if (!selStart) return false
+    const h = hovered ?? selStart
+    const lo = selStart < h ? selStart : h
+    const hi = selStart < h ? h : selStart
+    return d >= lo && d <= hi
+  }
+
+  const formatDate = (s: string) => {
+    const d = new Date(s + 'T12:00:00')
+    return `${d.getDate()} ${ARABIC_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Calendar header */}
+      <div className="flex items-center justify-between">
+        <button onClick={nextMonth} className="p-1 rounded hover:bg-slate-100"><ChevronLeft className="h-4 w-4" /></button>
+        <span className="text-sm font-semibold">{ARABIC_MONTHS[month]} {year}</span>
+        <button onClick={prevMonth} className="p-1 rounded hover:bg-slate-100"><ChevronRight className="h-4 w-4" /></button>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 text-center text-xs text-slate-400 mb-1">
+        {ARABIC_DAYS.map(d => <span key={d}>{d}</span>)}
+      </div>
+
+      {/* Days grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />
+          const isBlackout = isInBlackout(d, blackoutPeriods)
+          const inSel = isInSelection(d)
+          return (
+            <button
+              key={d}
+              onClick={() => handleDayClick(d)}
+              onMouseEnter={() => selStart && setHovered(d)}
+              onMouseLeave={() => setHovered(null)}
+              className={[
+                "h-8 w-full rounded text-xs font-medium transition-colors",
+                isBlackout ? "bg-red-100 text-red-700 hover:bg-red-200" :
+                inSel ? "bg-blue-100 text-blue-700" :
+                "hover:bg-slate-100 text-slate-700"
+              ].join(" ")}
+            >
+              {parseInt(d.substring(8))}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Hint */}
+      <p className="text-xs text-slate-400 text-center">
+        {selStart ? "الآن انقر على يوم النهاية" : "انقر على يوم البداية لتحديد فترة"}
+      </p>
+
+      {/* Blackout list */}
+      {blackoutPeriods.length > 0 && (
+        <div className="space-y-2 mt-2">
+          {blackoutPeriods.map(p => (
+            <div key={p.id} className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2">
+              <div>
+                <span className="text-sm font-medium text-red-700">{p.label}</span>
+                <span className="text-xs text-red-400 mr-2">{formatDate(p.startDate)} — {formatDate(p.endDate)}</span>
+              </div>
+              <button onClick={() => removeBlackout(p.id)} className="text-red-400 hover:text-red-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Label dialog */}
+      <Dialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen}>
+        <DialogContent dir="rtl" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>تسمية فترة عدم الإتاحة</DialogTitle>
+            {pendingRange && (
+              <DialogDescription>
+                من {formatDate(pendingRange.start)} إلى {formatDate(pendingRange.end)}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <Label>التسمية (اختياري)</Label>
+            <Input
+              dir="rtl"
+              placeholder="مثال: شهر رمضان"
+              value={labelInput}
+              onChange={e => setLabelInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmAdd()}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => { setLabelDialogOpen(false); setPendingRange(null) }}>إلغاء</Button>
+            <Button onClick={confirmAdd}>إضافة الفترة</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
 }
 
 export default function InstituteHallsPage() {
@@ -48,19 +245,27 @@ export default function InstituteHallsPage() {
     try {
       const data = await instituteService.getHalls()
       // Map backend fields to frontend interface
-      const mappedHalls = data.map((room: any) => ({
-        id: room.id,
-        name: room.name,
-        capacity: room.capacity,
-        location: room.location,
-        locationUrl: room.locationUrl,
-        type: room.type,
-        hourlyRate: room.pricePerHour,
-        description: room.description,
-        image: room.image,
-        features: room.facilities || [],
-        availability: room.availability || []
-      }))
+      const mappedHalls = data.map((room: any) => {
+        const rawAvail = room.availability
+        const availability: HallAvailability = Array.isArray(rawAvail)
+          ? { slots: rawAvail, blackoutPeriods: [] }
+          : rawAvail && typeof rawAvail === 'object'
+            ? { slots: rawAvail.slots ?? [], blackoutPeriods: rawAvail.blackoutPeriods ?? [] }
+            : { slots: [], blackoutPeriods: [] }
+        return {
+          id: room.id,
+          name: room.name,
+          capacity: room.capacity,
+          location: room.location,
+          locationUrl: room.locationUrl,
+          type: room.type,
+          hourlyRate: room.pricePerHour,
+          description: room.description,
+          image: room.image,
+          features: room.facilities || [],
+          availability,
+        }
+      })
       setHalls(mappedHalls)
     } catch {
       toast.error("فشل تحميل بيانات القاعات")
@@ -81,7 +286,7 @@ export default function InstituteHallsPage() {
     hourlyRate: 0,
     image: "",
     features: [],
-    availability: [],
+    availability: { slots: [], blackoutPeriods: [] },
     description: ""
   })
 
@@ -118,8 +323,8 @@ export default function InstituteHallsPage() {
   }
 
   useEffect(() => {
-    let url = editingHall?.image ?? ""
-    setImagePreviewUrl(getFileUrl(url))
+    const url = editingHall?.image ?? ""
+    setImagePreviewUrl(getFileUrl(url) ?? "")
   }, [editingHall?.image])
 
   const handleSaveEdit = async () => {
@@ -569,32 +774,39 @@ export default function InstituteHallsPage() {
                       </div>
                     </div>
 
+                    {/* ── أوقات العمل الأسبوعية ── */}
                     <div className="grid gap-4 border-t pt-4">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">أوقات العمل المتاحة للرواق</Label>
+                        <Label className="text-sm font-semibold">أوقات العمل المتاحة (أسبوعياً)</Label>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditingHall(prev => prev ? { ...prev, availability: [...prev.availability, { day: "SUNDAY", startTime: "08:00", endTime: "16:00" }] } : prev)}
+                          onClick={() => setEditingHall(prev => prev ? {
+                            ...prev,
+                            availability: {
+                              ...prev.availability,
+                              slots: [...prev.availability.slots, { day: "SUNDAY", startTime: "08:00", endTime: "16:00" }]
+                            }
+                          } : prev)}
                         >
                           <Plus className="h-4 w-4 ml-1" /> إضافة فترة
                         </Button>
                       </div>
-                      {(!editingForm.availability || editingForm.availability.length === 0) ? (
-                        <p className="text-sm text-gray-500">لم يتم تحديد أوقات. سيتم اعتبار القاعة متاحة دائماً ما لم يتم تحديد ساعات عمل.</p>
+                      {editingForm.availability.slots.length === 0 ? (
+                        <p className="text-sm text-gray-500">لم يتم تحديد أوقات. سيتم اعتبار القاعة متاحة دائماً.</p>
                       ) : (
                         <div className="space-y-3">
-                          {editingForm.availability.map((period, index) => (
+                          {editingForm.availability.slots.map((period, index) => (
                             <div key={index} className="flex items-center gap-2">
                               <Select
                                 value={period.day}
                                 onValueChange={(val) => {
                                   setEditingHall(prev => {
                                     if (!prev) return prev;
-                                    const newAv = [...prev.availability];
-                                    newAv[index].day = val;
-                                    return { ...prev, availability: newAv };
+                                    const newSlots = [...prev.availability.slots];
+                                    newSlots[index] = { ...newSlots[index], day: val };
+                                    return { ...prev, availability: { ...prev.availability, slots: newSlots } };
                                   });
                                 }}
                               >
@@ -622,9 +834,9 @@ export default function InstituteHallsPage() {
                                 onChange={(e) => {
                                   setEditingHall(prev => {
                                     if (!prev) return prev;
-                                    const newAv = [...prev.availability];
-                                    newAv[index].startTime = e.target.value;
-                                    return { ...prev, availability: newAv };
+                                    const newSlots = [...prev.availability.slots];
+                                    newSlots[index] = { ...newSlots[index], startTime: e.target.value };
+                                    return { ...prev, availability: { ...prev.availability, slots: newSlots } };
                                   });
                                 }}
                               />
@@ -636,9 +848,9 @@ export default function InstituteHallsPage() {
                                 onChange={(e) => {
                                   setEditingHall(prev => {
                                     if (!prev) return prev;
-                                    const newAv = [...prev.availability];
-                                    newAv[index].endTime = e.target.value;
-                                    return { ...prev, availability: newAv };
+                                    const newSlots = [...prev.availability.slots];
+                                    newSlots[index] = { ...newSlots[index], endTime: e.target.value };
+                                    return { ...prev, availability: { ...prev.availability, slots: newSlots } };
                                   });
                                 }}
                               />
@@ -650,9 +862,9 @@ export default function InstituteHallsPage() {
                                 onClick={() => {
                                   setEditingHall(prev => {
                                     if (!prev) return prev;
-                                    const newAv = [...prev.availability];
-                                    newAv.splice(index, 1);
-                                    return { ...prev, availability: newAv };
+                                    const newSlots = [...prev.availability.slots];
+                                    newSlots.splice(index, 1);
+                                    return { ...prev, availability: { ...prev.availability, slots: newSlots } };
                                   });
                                 }}
                               >
@@ -662,6 +874,21 @@ export default function InstituteHallsPage() {
                           ))}
                         </div>
                       )}
+                    </div>
+
+                    {/* ── فترات عدم الإتاحة (تقويم) ── */}
+                    <div className="grid gap-4 border-t pt-4">
+                      <Label className="text-sm font-semibold">فترات عدم الإتاحة</Label>
+                      <p className="text-xs text-slate-400 -mt-2">حدد التواريخ التي تكون فيها القاعة غير متاحة (مثل الإجازات والمناسبات).</p>
+                      <HallBlackoutCalendar
+                        blackoutPeriods={editingForm.availability.blackoutPeriods}
+                        onChange={(periods) =>
+                          setEditingHall(prev => prev ? {
+                            ...prev,
+                            availability: { ...prev.availability, blackoutPeriods: periods }
+                          } : prev)
+                        }
+                      />
                     </div>
                   </div>
                 </div>

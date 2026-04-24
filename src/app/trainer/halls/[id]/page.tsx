@@ -272,8 +272,13 @@ export default function HallDetailsPage() {
       const dayOfWeekMap = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
       const dayName = dayOfWeekMap[dateObj.getDay()]
 
-      const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
-      const hasAvailabilityDefined = data.availability && data.availability.length > 0
+      // Support both legacy array format and new {slots, blackoutPeriods} format
+      const availabilitySlots = Array.isArray(data.availability)
+        ? data.availability
+        : (data.availability?.slots ?? [])
+
+      const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
+      const hasAvailabilityDefined = availabilitySlots.length > 0
       const booked = data.bookedSessions || []
 
       const openSlots = timeSlots.filter(slot => {

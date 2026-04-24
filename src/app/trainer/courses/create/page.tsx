@@ -246,8 +246,12 @@ export default function CreateCoursePage() {
             const dayOfWeekMap = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
             const dayName = dayOfWeekMap[dateObj.getDay()]
 
-            const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
-            const hasAvailabilityDefined = data.availability && data.availability.length > 0
+            const availabilitySlots = Array.isArray(data.availability)
+                ? data.availability
+                : (data.availability?.slots ?? [])
+
+            const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
+            const hasAvailabilityDefined = availabilitySlots.length > 0
 
             const booked = data.bookedSessions || []
 
@@ -278,7 +282,7 @@ export default function CreateCoursePage() {
             })
 
             setAvailableSlots(openSlots)
-            if (openSlots.length === 0) setUnavailableMessage("لا يوجد أوقات متاحة في هذا اليوم أوالقاعة مغلقة")
+            if (openSlots.length === 0) setUnavailableMessage("لا يوجد أوقات متاحة في هذا اليوم أو القاعة مغلقة")
         } catch (e: any) {
             toast.error("فشل جلب أوقات القاعة المتاحة")
         } finally {

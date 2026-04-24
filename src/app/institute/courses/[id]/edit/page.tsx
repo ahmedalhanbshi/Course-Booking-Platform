@@ -142,8 +142,12 @@ export default function EditCoursePage() {
             const [y, m, d] = dateKey.split("-").map(Number)
             const dateObj = new Date(y, m - 1, d)
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][dateObj.getDay()]
-            const allowedPeriods = data.availability?.filter((a: any) => a.day === dayName) || []
-            const hasAvailability = data.availability?.length > 0
+            const availabilitySlots = Array.isArray(data.availability)
+                ? data.availability
+                : (data.availability?.slots ?? [])
+
+            const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
+            const hasAvailability = availabilitySlots.length > 0
             const booked = data.bookedSessions || []
             const open = timeSlots.filter(slot => {
                 const [s, e] = slot.split(" - ")
