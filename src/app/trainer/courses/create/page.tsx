@@ -296,7 +296,7 @@ export default function CreateCoursePage() {
     }
 
     // --- Submission Logic ---
-    const handleSubmit = async (status: 'DRAFT' | 'ACTIVE') => {
+    const handleSubmit = async (status: 'DRAFT' | 'ACTIVE' | 'PENDING_MINIMUM') => {
         try {
             setIsSubmitting(true)
 
@@ -304,8 +304,8 @@ export default function CreateCoursePage() {
             let startDate: string, endDate: string;
             let sessionsPayload: any[] = [];
 
-            if (status === 'DRAFT') {
-                // Drafts don't need hall/session — save with placeholders
+            if (status === 'DRAFT' || status === 'PENDING_MINIMUM') {
+                // Drafts and PENDING_MINIMUM don't need hall/session — save with placeholders
                 startDate = new Date().toISOString().split('T')[0];
                 endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 sessionsPayload = [];
@@ -381,7 +381,11 @@ export default function CreateCoursePage() {
 
             await trainerService.createCourse(formData);
 
-            toast.success(status === 'DRAFT' ? 'تم حفظ المسودة بنجاح' : 'تم إنشاء الدورة بنجاح');
+            toast.success(
+                status === 'DRAFT'           ? 'تم حفظ المسودة بنجاح' :
+                status === 'PENDING_MINIMUM' ? 'تم نشر الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد' :
+                                              'تم إنشاء الدورة بنجاح'
+            );
             router.push('/trainer/courses');
 
         } catch (err: any) {
@@ -614,7 +618,24 @@ export default function CreateCoursePage() {
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                             حفظ كمسودة
                         </Button>
-                        <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي ←</Button>
+
+                        <div className="flex items-center gap-3">
+                            {Number(courseData.minStudents) > 1 && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleSubmit('PENDING_MINIMUM')}
+                                    disabled={isSubmitting || !isInfoValid}
+                                    className="border-purple-300 text-purple-700 hover:bg-purple-50 hover:border-purple-400 gap-2"
+                                >
+                                    {isSubmitting
+                                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                                        : <Users className="h-4 w-4" />
+                                    }
+                                    نشر بانتظار الحد الأدنى
+                                </Button>
+                            )}
+                            <Button onClick={() => setActiveTab("pricing")} disabled={!isInfoValid}>التالي ←</Button>
+                        </div>
                     </div>
                 </TabsContent>
 

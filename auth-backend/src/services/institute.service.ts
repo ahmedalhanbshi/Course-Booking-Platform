@@ -1332,14 +1332,16 @@ class InstituteService {
                     where: { id: booking.courseId },
                     select: { status: true }
                 });
-                if (targetCourse?.status === 'PENDING_MINIMUM') {
-                    // Course was waiting for min students — notify all registered students now
+                
+                // Always set course to ACTIVE when booking is approved
+                await prisma.course.update({
+                    where: { id: booking.courseId },
+                    data: { status: "ACTIVE" }
+                });
+
+                if (targetCourse?.status === 'PENDING_MINIMUM' || targetCourse?.status === 'PENDING_REVIEW') {
+                    // Notify any existing preliminary students
                     await this.activateCourseAndNotifyStudents(booking.courseId);
-                } else {
-                    await prisma.course.update({
-                        where: { id: booking.courseId },
-                        data: { status: "ACTIVE" }
-                    });
                 }
             }
 

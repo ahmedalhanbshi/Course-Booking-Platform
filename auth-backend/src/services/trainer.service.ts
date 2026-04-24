@@ -416,66 +416,110 @@ class TrainerService {
         // If publishing (ACTIVE or PENDING_REVIEW) with sessions payload, create sessions
         if ((data.status?.toUpperCase() === 'ACTIVE' || data.status?.toUpperCase() === 'PENDING_REVIEW') && Array.isArray(data.sessions) && data.sessions.length > 0) {
             const sessionType = data.deliveryType === 'online' ? 'ONLINE' : 'IN_PERSON';
-            const mappedSessions = data.sessions.map((s: any) => ({
-                startTime: new Date(`${s.date}T${s.startTime}`),
-                endTime: new Date(`${s.date}T${s.endTime}`),
-                type: sessionType,
-                status: 'SCHEDULED' as const,
-                location: s.location || '',
-                meetingLink: s.meetingLink || null,
-                topic: s.topic || '',
-                courseId,
-            }));
+            
+            const mappedSessions = data.sessions.map((s: any) => {
+                // Ensure time format is HH:mm:ss for ISO parsing
+                const formatTime = (t: string) => (t && t.split(':').length === 2) ? `${t}:00` : t;
+                const start = new Date(`${s.date}T${formatTime(s.startTime)}`);
+                const end = new Date(`${s.date}T${formatTime(s.endTime)}`);
+
+                return {
+                    startTime: isNaN(start.getTime()) ? new Date() : start,
+                    endTime: isNaN(end.getTime()) ? new Date() : end,
+                    type: sessionType,
+                    status: 'SCHEDULED' as const,
+                    location: s.location || '',
+                    meetingLink: s.meetingLink || null,
+                    topic: s.topic || '',
+                    courseId,
+                };
+            });
 
             // Delete old sessions for this course first
             await prisma.session.deleteMany({ where: { courseId } });
 
             if (data.hallId && data.paymentReceiptPath) {
-                // In-person: create room booking + payment + sessions linked to booking
-                const room = await prisma.room.findUnique({ where: { id: data.hallId } });
-                if (!room) throw new Error('القاعة غير موجودة');
+                try {
+                    // In-person: create room booking + payment + sessions linked to booking
+                    const room = await prisma.room.findUnique({ where: { id: data.hallId } });
+                    if (!room) throw new Error('القاعة غير موجودة');
 
-                const totalHours = mappedSessions.reduce((acc: number, s: any) => {
-                    return acc + (s.endTime.getTime() - s.startTime.getTime()) / 3600000;
-                }, 0);
-                const totalPrice = totalHours * Number(room.pricePerHour);
-                const sortedSessions = [...mappedSessions].sort((a: any, b: any) => a.startTime - b.startTime);
+                    const totalHours = mappedSessions.reduce((acc: number, s: any) => {
+                        const diff = s.endTime.getTime() - s.startTime.getTime();
+                        return acc + (isNaN(diff) || diff < 0 ? 0 : diff / 3600000);
+                    }, 0);
+                    
+                    const hourlyRate = Number(room.pricePerHour) || 0;
+                    const totalPrice = totalHours * hourlyRate;
 
-                const roomBooking = await prisma.roomBooking.create({
-                    data: {
-                        bookingMode: 'CUSTOM_TIME',
-                        startDate: sortedSessions[0].startTime,
-                        endDate: sortedSessions[sortedSessions.length - 1].endTime,
-                        selectedDays: [],
-                        defaultStartTime: sortedSessions[0].startTime,
-                        defaultEndTime: sortedSessions[0].endTime,
-                        status: 'PENDING_APPROVAL',
-                        totalPrice,
-                        roomId: room.id,
-                        requestedById: userId,
-                        courseId,
-                        purpose: `حجز لدورة: ${updated.title}`
+                    const sortedSessions = [...mappedSessions].sort((a: any, b: any) => a.startTime.getTime() - b.startTime.getTime());
+                    
+                    // Helper to create a time-only date for Prisma @db.Time(6) compatibility
+                    const toTimeOnly = (d: Date) => {
+                        const t = new Date(1970, 0, 1);
+                        t.setHours(d.getHours(), d.getMinutes(), d.getSeconds(), 0);
+                        return t;
+                    };
+
+                    const roomBooking = await prisma.roomBooking.create({
+                        data: {
+                            bookingMode: 'CUSTOM_TIME',
+                            startDate: sortedSessions[0].startTime,
+                            endDate: sortedSessions[sortedSessions.length - 1].endTime,
+                            selectedDays: [],
+                            defaultStartTime: toTimeOnly(sortedSessions[0].startTime),
+                            defaultEndTime: toTimeOnly(sortedSessions[0].endTime),
+                            status: 'PENDING_APPROVAL',
+                            totalPrice: isNaN(totalPrice) ? 0 : totalPrice,
+                            roomId: room.id,
+                            requestedById: userId,
+                            courseId,
+                            purpose: `حجز لدورة: ${updated.title}`
+                        }
+                    });
+
+                    await prisma.payment.create({
+                        data: {
+                            amount: isNaN(totalPrice) ? 0 : totalPrice,
+                            currency: 'YER',
+                            depositSlipImage: data.paymentReceiptPath,
+                            notes: `إيصال دفع لحجز قاعة (${room.name}) للدورة (${updated.title})`,
+                            status: 'PENDING_REVIEW',
+                            roomBookingId: roomBooking.id
+                        }
+                    });
+
+                    await prisma.session.createMany({
+                        data: mappedSessions.map((s: any) => ({
+                            ...s,
+                            roomBookingId: roomBooking.id,
+                            roomId: room.id,
+                        }))
+                    });
+
+                    // ── Notify Institute of new booking request ──
+                    const institute = await prisma.institute.findUnique({
+                        where: { id: room.instituteId },
+                        include: { user: { select: { id: true, name: true, email: true, phone: true } } }
+                    });
+                    const trainerUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+
+                    if (institute && trainerUser) {
+                        await notificationService.createNotification({
+                            userId: institute.user.id,
+                            type: 'NEW_BOOKING_REQUEST',
+                            title: 'طلب حجز قاعة جديد (تعديل)',
+                            message: `طلب المدرب ${trainerUser.name} تحديث حجز قاعة "${room.name}" لدورة "${updated.title}"`,
+                            relatedEntityId: roomBooking.id,
+                            actionUrl: '/institute/room-bookings',
+                            emailFn: institute.user.email ? () => mailerService.sendNewBookingRequest(institute.user.email!, institute.user.name, trainerUser.name, room.name) : undefined,
+                            whaFn: institute.user.phone ? () => whatsAppService.notifyNewBookingRequest(institute.user.phone!, institute.user.name, trainerUser.name, room.name) : undefined
+                        });
                     }
-                });
-
-                await prisma.payment.create({
-                    data: {
-                        amount: totalPrice,
-                        currency: 'YER',
-                        depositSlipImage: data.paymentReceiptPath,
-                        notes: `إيصال دفع لحجز قاعة (${room.name})`,
-                        status: 'PENDING_REVIEW',
-                        roomBookingId: roomBooking.id
-                    }
-                });
-
-                await prisma.session.createMany({
-                    data: mappedSessions.map((s: any) => ({
-                        ...s,
-                        roomBookingId: roomBooking.id,
-                        roomId: room.id,
-                    }))
-                });
+                } catch (bookingError: any) {
+                    console.error('[updateTrainerCourse] RoomBooking Error:', bookingError);
+                    throw new Error(`فشل في إنشاء حجز القاعة: ${bookingError.message}`);
+                }
             } else {
                 // Online or capacity_based: just create sessions
                 await prisma.session.createMany({ data: mappedSessions });

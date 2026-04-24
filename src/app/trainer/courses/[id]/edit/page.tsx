@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HallImage } from "@/components/halls/HallImage"
-import { Save, Send, Trash2, ArrowLeft, X, Loader2, AlertCircle, UploadCloud, Banknote, Plus, Globe, Building, Users, MapPin, Calendar, CheckCircle } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, Loader2, AlertCircle, UploadCloud, Banknote, Plus, Globe, Building, Users, MapPin, Calendar, CheckCircle, Landmark } from "lucide-react"
 import { toast } from "sonner"
 import { trainerService } from "@/lib/trainer-service"
 import { getFileUrl } from "@/lib/utils"
@@ -108,6 +108,7 @@ export default function EditTrainerCoursePage() {
         image: h.image || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000",
         features: h.facilities?.length > 0 ? h.facilities : ["مجهزة بالكامل"],
         owner: h.institute?.name || "المعهد",
+        bankAccounts: h.institute?.bankAccounts || [],
         description: h.description
     }))
     const selectedHall = mappedHalls.find(h => h.id === selectedHallId)
@@ -300,7 +301,12 @@ export default function EditTrainerCoursePage() {
                         <Button variant="destructive" size="sm" disabled={isSubmitting}><Trash2 className="mr-2 h-4 w-4" />حذف الدورة</Button>
                     </DialogTrigger>
                     <DialogContent dir="rtl">
-                        <DialogHeader className="text-right"><h2 className="text-lg font-bold">تأكيد الحذف</h2><p className="text-sm text-gray-600">هل أنت متأكد من حذف هذه الدورة؟ هذا الإجراء لا يمكن التراجع عنه.</p></DialogHeader>
+                        <DialogHeader className="text-right">
+                            <DialogTitle className="text-lg font-bold">تأكيد الحذف</DialogTitle>
+                            <DialogDescription className="text-sm text-gray-600">
+                                هل أنت متأكد من حذف هذه الدورة؟ هذا الإجراء لا يمكن التراجع عنه.
+                            </DialogDescription>
+                        </DialogHeader>
                         <div className="flex gap-2 justify-end"><Button variant="outline" onClick={() => setShowDeleteDialog(false)}>إلغاء</Button><Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>{isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}حذف نهائي</Button></div>
                     </DialogContent>
                 </Dialog>
@@ -486,7 +492,9 @@ export default function EditTrainerCoursePage() {
                                             )}
                                             <Dialog open={isHallDialogOpen} onOpenChange={setIsHallDialogOpen}>
                                                 <DialogContent className="max-w-4xl h-[80vh] overflow-y-auto">
-                                                    <DialogHeader><h2 className="text-lg font-bold">اختيار القاعة</h2></DialogHeader>
+                                                    <DialogHeader>
+                                                        <DialogTitle className="text-lg font-bold">اختيار القاعة</DialogTitle>
+                                                    </DialogHeader>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
                                                         {mappedHalls.map(hall => (
                                                             <div key={hall.id} className="border rounded-xl overflow-hidden hover:border-blue-500 transition-colors group flex flex-col bg-white">
@@ -563,8 +571,53 @@ export default function EditTrainerCoursePage() {
                                                             <div className="flex flex-wrap gap-2">{selectedSessions.map((s, i) => <Badge key={i} variant="secondary" className="bg-white">{formatDateLabel(s.date)} ({s.slot})</Badge>)}</div>
                                                         </div>
                                                         <Card className="border-2 border-dashed border-blue-200">
-                                                            <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Banknote className="h-5 w-5 text-blue-600" />سند الدفع لحجز القاعة</CardTitle><CardDescription>يرجى تحويل {totalPrice.toLocaleString()} ر.ي وإرفاق صورة السند</CardDescription></CardHeader>
-                                                            <CardContent>
+                                                            <CardHeader className="pb-3">
+                                                                <CardTitle className="text-base flex items-center gap-2">
+                                                                    <Banknote className="h-5 w-5 text-blue-600" />
+                                                                    بيانات الدفع لحجز القاعة
+                                                                </CardTitle>
+                                                                <CardDescription>يرجى تحويل مبلغ {totalPrice.toLocaleString()} ر.ي إلى أحد الحسابات التالية وإرفاق صورة السند أدناه</CardDescription>
+                                                            </CardHeader>
+                                                            <CardContent className="space-y-6">
+                                                                
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-sm font-semibold text-gray-700">الحسابات البنكية للمعهد</h4>
+                                                                    {selectedHall?.bankAccounts && selectedHall.bankAccounts.length > 0 ? (
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                            {selectedHall.bankAccounts.map((bank: any) => (
+                                                                                <div key={bank.id} className="relative overflow-hidden group p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow border-gray-100">
+                                                                                    <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-600"></div>
+                                                                                    <div className="flex items-center gap-3 mb-4">
+                                                                                        <div className="h-10 w-10 bg-blue-50/80 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+                                                                                            <Landmark className="h-5 w-5" />
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <h5 className="font-bold text-gray-900 leading-tight">{bank.bankName}</h5>
+                                                                                            <p className="text-xs text-gray-500 mt-1">{bank.accountName}</p>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100/60">
+                                                                                        <div className="flex justify-between items-center text-sm">
+                                                                                            <span className="text-xs text-gray-500 font-medium">رقم الحساب</span>
+                                                                                            <span className="font-mono font-semibold text-blue-900" dir="ltr">{bank.accountNumber}</span>
+                                                                                        </div>
+                                                                                        {bank.iban && (
+                                                                                            <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
+                                                                                                <span className="text-xs text-gray-500 font-medium">IBAN</span>
+                                                                                                <span className="font-mono text-xs font-semibold text-gray-700" dir="ltr">{bank.iban}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded-lg border border-dashed">
+                                                                            لا توجد حسابات بنكية مضافة لهذا المعهد حالياً. يمكنك التواصل مع المعهد مباشرة.
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
                                                                 <div className="relative h-48 w-full rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 cursor-pointer overflow-hidden group" onClick={() => paymentInputRef.current?.click()}>
                                                                     {paymentPreview ? <><img src={paymentPreview} alt="Payment" className="h-full w-full object-contain" /><div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Button variant="secondary" size="sm">تغيير الصورة</Button></div></> : <div className="text-center p-6"><div className="bg-blue-100 p-3 rounded-full w-fit mx-auto mb-3"><Plus className="h-6 w-6 text-blue-600" /></div><p className="font-medium text-gray-700">إرفاق صورة سند الدفع</p><p className="text-xs text-gray-500 mt-1">اضغط هنا لرفع الملف</p></div>}
                                                                     <input type="file" ref={paymentInputRef} className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) { setPaymentFile(e.target.files[0]); setPaymentPreview(URL.createObjectURL(e.target.files[0])) } }} />
