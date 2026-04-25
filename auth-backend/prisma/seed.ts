@@ -46,10 +46,12 @@ async function main() {
     await prisma.room.deleteMany();
     await prisma.course.deleteMany();
     await prisma.courseCategory.deleteMany();
+    await prisma.tag.deleteMany();
     await prisma.institute.deleteMany();
     await prisma.trainerProfile.deleteMany();
     await prisma.user.deleteMany();
     console.log('✅ Existing data cleared\n');
+
 
     // Common password for all users
     const commonPassword = await hashPassword('Test@123456');
@@ -476,6 +478,37 @@ async function main() {
     });
 
     console.log('✅ Created 4 course categories\n');
+
+    // ================================================
+    // TAGS
+    // ================================================
+    console.log('🏷️  Creating tags...');
+
+    await prisma.tag.createMany({
+        data: [
+            { name: 'برمجة',            slug: 'programming',   color: '#3B82F6' },
+            { name: 'تصميم',            slug: 'design',        color: '#8B5CF6' },
+            { name: 'لغات',             slug: 'languages',     color: '#10B981' },
+            { name: 'إدارة',            slug: 'management',    color: '#F59E0B' },
+            { name: 'تسويق',            slug: 'marketing',     color: '#EF4444' },
+            { name: 'محاسبة',           slug: 'accounting',    color: '#6366F1' },
+            { name: 'صحة ولياقة',       slug: 'health',        color: '#14B8A6' },
+            { name: 'فنون',             slug: 'arts',          color: '#EC4899' },
+            { name: 'ذكاء اصطناعي',     slug: 'ai',            color: '#F97316' },
+            { name: 'أعمال حرة',        slug: 'freelancing',   color: '#0EA5E9' },
+            { name: 'تطوير ويب',        slug: 'web-dev',       color: '#84CC16' },
+            { name: 'تطوير تطبيقات',    slug: 'mobile-dev',    color: '#06B6D4' },
+            { name: 'شبكات',            slug: 'networking',    color: '#64748B' },
+            { name: 'أمن معلومات',      slug: 'cybersecurity', color: '#DC2626' },
+            { name: 'ريادة أعمال',      slug: 'entrepreneurship', color: '#7C3AED' },
+            { name: 'مبتدئ',            slug: 'beginner',      color: '#22C55E' },
+            { name: 'متقدم',            slug: 'advanced',      color: '#EF4444' },
+            { name: 'عملي',             slug: 'practical',     color: '#F59E0B' },
+        ],
+        skipDuplicates: true,
+    });
+
+    console.log('✅ Created 18 tags\n');
 
     // ================================================
     // COURSES

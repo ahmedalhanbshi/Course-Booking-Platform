@@ -17,5 +17,6 @@ router.get('/institutes/:id', instituteController.getPublicInstituteById);
 router.get('/stats', publicController.getStats);
 router.get('/categories', publicController.getCategories);
 router.get('/featured-courses', publicController.getFeaturedCourses);
+router.get('/tags', publicController.getTags);
 
 export default router;

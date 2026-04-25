@@ -73,6 +73,19 @@ export const publicController = {
       console.error('Error fetching featured courses:', error);
       res.status(500).json({ success: false, message: 'فشل في جلب الدورات المميزة' });
     }
+  },
+
+  // 4. Get All Tags
+  getTags: async (req: Request, res: Response) => {
+    try {
+      const tags = await prisma.tag.findMany({
+        orderBy: { name: 'asc' }
+      });
+      res.status(200).json({ success: true, data: tags });
+    } catch (error: any) {
+      console.error('Error fetching tags:', error);
+      res.status(500).json({ success: false, message: 'فشل في جلب الوسوم' });
+    }
   }
 };
 

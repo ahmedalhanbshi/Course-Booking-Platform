@@ -27,6 +27,14 @@ export interface FeaturedCourse {
   institute: { id: string; name: string; logo: string | null } | null;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  color: string | null;
+  createdAt: string;
+}
+
 export const PublicService = {
   // Get platform statistics
   getStats: async (): Promise<PlatformStats> => {
@@ -43,6 +51,12 @@ export const PublicService = {
   // Get featured courses for homepage
   getFeaturedCourses: async (): Promise<FeaturedCourse[]> => {
     const response = await api.get('/api/public/featured-courses');
+    return response.data.data;
+  },
+
+  // Get all available tags
+  getTags: async (): Promise<Tag[]> => {
+    const response = await api.get('/api/public/tags');
     return response.data.data;
   }
 };

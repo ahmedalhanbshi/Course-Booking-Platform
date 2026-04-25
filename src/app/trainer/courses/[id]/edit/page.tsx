@@ -17,6 +17,7 @@ import { HallImage } from "@/components/halls/HallImage"
 import { Save, Send, Trash2, ArrowLeft, X, Loader2, AlertCircle, UploadCloud, Banknote, Plus, Globe, Building, Users, MapPin, Calendar, CheckCircle, Landmark } from "lucide-react"
 import { toast } from "sonner"
 import { trainerService } from "@/lib/trainer-service"
+import { PublicService, Tag } from "@/lib/public-service"
 import { getFileUrl } from "@/lib/utils"
 import Image from "next/image"
 
@@ -46,9 +47,9 @@ export default function EditTrainerCoursePage() {
     const [activeTab, setActiveTab] = useState("info")
 
     const [courseData, setCourseData] = useState<any>(null)
+    const [availableTags, setAvailableTags] = useState<Tag[]>([])
     const [currentObjective, setCurrentObjective] = useState("")
     const [currentPrerequisite, setCurrentPrerequisite] = useState("")
-    const [currentTag, setCurrentTag] = useState("")
 
     const [resubmitFile, setResubmitFile] = useState<File | null>(null)
     const [resubmitPreview, setResubmitPreview] = useState<string>("")
@@ -174,9 +175,10 @@ export default function EditTrainerCoursePage() {
         const fetchCourse = async () => {
             try {
                 setLoading(true)
-                const [data, hls] = await Promise.all([
+                const [data, hls, tags] = await Promise.all([
                     trainerService.getTrainerCourseById(courseId),
-                    trainerService.getHalls()
+                    trainerService.getHalls(),
+                    PublicService.getTags()
                 ])
                 setCourseData({ ...data,
                     startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
@@ -184,6 +186,7 @@ export default function EditTrainerCoursePage() {
                     enrolledStudents: data.enrolledStudents ?? 0,
                 })
                 setHalls(hls)
+                setAvailableTags(tags)
                 if (data.image) setImagePreview(getFileUrl(data.image) ?? "")
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || "فشل في تحميل بيانات الدورة")
@@ -272,8 +275,19 @@ export default function EditTrainerCoursePage() {
     const removeObjective = (i: number) => setCourseData((p: any) => ({ ...p, objectives: p.objectives.filter((_: any, idx: number) => idx !== i) }))
     const addPrerequisite = () => { if (currentPrerequisite.trim()) { setCourseData((p: any) => ({ ...p, prerequisites: [...p.prerequisites, currentPrerequisite.trim()] })); setCurrentPrerequisite("") } }
     const removePrerequisite = (i: number) => setCourseData((p: any) => ({ ...p, prerequisites: p.prerequisites.filter((_: any, idx: number) => idx !== i) }))
-    const addTag = () => { if (currentTag.trim() && !courseData.tags.includes(currentTag.trim())) { setCourseData((p: any) => ({ ...p, tags: [...p.tags, currentTag.trim()] })); setCurrentTag("") } }
-    const removeTag = (tag: string) => setCourseData((p: any) => ({ ...p, tags: p.tags.filter((t: string) => t !== tag) }))
+
+    const toggleTag = (tagName: string) => {
+        setCourseData((prev: any) => {
+            const exists = prev.tags.includes(tagName)
+            return {
+                ...prev,
+                tags: exists
+                    ? prev.tags.filter((t: string) => t !== tagName)
+                    : [...prev.tags, tagName]
+            }
+        })
+    }
+
     const handleDelete = async () => {
         try { setIsSubmitting(true); await trainerService.deleteCourse(courseId); toast.success("تم حذف الدورة بنجاح"); router.push('/trainer/courses') }
         catch (err: any) { toast.error(err?.response?.data?.message || "فشل في حذف الدورة") }
@@ -408,10 +422,24 @@ export default function EditTrainerCoursePage() {
                     <Card>
                         <CardHeader><CardTitle>التسعير والتواريخ</CardTitle><CardDescription>حدد سعر الدورة ومواعيدها</CardDescription></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2"><Label>السعر (ر.ي) *</Label><Input type="number" value={courseData.price} onChange={e => setCourseData((p: any) => ({ ...p, price: e.target.value }))} /></div>
                                 <div className="space-y-2"><Label>المدة (ساعة)</Label><Input type="number" value={courseData.duration} onChange={e => setCourseData((p: any) => ({ ...p, duration: e.target.value }))} /></div>
-                                <div className="space-y-2"><Label>الحد الأقصى للطلاب</Label><Input type="number" value={courseData.maxStudents} onChange={e => setCourseData((p: any) => ({ ...p, maxStudents: e.target.value }))} /></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div className="space-y-2">
+                                    <Label>الحد الأدنى للطلاب</Label>
+                                    <Input type="number" value={courseData.minStudents} 
+                                        onChange={e => setCourseData((p: any) => ({ ...p, minStudents: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>الحد الأقصى للطلاب</Label>
+                                    <Input type="number" value={courseData.maxStudents} 
+                                        onChange={e => setCourseData((p: any) => ({ ...p, maxStudents: e.target.value }))}
+                                    />
+                                </div>
+                                {courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) > Number(courseData.maxStudents) && <p className="text-sm text-red-500 md:col-span-2 mt-1">⚠️ الحد الأدنى يجب أن يكون أقل من أو يساوي الحد الأقصى</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -433,10 +461,47 @@ export default function EditTrainerCoursePage() {
                     </Card>
 
                     <Card>
-                        <CardHeader><CardTitle>الكلمات المفتاحية</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex gap-2"><Input placeholder="أدخل كلمة مفتاحية" value={currentTag} onChange={e => setCurrentTag(e.target.value)} onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addTag())} /><Button type="button" onClick={addTag}>إضافة</Button></div>
-                            {courseData.tags?.length > 0 && <div className="flex flex-wrap gap-2">{courseData.tags.map((tag: string) => (<Badge key={tag} variant="secondary">{tag}<button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-red-500"><X className="h-3 w-3" /></button></Badge>))}</div>}
+                        <CardHeader>
+                            <CardTitle className="text-base">الوسوم</CardTitle>
+                            <CardDescription>انقر على الوسوم لتحديدها أو إلغاء تحديدها</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                                {availableTags.map(tag => {
+                                    const isSelected = courseData.tags?.includes(tag.name)
+                                    return (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            onClick={() => toggleTag(tag.name)}
+                                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all duration-150 ${
+                                                isSelected
+                                                    ? 'text-white border-transparent shadow-md scale-105'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                            }`}
+                                            style={isSelected ? { backgroundColor: tag.color || '#6366F1', borderColor: tag.color || '#6366F1' } : {}}
+                                        >
+                                            {isSelected && <CheckCircle className="h-3.5 w-3.5" />}
+                                            {tag.name}
+                                        </button>
+                                    )
+                                })}
+                                {availableTags.length === 0 && (
+                                    <p className="text-xs text-gray-400">جاري تحميل الوسوم...</p>
+                                )}
+                            </div>
+                            {courseData.tags?.length > 0 && (
+                                <div className="pt-2 border-t">
+                                    <p className="text-xs text-gray-500 mb-1.5">المختار ({courseData.tags.length}):</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {courseData.tags.map((t: string) => (
+                                            <Badge key={t} variant="secondary" className="text-xs">
+                                                {t}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -444,7 +509,7 @@ export default function EditTrainerCoursePage() {
                         <Button variant="outline" type="button" onClick={() => router.back()}>إلغاء</Button>
                         <div className="flex gap-2">
                             {canSetupSchedule && <Button variant="outline" onClick={() => setActiveTab("schedule")}>الحجز والمواعيد ←</Button>}
-                            <Button variant="outline" type="button" onClick={() => handleSubmit()} disabled={isSubmitting}><Save className="mr-2 h-4 w-4" />{isSubmitting ? 'جاري الحفظ...' : 'حفظ التغييرات'}</Button>
+                            <Button variant="outline" type="button" onClick={() => handleSubmit()} disabled={isSubmitting || Boolean(courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) > Number(courseData.maxStudents))}><Save className="mr-2 h-4 w-4" />{isSubmitting ? 'جاري الحفظ...' : 'حفظ التغييرات'}</Button>
                         </div>
                     </div>
                 </TabsContent>

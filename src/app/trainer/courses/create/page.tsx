@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { trainerService } from "@/lib/trainer-service"
+import { PublicService, Tag } from "@/lib/public-service"
 import { HallImage } from "@/components/halls/HallImage"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,6 +56,7 @@ export default function CreateCoursePage() {
     // Reference Data State
     const [categories, setCategories] = useState<{ id: string, name: string }[]>([])
     const [halls, setHalls] = useState<any[]>([])
+    const [availableTags, setAvailableTags] = useState<Tag[]>([])
     const [newCategoryInput, setNewCategoryInput] = useState("")
     const [isAddingCategory, setIsAddingCategory] = useState(false)
     const [isCreatingCategory, setIsCreatingCategory] = useState(false)
@@ -105,7 +107,6 @@ export default function CreateCoursePage() {
 
     const [currentObjective, setCurrentObjective] = useState("")
     const [currentPrerequisite, setCurrentPrerequisite] = useState("")
-    const [currentTag, setCurrentTag] = useState("")
 
     const [imageFile, setImageFile] = useState<File | null>(null)
     const [imagePreview, setImagePreview] = useState<string>("")
@@ -153,13 +154,14 @@ export default function CreateCoursePage() {
         const fetchData = async () => {
             try {
                 setLoading(true)
-                const [cats, hls] = await Promise.all([
+                const [cats, hls, tags] = await Promise.all([
                     trainerService.getCategories(),
-                    trainerService.getHalls()
+                    trainerService.getHalls(),
+                    PublicService.getTags()
                 ])
                 setCategories(cats)
-                // Note: Trainers do not fetch a 'trainers' list because they are the trainer
                 setHalls(hls)
+                setAvailableTags(tags)
                 console.log("HLS DATA FETCHED:", hls)
             } catch (err) {
                 toast.error("فشل في تحميل البيانات الأساسية")
@@ -417,16 +419,20 @@ export default function CreateCoursePage() {
     }
     const removePrerequisite = (i: number) => setCourseData(prev => ({ ...prev, prerequisites: prev.prerequisites.filter((_, idx) => idx !== i) }))
 
-    const addTag = () => {
-        if (currentTag.trim() && !courseData.tags.includes(currentTag.trim())) {
-            setCourseData(prev => ({ ...prev, tags: [...prev.tags, currentTag.trim()] }))
-            setCurrentTag("")
-        }
+    const toggleTag = (tagName: string) => {
+        setCourseData(prev => {
+            const exists = prev.tags.includes(tagName)
+            return {
+                ...prev,
+                tags: exists
+                    ? prev.tags.filter(t => t !== tagName)
+                    : [...prev.tags, tagName]
+            }
+        })
     }
-    const removeTag = (t: string) => setCourseData(prev => ({ ...prev, tags: prev.tags.filter(tag => tag !== t) }))
 
     // --- Validation ---
-    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents;
+    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents);
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
@@ -550,12 +556,17 @@ export default function CreateCoursePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label>أقل عدد مقاعد *</Label>
-                                    <Input type="number" value={courseData.minStudents} onChange={e => setCourseData({ ...courseData, minStudents: e.target.value })} />
+                                    <Input type="number" value={courseData.minStudents} 
+                                        onChange={e => setCourseData({ ...courseData, minStudents: e.target.value })}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>أقصى عدد مقاعد *</Label>
-                                    <Input type="number" value={courseData.maxStudents} onChange={e => setCourseData({ ...courseData, maxStudents: e.target.value })} />
+                                    <Input type="number" value={courseData.maxStudents} 
+                                        onChange={e => setCourseData({ ...courseData, maxStudents: e.target.value })}
+                                    />
                                 </div>
+                                {courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) > Number(courseData.maxStudents) && <p className="text-sm text-red-500 md:col-span-3 mt-1">⚠️ الحد الأدنى يجب أن يكون أقل من أو يساوي الحد الأقصى</p>}
                             </CardContent>
                         </Card>
 
@@ -595,19 +606,47 @@ export default function CreateCoursePage() {
                                 </CardContent>
                             </Card>
                             <Card>
-                                <CardHeader><CardTitle className="text-base">الوسوم</CardTitle></CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <Input value={currentTag} onChange={e => setCurrentTag(e.target.value)} placeholder="أضف وسم..." />
-                                        <Button onClick={addTag} size="icon"><Plus className="h-4 w-4" /></Button>
-                                    </div>
+                                <CardHeader>
+                                    <CardTitle className="text-base">الوسوم</CardTitle>
+                                    <p className="text-xs text-gray-500 mt-1">انقر على الوسوم لتحديدها أو إلغاء تحديدها</p>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
                                     <div className="flex flex-wrap gap-2">
-                                        {courseData.tags.map(t => (
-                                            <Badge key={t} variant="secondary">
-                                                {t} <X className="ml-1 h-3 w-3 cursor-pointer" onClick={() => removeTag(t)} />
-                                            </Badge>
-                                        ))}
+                                        {availableTags.map(tag => {
+                                            const isSelected = courseData.tags.includes(tag.name)
+                                            return (
+                                                <button
+                                                    key={tag.id}
+                                                    type="button"
+                                                    onClick={() => toggleTag(tag.name)}
+                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all duration-150 ${
+                                                        isSelected
+                                                            ? 'text-white border-transparent shadow-md scale-105'
+                                                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                                    }`}
+                                                    style={isSelected ? { backgroundColor: tag.color || '#6366F1', borderColor: tag.color || '#6366F1' } : {}}
+                                                >
+                                                    {isSelected && <CheckCircle className="h-3.5 w-3.5" />}
+                                                    {tag.name}
+                                                </button>
+                                            )
+                                        })}
+                                        {availableTags.length === 0 && (
+                                            <p className="text-xs text-gray-400">جاري تحميل الوسوم...</p>
+                                        )}
                                     </div>
+                                    {courseData.tags.length > 0 && (
+                                        <div className="pt-2 border-t">
+                                            <p className="text-xs text-gray-500 mb-1.5">المختار ({courseData.tags.length}):</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {courseData.tags.map(t => (
+                                                    <Badge key={t} variant="secondary" className="text-xs">
+                                                        {t}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
