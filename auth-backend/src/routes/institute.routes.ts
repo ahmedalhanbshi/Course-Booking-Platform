@@ -36,6 +36,7 @@ router.delete('/halls/:hallId', instituteController.removeHall);
 
 // Room Bookings
 router.get('/halls/bookings', instituteController.getRoomBookings);
+router.get('/halls/direct-bookers', instituteController.getDirectBookers);
 router.patch('/halls/bookings/:bookingId/status', instituteController.updateRoomBookingStatus);
 
 

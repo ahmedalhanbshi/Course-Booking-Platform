@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Plus, Send, MessageSquare, Clock, Pencil, Trash2, Loader2, Users, User, GraduationCap } from "lucide-react"
+import { Plus, Send, MessageSquare, Clock, Pencil, Trash2, Loader2, Users, User, GraduationCap, Building } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { instituteService } from "@/lib/institute-service"
 import { toast } from "sonner"
@@ -21,6 +21,7 @@ export default function InstituteAnnouncements() {
   const [courses, setCourses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [trainers, setTrainers] = useState<any[]>([])
+  const [directBookers, setDirectBookers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
@@ -41,16 +42,18 @@ export default function InstituteAnnouncements() {
   const fetchData = useCallback(async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true)
-      const [annsRes, coursesRes, studentsRes, trainersRes] = await Promise.all([
+      const [annsRes, coursesRes, studentsRes, trainersRes, directBookersRes] = await Promise.all([
         instituteService.getAnnouncements().catch(() => []),
         instituteService.getCourses().catch(() => []),
         instituteService.getStudents().then(res => res.students).catch(() => []),
-        instituteService.getTrainers().catch(() => [])
+        instituteService.getTrainers().catch(() => []),
+        instituteService.getDirectBookers().catch(() => [])
       ])
       setAnnouncements(annsRes || [])
       setCourses(coursesRes || [])
       setStudents(studentsRes || [])
       setTrainers(trainersRes || [])
+      setDirectBookers(directBookersRes || [])
     } catch (error) {
       if (!isSilent) {
         console.error("Fetch error:", error)
@@ -102,11 +105,11 @@ export default function InstituteAnnouncements() {
       const payload: any = {
         title: formData.title,
         message: formData.message,
-        targetAudience: formData.targetAudience, // Always use the explicitly chosen audience
+        targetAudience: formData.targetAudience === 'DIRECT_BOOKERS' ? 'STUDENTS' : formData.targetAudience, // Always use the explicitly chosen audience (map DIRECT_BOOKERS to STUDENTS)
         courseId: ((formData.targetAudience === 'STUDENTS' || formData.targetAudience === 'ALL') && formData.courseId !== 'all') ? formData.courseId : undefined,
         status: formData.scheduledAt ? 'SCHEDULED' : 'SENT',
         scheduledAt: formData.scheduledAt ? new Date(formData.scheduledAt).toISOString() : undefined,
-        recipientIds: formData.selectedRecipients.length > 0 ? formData.selectedRecipients : undefined,
+        recipientIds: formData.selectedRecipients.length > 0 ? formData.selectedRecipients : (formData.targetAudience === 'DIRECT_BOOKERS' ? directBookers.map(b => b.id) : undefined),
       }
 
       if (editingId) {
@@ -179,6 +182,10 @@ export default function InstituteAnnouncements() {
 
     if (formData.targetAudience === 'TRAINERS') {
       return trainersList;
+    }
+    
+    if (formData.targetAudience === 'DIRECT_BOOKERS') {
+      return directBookers.map(b => ({ ...b, type: 'direct_booker' }));
     }
     
     if (formData.targetAudience === 'ALL') {
@@ -261,6 +268,7 @@ export default function InstituteAnnouncements() {
                       <SelectItem value="STUDENTS">الطلاب</SelectItem>
                       <SelectItem value="TRAINERS">المدربين (إيميل فقط)</SelectItem>
                       <SelectItem value="ALL">الجميع (طلاب + مدربين)</SelectItem>
+                      <SelectItem value="DIRECT_BOOKERS">أصحاب الحجز المباشر</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -291,7 +299,9 @@ export default function InstituteAnnouncements() {
                       ? "تحديد طلاب ومدربين محددين" 
                       : formData.targetAudience === 'TRAINERS' 
                         ? "تحديد مدربين محددين" 
-                        : "تحديد طلاب محددين"} (اختياري)
+                        : formData.targetAudience === 'DIRECT_BOOKERS'
+                          ? "تحديد أصحاب حجز محددين"
+                          : "تحديد طلاب محددين"} (اختياري)
                   </Label>
                   <Button 
                     variant="ghost" 
@@ -312,8 +322,19 @@ export default function InstituteAnnouncements() {
                           checked={formData.selectedRecipients.includes(item.id)}
                           onCheckedChange={() => toggleRecipientSelection(item.id)}
                         />
-                        <Label htmlFor={`r-${item.id}`} className="text-sm font-normal cursor-pointer flex-1 text-right">
-                          {item.name} <span className="text-[10px] text-muted-foreground mr-1">({item.type === 'trainer' ? 'مدرب' : 'طالب'})</span>
+                        <Label htmlFor={`r-${item.id}`} className="cursor-pointer flex-1 text-right flex flex-col justify-center py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{item.name}</span>
+                            <Badge variant="secondary" className="text-[10px] py-0 h-4 px-1.5 font-normal">
+                              {item.type === 'trainer' ? 'مدرب' : item.type === 'direct_booker' ? 'صاحب حجز' : 'طالب'}
+                            </Badge>
+                          </div>
+                          {item.type === 'direct_booker' && item.bookedHalls?.length > 0 && (
+                            <div className="text-[11px] text-muted-foreground mt-1.5 flex items-center">
+                              <Building className="h-3 w-3 ml-1 text-primary/70" />
+                              <span className="truncate leading-none">حجز: {item.bookedHalls.map((h: any) => h.hallName).join('، ')}</span>
+                            </div>
+                          )}
                         </Label>
                       </div>
                     ))

@@ -517,10 +517,11 @@ class StudentService {
                             orderBy: { startTime: 'asc' },
                             include: { room: true }
                         },
-                        announcements: {
-                            where: { status: 'SENT' },
-                            orderBy: { createdAt: 'desc' }
+                        roomBookings: {
+                            include: { room: true },
+                            take: 1
                         },
+                        // announcements are fetched separately below with proper OR filtering
                         institute: {
                             select: {
                                 name: true,
@@ -572,6 +573,27 @@ class StudentService {
             });
         }
 
+        // Fetch announcements for this course that are relevant to this student:
+        // 1. General course announcements (no specific recipient)
+        // 2. Announcements targeted specifically to this student (recipientId)
+        // 3. Announcements where this student is in the recipientIds array
+        // All must be tied to this specific courseId (admin-wide announcements without courseId are excluded)
+        const announcements = await (prisma.announcement as any).findMany({
+            where: {
+                status: 'SENT',
+                courseId: courseId,
+                OR: [
+                    // Case 1: General course announcement (no specific recipient)
+                    { recipientId: null, recipientIds: { isEmpty: true } },
+                    // Case 2: Targeted to this student via recipientId
+                    { recipientId: userId },
+                    // Case 3: This student is in the recipientIds list
+                    { recipientIds: { has: userId } },
+                ]
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
         return {
             id: course.id,
             title: course.title,
@@ -582,7 +604,8 @@ class StudentService {
             courseStatus: course.status,           // ← حالة الدورة (لمنطق PENDING_MINIMUM)
             minStudents: course.minStudents,        // ← الحد الأدنى من الطلاب
             bookingTrigger: (course as any).bookingTrigger,
-            locationName: primarySession?.room?.name || primarySession?.location || null,
+            hallId: (course as any).roomBookings?.[0]?.roomId || primarySession?.roomId || null,
+            locationName: (course as any).roomBookings?.[0]?.room?.name || primarySession?.room?.name || primarySession?.location || null,
             deliveryType,
             onlinePlatform,
             enrollmentStatus: enrollment.status,
@@ -632,7 +655,7 @@ class StudentService {
                 meetingLink: s.meetingLink,
                 roomId: s.roomId
             })),
-            announcements: course.announcements.map(a => ({
+            announcements: announcements.map((a: any) => ({
                 id: a.id,
                 title: a.title,
                 content: a.message,

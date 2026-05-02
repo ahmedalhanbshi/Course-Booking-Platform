@@ -416,6 +416,14 @@ class InstituteController {
         } catch (error: any) { return sendError(res, error.message, 400); }
     }
 
+    async getDirectBookers(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.getDirectBookers(req.user.userId);
+            return sendSuccess(res, 'تم جلب أصحاب الحجز المباشر بنجاح', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
     async updateRoomBookingStatus(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);

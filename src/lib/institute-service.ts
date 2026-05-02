@@ -249,6 +249,11 @@ class InstituteService {
         return response.data.data;
     }
 
+    async getDirectBookers(): Promise<any[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/halls/direct-bookers');
+        return response.data.data;
+    }
+
     async updateRoomBookingStatus(bookingId: string, data: { status: 'APPROVED' | 'REJECTED'; notes?: string; roomId?: string }): Promise<any> {
         const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/halls/bookings/${bookingId}/status`, data);
         return response.data.data;

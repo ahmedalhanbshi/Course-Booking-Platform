@@ -1301,6 +1301,61 @@ class InstituteService {
     }
 
     /**
+     * Get all unique direct hall bookers for this institute (for announcement targeting).
+     * Returns one entry per unique requester with a list of halls they booked.
+     */
+    async getDirectBookers(userId: string) {
+        const institute = await prisma.institute.findUnique({ where: { userId } });
+        if (!institute) throw new Error('لم يتم العثور على المعهد');
+
+        const bookings = await prisma.roomBooking.findMany({
+            where: {
+                room: { instituteId: institute.id },
+                status: { not: 'CANCELLED' },
+                requestedById: { not: null },
+                NOT: { requestedById: userId },
+            },
+            include: {
+                requestedBy: {
+                    select: { id: true, name: true, email: true, phone: true }
+                },
+                room: { select: { id: true, name: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Group by userId → keep unique bookers with their booked halls
+        const bookerMap = new Map<string, {
+            id: string;
+            name: string;
+            email: string | null;
+            phone: string | null;
+            bookedHalls: { bookingId: string; hallName: string; status: string }[];
+        }>();
+
+        for (const booking of bookings) {
+            if (!booking.requestedBy) continue;
+            const uid = booking.requestedBy.id;
+            if (!bookerMap.has(uid)) {
+                bookerMap.set(uid, {
+                    id: uid,
+                    name: booking.requestedBy.name,
+                    email: booking.requestedBy.email,
+                    phone: booking.requestedBy.phone,
+                    bookedHalls: []
+                });
+            }
+            bookerMap.get(uid)!.bookedHalls.push({
+                bookingId: booking.id,
+                hallName: booking.room.name,
+                status: booking.status
+            });
+        }
+
+        return Array.from(bookerMap.values());
+    }
+
+    /**
      * Update room booking status (Approve/Reject)
      */
     async updateRoomBookingStatus(

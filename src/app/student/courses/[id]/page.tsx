@@ -389,10 +389,10 @@ export default function StudentCourseDashboard() {
                   )}
                   <span>
                     {courseDeliveryType === "حضوري" ? "القاعة/المكان:" : "المنصة:"}{" "}
-                    {(courseDeliveryType === "حضوري" || courseDeliveryType === "هجين") && courseData.sessions?.[0]?.roomId ? (
+                    {(courseDeliveryType === "حضوري" || courseDeliveryType === "هجين") && (courseData.hallId || courseData.sessions?.[0]?.roomId) ? (
                       <button
                         type="button"
-                        onClick={() => openHallModal(courseData.sessions[0].roomId)}
+                        onClick={() => openHallModal(courseData.hallId || courseData.sessions[0].roomId)}
                         className="text-right hover:text-blue-200 hover:underline transition-colors focus:outline-none focus:ring-1 focus:ring-white/20 rounded px-1 -mx-1"
                       >
                         {coursePlatform}
