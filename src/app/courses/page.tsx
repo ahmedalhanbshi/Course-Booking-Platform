@@ -40,11 +40,8 @@ const deliveryTypesMap: Record<string, string> = {
 
 const deliveryTypes = ["أونلاين", "حضوري", "حضور وأونلاين"]
 
-interface CoursesPageProps {
-  basePath?: string
-}
-
-export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps) {
+export default function CoursesPage() {
+  const basePath = "/courses"
   const [courses, setCourses] = useState<ExploreCourse[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: "all", name: "جميع الفئات" }])
   const [loading, setLoading] = useState(true)

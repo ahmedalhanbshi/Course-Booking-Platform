@@ -142,12 +142,12 @@ class TrainerService {
     }
 
     async getPublicCourseById(courseId: string): Promise<CourseDetail> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: CourseDetail }>(`/api/trainer/explore/${courseId}`);
+        const response = await apiClient.get<{ success: boolean; message: string; data: CourseDetail }>(`/api/public/courses/${courseId}`);
         return response.data.data;
     }
 
     async getExploreCourses(): Promise<ExploreCoursesData> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: ExploreCoursesData }>('/api/trainer/explore');
+        const response = await apiClient.get<{ success: boolean; message: string; data: ExploreCoursesData }>('/api/public/courses');
         return response.data.data;
     }
 

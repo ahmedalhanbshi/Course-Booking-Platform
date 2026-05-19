@@ -5,6 +5,10 @@ import publicController from '../controllers/public.controller';
 
 const router = Router();
 
+// Publicly accessible courses (explore catalog)
+router.get('/courses', trainerController.getExploreCourses);
+router.get('/courses/:courseId', trainerController.getPublicCourseById);
+
 // Publicly accessible halls endpoint
 router.get('/halls', trainerController.getHalls);
 router.get('/halls/:hallId/availability', trainerController.getHallAvailability);

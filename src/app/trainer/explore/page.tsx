@@ -1,5 +1,5 @@
-import StudentExplorePage from "@/app/student/courses/page"
+import StudentCoursesView from "@/components/pages/student-courses-view"
 
 export default function TrainerExplorePage() {
-  return <StudentExplorePage basePath="/trainer/explore/course" />
+  return <StudentCoursesView basePath="/trainer/explore/course" />
 }
