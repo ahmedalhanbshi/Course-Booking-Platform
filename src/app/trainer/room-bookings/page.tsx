@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MapPin, Calendar, Clock, X, CheckCircle, AlertCircle, Filter, Loader2, Upload, Eye } from "lucide-react"
-import { formatDate, formatTime } from "@/lib/utils"
+import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
 import { trainerService } from "@/lib/trainer-service"
 import { toast } from "sonner"
 
@@ -543,7 +543,7 @@ export default function TrainerRoomBookingsPage() {
                     <div className="mt-2 pt-2 border-t">
                       <span className="font-medium text-gray-700 block mb-2">صورة الإيصال:</span>
                       <img
-                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${payment.depositSlipImage}`}
+                        src={getFileUrl(payment.depositSlipImage)}
                         alt="Deposit Slip"
                         className="max-w-full h-auto rounded-md border"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

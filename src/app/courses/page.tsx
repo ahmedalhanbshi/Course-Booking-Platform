@@ -21,8 +21,7 @@ import { CourseCard } from "@/components/course-card"
 import { trainerService, ExploreCourse } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
 import { useAuth } from "@/contexts/auth-context"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+import { API_BASE_URL as API_BASE } from "@/lib/config"
 
 function resolveImage(src: string | null): string {
   if (!src) return "/images/course-web.png"

@@ -1,92 +1,91 @@
-import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { NextFunction, Request, Response } from 'express';
+import publicService from '../services/public.service';
+import { sendError, sendSuccess } from '../utils/response';
 
-const prisma = new PrismaClient();
-
-export const publicController = {
-  // 1. Get Platform Stats
-  getStats: async (req: Request, res: Response) => {
-    try {
-      // Parallelize queries for efficiency
-      const [studentsCount, coursesCount, trainersCount, institutesCount] = await Promise.all([
-        prisma.user.count({ where: { role: 'STUDENT', status: 'ACTIVE' } }),
-        prisma.course.count({ where: { status: 'ACTIVE' } }),
-        prisma.user.count({ where: { role: 'TRAINER', status: 'ACTIVE' } }),
-        prisma.institute.count({ where: { user: { status: 'ACTIVE' } } })
-      ]);
-
-      res.status(200).json({
-        success: true,
-        data: {
-          students: studentsCount,
-          courses: coursesCount,
-          trainers: trainersCount,
-          institutes: institutesCount
+class PublicController {
+    async getStats(_req: Request, res: Response, _next: NextFunction) {
+        try {
+            const stats = await publicService.getStats();
+            return sendSuccess(res, 'Platform stats fetched successfully', stats);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch platform stats', 500);
         }
-      });
-    } catch (error: any) {
-      console.error('Error fetching stats:', error);
-      res.status(500).json({ success: false, message: 'فشل في جلب الإحصائيات' });
     }
-  },
 
-  // 2. Get Categories with Course Count
-  getCategories: async (req: Request, res: Response) => {
-    try {
-      const categories = await prisma.courseCategory.findMany({
-        include: {
-          _count: {
-            select: { courses: { where: { status: 'ACTIVE' } } }
-          }
+    async getCategories(_req: Request, res: Response, _next: NextFunction) {
+        try {
+            const categories = await publicService.getCategories();
+            return sendSuccess(res, 'Categories fetched successfully', categories);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch categories', 500);
         }
-      });
-
-      res.status(200).json({ success: true, data: categories });
-    } catch (error: any) {
-      console.error('Error fetching categories:', error);
-      res.status(500).json({ success: false, message: 'فشل في جلب التصنيفات' });
     }
-  },
 
-  // 3. Get Featured Courses
-  getFeaturedCourses: async (req: Request, res: Response) => {
-    try {
-      const courses = await prisma.course.findMany({
-        where: { status: 'ACTIVE' },
-        take: 4,
-        orderBy: {
-          enrollments: { _count: 'desc' }
-        },
-        include: {
-          category: true,
-          trainer: {
-            select: { id: true, name: true, avatar: true }
-          },
-          institute: {
-            select: { id: true, name: true, logo: true }
-          }
+    async getFeaturedCourses(_req: Request, res: Response, _next: NextFunction) {
+        try {
+            const courses = await publicService.getFeaturedCourses();
+            return sendSuccess(res, 'Featured courses fetched successfully', courses);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch featured courses', 500);
         }
-      });
-
-      res.status(200).json({ success: true, data: courses });
-    } catch (error: any) {
-      console.error('Error fetching featured courses:', error);
-      res.status(500).json({ success: false, message: 'فشل في جلب الدورات المميزة' });
     }
-  },
 
-  // 4. Get All Tags
-  getTags: async (req: Request, res: Response) => {
-    try {
-      const tags = await prisma.tag.findMany({
-        orderBy: { name: 'asc' }
-      });
-      res.status(200).json({ success: true, data: tags });
-    } catch (error: any) {
-      console.error('Error fetching tags:', error);
-      res.status(500).json({ success: false, message: 'فشل في جلب الوسوم' });
+    async getTags(_req: Request, res: Response, _next: NextFunction) {
+        try {
+            const tags = await publicService.getTags();
+            return sendSuccess(res, 'Tags fetched successfully', tags);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch tags', 500);
+        }
     }
-  }
-};
 
-export default publicController;
+    async getExploreCourses(_req: Request, res: Response, _next: NextFunction) {
+        try {
+            const data = await publicService.getExploreCourses();
+            return sendSuccess(res, 'Explore courses fetched successfully', data);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch explore courses', 400);
+        }
+    }
+
+    async getPublicCourseById(req: Request, res: Response, _next: NextFunction) {
+        try {
+            const { courseId } = req.params;
+            const course = await publicService.getPublicCourseById(courseId);
+            return sendSuccess(res, 'Course details fetched successfully', course);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch course details', 404);
+        }
+    }
+
+    async getHalls(_req: Request, res: Response, _next: NextFunction) {
+        try {
+            const halls = await publicService.getHalls();
+            return sendSuccess(res, 'Halls fetched successfully', halls);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch halls', 400);
+        }
+    }
+
+    async getHallById(req: Request, res: Response, _next: NextFunction) {
+        try {
+            const { hallId } = req.params;
+            const hall = await publicService.getHallById(hallId);
+            return sendSuccess(res, 'Hall details fetched successfully', hall);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch hall details', 404);
+        }
+    }
+
+    async getHallAvailability(req: Request, res: Response, _next: NextFunction) {
+        try {
+            const { hallId } = req.params;
+            const availability = await publicService.getHallAvailability(hallId);
+            return sendSuccess(res, 'Hall availability fetched successfully', availability);
+        } catch (error: any) {
+            return sendError(res, error.message || 'Failed to fetch hall availability', 400);
+        }
+    }
+}
+
+export default new PublicController();

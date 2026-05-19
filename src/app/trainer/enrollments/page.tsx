@@ -11,8 +11,7 @@ import { CheckCircle, XCircle, Clock, User, BookOpen, CreditCard, FileText, Down
 import { formatDate } from "@/lib/utils"
 import { trainerService } from "@/lib/trainer-service"
 import { toast } from "sonner"
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+import { API_BASE_URL } from "@/lib/config"
 
 function resolveImage(src: string | null | undefined): string {
     if (!src) return "/images/placeholder.png"

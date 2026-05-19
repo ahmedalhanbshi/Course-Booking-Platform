@@ -1,4 +1,5 @@
 import apiClient from './api-client';
+import type { Course, Room, Announcement, Enrollment, RoomBooking, HallAvailabilityPeriod, HallBookedSession, TrainerProfileDetail, TrainerStudentsData } from "@/types";
 
 export interface TrainerDashboardData {
     stats: {
@@ -156,32 +157,34 @@ class TrainerService {
         return response.data.data;
     }
 
-    async getCategories(): Promise<any[]> {
-        const response = await apiClient.get('/api/trainer/categories');
+    async getCategories(): Promise<{ id: string; name: string }[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: { id: string; name: string }[] }>('/api/trainer/categories');
         return response.data.data;
     }
 
-    async createCategory(name: string): Promise<any> {
-        const response = await apiClient.post('/api/trainer/categories', { name });
+    async createCategory(name: string): Promise<{ id: string; name: string }> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: { id: string; name: string } }>('/api/trainer/categories', { name });
         return response.data.data;
     }
 
     /**
      * Get all active halls across all institutes 
      */
-    async getHalls(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/halls');
+    async getHalls(): Promise<Room[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Room[] }>('/api/trainer/halls');
         return response.data.data;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async getHallById(hallId: string): Promise<any> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/trainer/halls/${hallId}`);
         return response.data.data;
     }
 
-    async getHallAvailability(hallId: string, date?: string): Promise<any> {
+    async getHallAvailability(hallId: string, date?: string): Promise<{ availability?: HallAvailabilityPeriod[]; bookedSessions?: HallBookedSession[] }> {
         const url = `/api/trainer/halls/${hallId}/availability${date ? `?date=${date}` : ''}`;
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(url);
+        const response = await apiClient.get<{ success: boolean; message: string; data: { availability?: HallAvailabilityPeriod[]; bookedSessions?: HallBookedSession[] } }>(url);
         return response.data.data;
     }
 
@@ -190,8 +193,8 @@ class TrainerService {
      * Create a new course
      * Handles standard courses, or "in_person" courses where a hall is booked and a payment receipt is required.
      */
-    async getCourses(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/courses');
+    async getCourses(): Promise<Course[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Course[] }>('/api/trainer/courses');
         return response.data.data;
     }
 
@@ -199,39 +202,39 @@ class TrainerService {
         await apiClient.delete(`/api/trainer/courses/${id}`);
     }
 
-    async getTrainerCourseById(courseId: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/trainer/courses/${courseId}`);
+    async getTrainerCourseById(courseId: string): Promise<Course> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Course }>(`/api/trainer/courses/${courseId}`);
         return response.data.data;
     }
 
-    async updateTrainerCourse(courseId: string, data: any | FormData): Promise<any> {
+    async updateTrainerCourse(courseId: string, data: Record<string, unknown> | FormData): Promise<Course> {
         let headers = {};
         if (data instanceof FormData) {
             headers = { 'Content-Type': 'multipart/form-data' };
         }
-        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/trainer/courses/${courseId}`, data, { headers });
+        const response = await apiClient.put<{ success: boolean; message: string; data: Course }>(`/api/trainer/courses/${courseId}`, data, { headers });
         return response.data.data;
     }
 
-    async getCourseStudents(courseId: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/trainer/courses/${courseId}/students`);
+    async getCourseStudents(courseId: string): Promise<Record<string, unknown>> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/trainer/courses/${courseId}/students`);
         return response.data.data;
     }
 
-    async unenrollStudent(courseId: string, enrollmentId: string, reason: string): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/trainer/courses/${courseId}/students/${enrollmentId}/unenroll`, { reason });
+    async unenrollStudent(courseId: string, enrollmentId: string, reason: string): Promise<Enrollment> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Enrollment }>(`/api/trainer/courses/${courseId}/students/${enrollmentId}/unenroll`, { reason });
         return response.data.data;
     }
 
-    async createCourse(data: FormData): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/trainer/courses', data, {
+    async createCourse(data: FormData): Promise<Course> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Course }>('/api/trainer/courses', data, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data.data;
     }
 
-    async getProfile(): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>('/api/trainer/profile');
+    async getProfile(): Promise<TrainerProfileDetail> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: TrainerProfileDetail }>('/api/trainer/profile');
         return response.data.data;
     }
 
@@ -242,7 +245,7 @@ class TrainerService {
         bio?: string;
         specialties?: string[];
         avatar?: File;
-    }): Promise<any> {
+    }): Promise<TrainerProfileDetail> {
         const formData = new FormData();
         if (data.name) formData.append('name', data.name);
         if (data.phone !== undefined) formData.append('phone', data.phone);
@@ -251,7 +254,7 @@ class TrainerService {
         if (data.specialties) formData.append('specialties', JSON.stringify(data.specialties));
         if (data.avatar) formData.append('avatar', data.avatar);
 
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>('/api/trainer/profile', formData, {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: TrainerProfileDetail }>('/api/trainer/profile', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
         return response.data.data;
@@ -261,8 +264,8 @@ class TrainerService {
         await apiClient.post('/api/trainer/profile/change-password', { currentPassword, newPassword });
     }
 
-    async getAllStudents(): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>('/api/trainer/students');
+    async getAllStudents(): Promise<TrainerStudentsData> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: TrainerStudentsData }>('/api/trainer/students');
         return response.data.data;
     }
 
@@ -274,18 +277,18 @@ class TrainerService {
         category?: string;
         status?: string;
         scheduledAt?: string;
-    }): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/trainer/announcements/send', data);
+    }): Promise<Announcement> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Announcement }>('/api/trainer/announcements/send', data);
         return response.data.data;
     }
 
-    async getAnnouncements(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/announcements');
+    async getAnnouncements(): Promise<Announcement[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Announcement[] }>('/api/trainer/announcements');
         return response.data.data;
     }
 
-    async updateAnnouncement(id: string, data: { title: string; message: string }): Promise<any> {
-        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/trainer/announcements/${id}`, data);
+    async updateAnnouncement(id: string, data: { title: string; message: string }): Promise<Announcement> {
+        const response = await apiClient.put<{ success: boolean; message: string; data: Announcement }>(`/api/trainer/announcements/${id}`, data);
         return response.data.data;
     }
 
@@ -293,25 +296,25 @@ class TrainerService {
         await apiClient.delete(`/api/trainer/announcements/${id}`);
     }
 
-    async getEnrollments(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/enrollments');
+    async getEnrollments(): Promise<Enrollment[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Enrollment[] }>('/api/trainer/enrollments');
         return response.data.data;
     }
 
-    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/trainer/enrollments/${enrollmentId}/status`, { status, reason });
+    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string): Promise<Enrollment> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Enrollment }>(`/api/trainer/enrollments/${enrollmentId}/status`, { status, reason });
         return response.data.data;
     }
 
-    async getRoomBookings(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/bookings');
+    async getRoomBookings(): Promise<RoomBooking[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: RoomBooking[] }>('/api/trainer/bookings');
         return response.data.data;
     }
 
-    async resubmitBookingPayment(courseId: string, bookingId: string, file: File): Promise<any> {
+    async resubmitBookingPayment(courseId: string, bookingId: string, file: File): Promise<RoomBooking> {
         const formData = new FormData();
         formData.append('paymentReceipt', file);
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>(
+        const response = await apiClient.post<{ success: boolean; message: string; data: RoomBooking }>(
             `/api/trainer/courses/${courseId}/bookings/${bookingId}/resubmit`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -319,29 +322,29 @@ class TrainerService {
         return response.data.data;
     }
 
-    async cancelBooking(courseId: string | null | undefined, bookingId: string): Promise<any> {
+    async cancelBooking(courseId: string | null | undefined, bookingId: string): Promise<RoomBooking> {
         // Direct bookings (not linked to a course) use a different endpoint
         const url = courseId && courseId !== 'null'
             ? `/api/trainer/courses/${courseId}/bookings/${bookingId}`
             : `/api/trainer/bookings/${bookingId}`;
-        const response = await apiClient.delete<{ success: boolean; message: string; data: any }>(url);
+        const response = await apiClient.delete<{ success: boolean; message: string; data: RoomBooking }>(url);
         return response.data.data;
     }
 
-    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string; meetingLink?: string; updateAll?: boolean }): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(
+    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string; meetingLink?: string; updateAll?: boolean }): Promise<Session> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Session }>(
             `/api/trainer/sessions/${sessionId}`, data
         );
         return response.data.data;
     }
 
-    async bookHall(hallId: string, sessions: { date: string; slot: number }[], receipt?: File, note?: string): Promise<any> {
+    async bookHall(hallId: string, sessions: { date: string; slot: number }[], receipt?: File, note?: string): Promise<Record<string, unknown>> {
         const formData = new FormData();
         formData.append('sessions', JSON.stringify(sessions));
         if (receipt) formData.append('paymentReceipt', receipt);
         if (note) formData.append('note', note);
 
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>(
+        const response = await apiClient.post<{ success: boolean; message: string; data: Record<string, unknown> }>(
             `/api/trainer/halls/${hallId}/book`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -353,18 +356,18 @@ class TrainerService {
     // Trainer Bank Accounts
     // ==========================================
 
-    async getBankAccounts(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/trainer/bank-accounts');
+    async getBankAccounts(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/trainer/bank-accounts');
         return response.data.data;
     }
 
-    async addBankAccount(data: { bankName: string; accountName: string; accountNumber: string; iban?: string }): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/trainer/bank-accounts', data);
+    async addBankAccount(data: { bankName: string; accountName: string; accountNumber: string; iban?: string }): Promise<Record<string, unknown>> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Record<string, unknown> }>('/api/trainer/bank-accounts', data);
         return response.data.data;
     }
 
-    async updateBankAccount(accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/trainer/bank-accounts/${accountId}`, data);
+    async updateBankAccount(accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }): Promise<Record<string, unknown>> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/trainer/bank-accounts/${accountId}`, data);
         return response.data.data;
     }
 

@@ -11,10 +11,9 @@ import { studentService, StudentDashboardData } from "@/lib/student-service"
 import { formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { NotificationMessage } from "@/components/notifications/notification-message"
+import { API_BASE_URL as API_BASE } from "@/lib/config"
 
 const courseImagePlaceholder = "/images/course-abstract.svg"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 function resolveImage(src: string | null | undefined): string {
   if (!src) return courseImagePlaceholder

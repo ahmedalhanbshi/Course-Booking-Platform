@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { trainerService } from "@/lib/trainer-service"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { API_BASE_URL as API_URL } from "@/lib/config"
 
 type EnrolledCourse = {
   courseId: string
@@ -41,7 +42,6 @@ type StudentsData = {
   totalEarnings: number
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 const statusBadge: Record<string, { label: string; className: string }> = {
   active: { label: "مستمر", className: "bg-green-100 text-green-700 hover:bg-green-200 border-transparent shadow-none" },

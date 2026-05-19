@@ -128,8 +128,7 @@ export default function EditTrainerCoursePage() {
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][dateObj.getDay()]
             const availabilitySlots = Array.isArray(data.availability)
                 ? data.availability
-                : (data.availability?.slots ?? [])
-
+                : ((data.availability as any)?.slots ?? [])
             const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
             const hasAvailability = availabilitySlots.length > 0
             const booked = data.bookedSessions || []

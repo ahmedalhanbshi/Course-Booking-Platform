@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, CheckCircle, XCircle, UserCheck, BookOpen, Trash2, Edit, AlertTriangle, Users, FileText } from "lucide-react"
+import { Eye, CheckCircle, XCircle, UserCheck, Edit, AlertTriangle, Users, FileText } from "lucide-react"
 import { formatDate, getFileUrl } from "@/lib/utils"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { adminService } from "@/lib/admin-service"
@@ -40,8 +40,9 @@ interface TrainerData {
 }
 
 import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
-export default function AdminTrainers() {
+function AdminTrainersContent() {
   const searchParams = useSearchParams()
   const viewId = searchParams.get('view')
 
@@ -56,6 +57,7 @@ export default function AdminTrainers() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editForm, setEditForm] = useState<any>(null)
 
   useEffect(() => {
@@ -77,6 +79,7 @@ export default function AdminTrainers() {
       setError("")
       const data = await adminService.getAllTrainers()
       setTrainers(data)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err?.response?.data?.message || "فشل تحميل البيانات")
     } finally {
@@ -142,6 +145,7 @@ export default function AdminTrainers() {
       setSelectedTrainer(null)
       setActionReason("")
       setEditForm(null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err?.response?.data?.message || "فشل تنفيذ العملية")
     }
@@ -565,5 +569,13 @@ export default function AdminTrainers() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function AdminTrainers() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">جاري التحميل...</div>}>
+      <AdminTrainersContent />
+    </Suspense>
   )
 }

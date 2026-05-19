@@ -44,8 +44,7 @@ import {
 import { toast } from "sonner"
 import { trainerService, CourseDetail } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+import { API_BASE_URL as API_BASE } from "@/lib/config"
 
 function resolveImage(src: string | null | undefined): string {
   if (!src) return "/images/course-web.png"

@@ -238,7 +238,7 @@ export default function HomePage() {
                                     fill 
                                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                                     className="object-cover group-hover:scale-105 transition-transform duration-700" 
-                                    unoptimized={courseImage.includes('localhost:5000')}
+                                    unoptimized={courseImage.includes('localhost')}
                                  />
                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                              </div>
@@ -258,7 +258,7 @@ export default function HomePage() {
                                               fill 
                                               sizes="40px"
                                               className="object-cover" 
-                                              unoptimized={instructorAvatar.includes('localhost:5000')}
+                                              unoptimized={instructorAvatar.includes('localhost')}
                                           />
                                      </div>
                                      <div className="flex-1">

@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { API_BASE_URL, buildApiUrl } from './config';
 
 // In-memory token storage (never persisted)
 let accessToken: string | null = null;
@@ -45,7 +46,7 @@ const onTokenRefreshed = (token: string): void => {
  * Create Axios instance with base configuration
  */
 const apiClient: AxiosInstance = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+    baseURL: API_BASE_URL,
     timeout: 30000,
     withCredentials: true, // Critical: Send HTTP-only cookies
     headers: {
@@ -108,7 +109,7 @@ apiClient.interceptors.response.use(
 
         // If already refreshing, queue this request
         if (isRefreshing) {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 subscribeTokenRefresh((token: string) => {
                     if (originalRequest.headers) {
                         originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -124,7 +125,7 @@ apiClient.interceptors.response.use(
         try {
             // Call refresh token endpoint
             const response = await axios.post(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/refresh`,
+                buildApiUrl('/api/auth/refresh'),
                 {},
                 {
                     withCredentials: true, // Send HTTP-only cookie

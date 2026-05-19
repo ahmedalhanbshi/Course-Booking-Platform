@@ -145,8 +145,7 @@ export default function EditCoursePage() {
             const dayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][dateObj.getDay()]
             const availabilitySlots = Array.isArray(data.availability)
                 ? data.availability
-                : (data.availability?.slots ?? [])
-
+                : ((data.availability as any)?.slots ?? [])
             const allowedPeriods = availabilitySlots.filter((a: any) => a.day === dayName) || []
             const hasAvailability = availabilitySlots.length > 0
             const booked = data.bookedSessions || []
@@ -190,7 +189,7 @@ export default function EditCoursePage() {
                     description: course.description || "",
                     price: course.price.toString(),
                     duration: course.duration.toString(),
-                    minStudents: course.minStudents.toString(),
+                    minStudents: course.minStudents ? course.minStudents.toString() : "0",
                     maxStudents: course.maxStudents.toString(),
                     startDate: course.startDate ? new Date(course.startDate).toISOString().split('T')[0] : "",
                     endDate: course.endDate ? new Date(course.endDate).toISOString().split('T')[0] : "",
@@ -199,7 +198,11 @@ export default function EditCoursePage() {
                     image: course.image || "",
                     deliveryType: course.deliveryType || "",
                     objectives: course.objectives || [],
-                    prerequisites: course.prerequisites || [],
+                    prerequisites: Array.isArray(course.prerequisites)
+                        ? course.prerequisites
+                        : course.prerequisites
+                            ? String(course.prerequisites).split(/\n|,/).map((item) => item.trim()).filter(Boolean)
+                            : [],
                     tags: course.tags || [],
                     enrolledStudents: course.enrolledStudents ?? 0,
                 })

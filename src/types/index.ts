@@ -273,3 +273,125 @@ export interface AuditLog {
   performedBy?: string;
   performedAt: Date;
 }
+
+export interface HallAvailabilityPeriod {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface HallBookedSession {
+  startTime: string;
+  endTime: string;
+  [key: string]: unknown;
+}
+
+export interface TrainerProfileDetail {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatar: string | null;
+  role: string;
+  status: string;
+  createdAt: string;
+  bio: string;
+  cvUrl: string | null;
+  specialties: string[];
+  verificationStatus: string | null;
+}
+
+export interface TrainerEnrolledCourse {
+  courseId: string;
+  courseTitle: string;
+  enrollmentId: string;
+  status: string;
+  enrolledAt: string;
+}
+
+export interface TrainerStudent {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  avatar: string | null;
+  enrolledCourses: TrainerEnrolledCourse[];
+  totalCourses: number;
+  lastActivity: string;
+}
+
+export interface TrainerStudentsData {
+  students: TrainerStudent[];
+  totalStudents: number;
+  totalEnrollments: number;
+  totalEarnings: number;
+}
+
+export interface InstituteProfileDetail {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  avatar?: string;
+  instituteName: string;
+  instituteLogo?: string;
+  instituteAddress?: string;
+  instituteWebsite?: string;
+  instituteDescription?: string;
+  verificationStatus: string;
+}
+
+export interface ScheduleSession {
+  id: string;
+  title: string;
+  courseId: string | null;
+  courseTitle: string;
+  startTime: string;
+  endTime: string;
+  type: string;
+  status: string;
+  meetingLink: string | null;
+  location: string;
+  enrolledStudents: number;
+  roomId: string | null;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  bio: string | null;
+  specialties: string[];
+  status: "ACTIVE" | "INACTIVE";
+  joinedAt: string;
+  notes: string | null;
+}
+
+export interface InstituteEnrolledCourse {
+  courseId: string;
+  courseTitle: string;
+  enrollmentId: string;
+  status: string;
+  enrolledAt: string;
+  trainerName: string;
+}
+
+export interface InstituteStudent {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  avatar: string | null;
+  enrolledCourses: InstituteEnrolledCourse[];
+  totalCourses: number;
+  lastActivity: string;
+  status: string;
+}
+
+export interface InstituteStudentsData {
+  students: InstituteStudent[];
+  totalStudents: number;
+  totalEnrollments: number;
+  totalEarnings: number;
+}

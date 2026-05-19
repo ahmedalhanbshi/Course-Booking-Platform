@@ -15,6 +15,7 @@ import { User, Mail, Phone, Eye, EyeOff, Loader2, Camera, X, Plus, ShieldCheck, 
 import { toast } from "sonner"
 import { trainerService } from "@/lib/trainer-service"
 import { useAuth } from "@/contexts/auth-context"
+import { getFileUrl } from "@/lib/utils"
 
 type ProfileData = {
     id: string
@@ -147,7 +148,7 @@ export default function TrainerProfilePage() {
         const load = async () => {
             try {
                 const data = await trainerService.getProfile()
-                setProfile(data)
+                setProfile(data as ProfileData)
                 setForm({ name: data.name, phone: data.phone ?? "", bio: data.bio ?? "", specialties: data.specialties ?? [], email: data.email ?? "" })
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || "فشل في تحميل الملف الشخصي")
@@ -241,7 +242,7 @@ export default function TrainerProfilePage() {
     const removeSpecialty = (s: string) =>
         setForm(prev => ({ ...prev, specialties: prev.specialties.filter(x => x !== s) }))
 
-    const avatarSrc = avatarPreview || (profile?.avatar ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${profile.avatar}?t=${avatarCacheKey}` : "")
+    const avatarSrc = avatarPreview || (profile?.avatar ? getFileUrl(`${profile.avatar}?t=${avatarCacheKey}`) : "")
 
     if (loading) {
         return (
@@ -430,7 +431,7 @@ export default function TrainerProfilePage() {
                                 <div className="space-y-2">
                                     <Label>السيرة الذاتية</Label>
                                     <a
-                                        href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${profile.cvUrl}`}
+                                        href={getFileUrl(profile.cvUrl)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline"

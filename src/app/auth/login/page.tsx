@@ -11,7 +11,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
 import { Loader2, AlertCircle, Eye, EyeOff } from "lucide-react"
 
-export default function LoginPage() {
+import { Suspense } from "react"
+
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login, user, isLoading: authLoading } = useAuth()
@@ -75,6 +77,7 @@ export default function LoginPage() {
       await login(formData.email, formData.password)
       console.log('Login successful')
       // Redirect will be handled by useEffect when user state updates
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Login error:', err)
       setError(err?.message || "حدث خطأ أثناء تسجيل الدخول")
@@ -202,5 +205,13 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">جاري التحميل...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

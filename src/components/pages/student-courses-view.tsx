@@ -17,9 +17,8 @@ import {
 import { trainerService, ExploreCourse } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
 import { useAuth } from "@/contexts/auth-context"
+import { getFileUrl } from "@/lib/utils"
 import { toast } from "sonner"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 const sortOptions = ["الأحدث", "الأقدم", "الأعلى سعراً", "الأقل سعراً"]
 const priceOptions = [
@@ -29,14 +28,6 @@ const priceOptions = [
   "50,000 - 100,000 ر.ي",
   "أعلى من 100,000 ر.ي",
 ]
-
-function resolveImage(src: string | null): string {
-  if (!src) return "/images/course-web.png"
-  if (src.startsWith("http")) return src
-  const cleanSrc = src.replace(/\\/g, "/")
-  const separator = cleanSrc.startsWith("/") ? "" : "/"
-  return `${API_BASE}${separator}${cleanSrc}`
-}
 
 interface StudentCoursesPageProps {
   basePath?: string
@@ -248,7 +239,7 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
               >
                 <div className="relative h-[200px] w-[200px] shrink-0 overflow-hidden rounded-2xl">
                   <Image
-                    src={resolveImage(course.image)}
+                    src={getFileUrl(course.image) ?? "/images/course-web.png"}
                     alt={course.title}
                     fill
                     sizes="200px"
@@ -301,9 +292,9 @@ export default function StudentCoursesPage(props: StudentCoursesPageProps) {
                   ) : (
                     <div className="mt-2 flex items-center gap-2">
                       <div className="relative h-6 w-6 overflow-hidden rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center">
-                        {course.trainer.avatar ? (
+                        {getFileUrl(course.trainer.avatar) ? (
                           <Image
-                            src={resolveImage(course.trainer.avatar)}
+                            src={getFileUrl(course.trainer.avatar)!}
                             alt={course.trainer.name}
                             fill
                             sizes="24px"

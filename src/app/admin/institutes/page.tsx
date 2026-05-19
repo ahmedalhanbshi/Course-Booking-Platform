@@ -21,8 +21,9 @@ import { AdminPageHeader } from "@/components/admin/page-header"
 import { adminService } from "@/lib/admin-service"
 
 import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
-export default function AdminInstitutes() {
+function AdminInstitutesContent() {
   const searchParams = useSearchParams()
   const viewId = searchParams.get('view')
 
@@ -65,6 +66,7 @@ export default function AdminInstitutes() {
       setLoading(true)
       const data = await adminService.getAllInstitutes()
       setInstitutes(data)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error(err)
       setError("فشل تحميل قائمة المعاهد")
@@ -534,5 +536,13 @@ export default function AdminInstitutes() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function AdminInstitutes() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">جاري التحميل...</div>}>
+      <AdminInstitutesContent />
+    </Suspense>
   )
 }

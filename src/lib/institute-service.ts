@@ -1,4 +1,5 @@
 import apiClient from './api-client';
+import type { Course, HallAvailabilityPeriod, HallBookedSession, InstituteProfileDetail, ScheduleSession, StaffMember, InstituteStudentsData } from "@/types";
 
 interface InstituteDashboardData {
     institute: {
@@ -40,20 +41,20 @@ class InstituteService {
         return response.data.data;
     }
 
-    async getProfile(): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>('/api/institute/profile');
+    async getProfile(): Promise<InstituteProfileDetail> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: InstituteProfileDetail }>('/api/institute/profile');
         return response.data.data;
     }
 
-    async updateProfile(data: FormData): Promise<any> {
-        const response = await apiClient.put<{ success: boolean; message: string; data: any }>('/api/institute/profile', data, {
+    async updateProfile(data: FormData): Promise<InstituteProfileDetail> {
+        const response = await apiClient.put<{ success: boolean; message: string; data: InstituteProfileDetail }>('/api/institute/profile', data, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data.data;
     }
 
-    async getCourses(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/courses');
+    async getCourses(): Promise<Course[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Course[] }>('/api/institute/courses');
         return response.data.data;
     }
 
@@ -66,12 +67,12 @@ class InstituteService {
     }
 
     async getTrainers(): Promise<{ id: string; name: string; email: string }[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/trainers');
+        const response = await apiClient.get<{ success: boolean; message: string; data: { id: string; name: string; email: string }[] }>('/api/institute/trainers');
         return response.data.data;
     }
 
-    async getCourseStudents(courseId: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/institute/courses/${courseId}/students`);
+    async getCourseStudents(courseId: string): Promise<Record<string, unknown>> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/institute/courses/${courseId}/students`);
         return response.data.data;
     }
 
@@ -79,40 +80,40 @@ class InstituteService {
         await apiClient.put(`/api/institute/courses/${courseId}/students/${enrollmentId}/unenroll`, { reason });
     }
 
-    async getCourseById(courseId: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/institute/courses/${courseId}`);
+    async getCourseById(courseId: string): Promise<Course> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Course }>(`/api/institute/courses/${courseId}`);
         return response.data.data;
     }
 
-    async updateCourse(courseId: string, data: any | FormData): Promise<any> {
+    async updateCourse(courseId: string, data: Record<string, unknown> | FormData): Promise<Course> {
         let headers = {};
         if (data instanceof FormData) {
             headers = { 'Content-Type': 'multipart/form-data' };
         }
-        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/institute/courses/${courseId}`, data, { headers });
+        const response = await apiClient.put<{ success: boolean; message: string; data: Course }>(`/api/institute/courses/${courseId}`, data, { headers });
         return response.data.data;
     }
 
     async getCategories(): Promise<{ id: string; name: string }[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/categories');
+        const response = await apiClient.get<{ success: boolean; message: string; data: { id: string; name: string }[] }>('/api/institute/categories');
         return response.data.data;
     }
 
     async createCategory(name: string): Promise<{ id: string; name: string }> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/categories', { name });
+        const response = await apiClient.post<{ success: boolean; message: string; data: { id: string; name: string } }>('/api/institute/categories', { name });
         return response.data.data;
     }
 
 
-    async createCourse(data: FormData): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/courses', data, {
+    async createCourse(data: FormData): Promise<Record<string, unknown>> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Record<string, unknown> }>('/api/institute/courses', data, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data.data;
     }
 
-    async getStudents(): Promise<{ students: any[]; totalStudents: number; totalEnrollments: number; totalEarnings: number }> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: { students: any[]; totalStudents: number; totalEnrollments: number; totalEarnings: number } }>('/api/institute/students');
+    async getStudents(): Promise<InstituteStudentsData> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: InstituteStudentsData }>('/api/institute/students');
         return response.data.data;
     }
 
@@ -126,18 +127,18 @@ class InstituteService {
         category?: string;
         status?: string;
         scheduledAt?: string;
-    }): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/announcements/send', data);
+    }): Promise<Record<string, unknown>> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Record<string, unknown> }>('/api/institute/announcements/send', data);
         return response.data.data;
     }
 
-    async getAnnouncements(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/announcements');
+    async getAnnouncements(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/institute/announcements');
         return response.data.data;
     }
 
-    async updateAnnouncement(id: string, data: { title: string; message: string }): Promise<any> {
-        const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/api/institute/announcements/${id}`, data);
+    async updateAnnouncement(id: string, data: { title: string; message: string }): Promise<Record<string, unknown>> {
+        const response = await apiClient.put<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/institute/announcements/${id}`, data);
         return response.data.data;
     }
 
@@ -145,24 +146,27 @@ class InstituteService {
         await apiClient.delete(`/api/institute/announcements/${id}`);
     }
 
-    async getEnrollments(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/enrollments');
+    async getEnrollments(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/institute/enrollments');
         return response.data.data;
     }
-    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/enrollments/${enrollmentId}/status`, { status, reason });
-        return response.data.data;
-    }
-
-    async getStaff(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/staff');
+    async updateEnrollmentStatus(enrollmentId: string, status: 'ACTIVE' | 'CANCELLED' | 'REJECT_PAYMENT', reason?: string): Promise<Record<string, unknown>> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/institute/enrollments/${enrollmentId}/status`, { status, reason });
         return response.data.data;
     }
 
-    async addStaff(data: FormData): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/staff', data, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+    async getStaff(): Promise<StaffMember[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: StaffMember[] }>('/api/institute/staff');
+        return response.data.data;
+    }
+
+    async addStaff(data: FormData | { name: string; email?: string; phone?: string; bio?: string; specialties?: string[]; notes?: string }): Promise<StaffMember> {
+        const isFormData = data instanceof FormData;
+        const response = await apiClient.post<{ success: boolean; message: string; data: StaffMember }>(
+            '/api/institute/staff',
+            data,
+            isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+        );
         return response.data.data;
     }
 
@@ -170,15 +174,18 @@ class InstituteService {
         await apiClient.delete(`/api/institute/staff/${staffId}`);
     }
 
-    async updateStaff(staffId: string, data: FormData): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/staff/${staffId}`, data, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+    async updateStaff(staffId: string, data: FormData | { name?: string; email?: string | null; phone?: string | null; bio?: string | null; notes?: string | null }): Promise<StaffMember> {
+        const isFormData = data instanceof FormData;
+        const response = await apiClient.patch<{ success: boolean; message: string; data: StaffMember }>(
+            `/api/institute/staff/${staffId}`,
+            data,
+            isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+        );
         return response.data.data;
     }
 
-    async updateStaffStatus(staffId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/staff/${staffId}/status`, { status });
+    async updateStaffStatus(staffId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<StaffMember> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: StaffMember }>(`/api/institute/staff/${staffId}/status`, { status });
         return response.data.data;
     }
 
@@ -186,20 +193,20 @@ class InstituteService {
     // HALLS (ROOMS) MANAGEMENT
     // =====================================================
 
-    async getHalls(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/halls');
+    async getHalls(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/institute/halls');
         return response.data.data;
     }
 
-    async addHall(data: FormData): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/halls', data, {
+    async addHall(data: FormData): Promise<Record<string, unknown>> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Record<string, unknown> }>('/api/institute/halls', data, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data.data;
     }
 
-    async updateHall(hallId: string, data: FormData): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/halls/${hallId}`, data, {
+    async updateHall(hallId: string, data: FormData): Promise<Record<string, unknown>> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/institute/halls/${hallId}`, data, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data.data;
@@ -209,11 +216,10 @@ class InstituteService {
         await apiClient.delete(`/api/institute/halls/${hallId}`);
     }
 
-    async getHallAvailability(hallId: string, date?: string): Promise<any> {
-        const query = date ? `?date=${parseInt(date) ? date : new Date(date).toISOString()}` : ''; // simple query builder
+    async getHallAvailability(hallId: string, date?: string): Promise<{ availability?: HallAvailabilityPeriod[]; bookedSessions?: HallBookedSession[] }> {
         // Wait, backend expects strictly `?date=YYYY-MM-DD` or something that `new Date(dateStr)` parses.
         const url = `/api/institute/halls/${hallId}/availability${date ? `?date=${date}` : ''}`;
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(url);
+        const response = await apiClient.get<{ success: boolean; message: string; data: { availability?: HallAvailabilityPeriod[]; bookedSessions?: HallBookedSession[] } }>(url);
         return response.data.data;
     }
 
@@ -221,18 +227,18 @@ class InstituteService {
     // BANK ACCOUNTS
     // =====================================================
 
-    async getBankAccounts(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/bank-accounts');
+    async getBankAccounts(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/institute/bank-accounts');
         return response.data.data;
     }
 
-    async addBankAccount(data: { bankName: string; accountName: string; accountNumber: string; iban?: string }): Promise<any> {
-        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/bank-accounts', data);
+    async addBankAccount(data: { bankName: string; accountName: string; accountNumber: string; iban?: string }): Promise<Record<string, unknown>> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: Record<string, unknown> }>('/api/institute/bank-accounts', data);
         return response.data.data;
     }
 
-    async updateBankAccount(accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/bank-accounts/${accountId}`, data);
+    async updateBankAccount(accountId: string, data: { bankName?: string; accountName?: string; accountNumber?: string; iban?: string; isActive?: boolean }): Promise<Record<string, unknown>> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/institute/bank-accounts/${accountId}`, data);
         return response.data.data;
     }
 
@@ -244,40 +250,40 @@ class InstituteService {
     // ROOM BOOKINGS
     // =====================================================
 
-    async getRoomBookings(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/halls/bookings');
+    async getRoomBookings(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/institute/halls/bookings');
         return response.data.data;
     }
 
-    async getDirectBookers(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/halls/direct-bookers');
+    async getDirectBookers(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/institute/halls/direct-bookers');
         return response.data.data;
     }
 
-    async updateRoomBookingStatus(bookingId: string, data: { status: 'APPROVED' | 'REJECTED'; notes?: string; roomId?: string }): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(`/api/institute/halls/bookings/${bookingId}/status`, data);
+    async updateRoomBookingStatus(bookingId: string, data: { status: 'APPROVED' | 'REJECTED'; notes?: string; roomId?: string }): Promise<Record<string, unknown>> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/institute/halls/bookings/${bookingId}/status`, data);
         return response.data.data;
     }
 
-    async getSchedule(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/institute/schedule');
+    async getSchedule(): Promise<ScheduleSession[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: ScheduleSession[] }>('/api/institute/schedule');
         return response.data.data;
     }
 
-    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string; meetingLink?: string; updateAll?: boolean }): Promise<any> {
-        const response = await apiClient.patch<{ success: boolean; message: string; data: any }>(
+    async updateSession(sessionId: string, data: { startTime?: string; endTime?: string; status?: string; meetingLink?: string; updateAll?: boolean }): Promise<ScheduleSession> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: ScheduleSession }>(
             `/api/institute/sessions/${sessionId}`, data
         );
         return response.data.data;
     }
 
-    async getPublicInstitutes(): Promise<any[]> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any[] }>('/api/public/institutes');
+    async getPublicInstitutes(): Promise<Record<string, unknown>[]> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown>[] }>('/api/public/institutes');
         return response.data.data;
     }
 
-    async getPublicInstituteById(id: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/public/institutes/${id}`);
+    async getPublicInstituteById(id: string): Promise<Record<string, unknown>> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: Record<string, unknown> }>(`/api/public/institutes/${id}`);
         return response.data.data;
     }
 }

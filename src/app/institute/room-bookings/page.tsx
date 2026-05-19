@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { CheckCircle, XCircle, Clock, MapPin, Calendar, User, Loader2, Eye, BookOpen, Phone, Mail, DollarSign, Info, List } from "lucide-react"
-import { formatDate, formatTime } from "@/lib/utils"
+import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
 import { instituteService } from "@/lib/institute-service"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -405,7 +405,7 @@ export default function InstituteRoomBookings() {
                       <div className="mt-2 pt-2 border-t">
                         <span className="font-medium text-gray-700 block mb-2">صورة الإيصال:</span>
                         <img
-                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${payment.depositSlipImage}`}
+                          src={getFileUrl(payment.depositSlipImage)}
                           alt="Deposit Slip"
                           className="max-w-full h-auto rounded-md border"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

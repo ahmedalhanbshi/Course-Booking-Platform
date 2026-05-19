@@ -2,11 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, Building, BookOpen, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock, ShieldCheck, ArrowUpRight, Activity, Eye } from "lucide-react"
-import { AdminPageHeader } from "@/components/admin/page-header"
+import { AlertTriangle, CheckCircle, ShieldCheck, Activity, Eye } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useState, useEffect } from "react"
@@ -16,11 +15,9 @@ import { formatDate } from "@/lib/utils"
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
-  const [selectedRequest, setSelectedRequest] = useState<any>(null)
+  const [selectedRequest, setSelectedRequest] = useState<{ type: string; id: string; title: string; description?: string; userId?: string } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => {
@@ -32,15 +29,14 @@ export default function AdminDashboard() {
       setLoading(true)
       const data = await adminService.getDashboardStats()
       setStats(data)
-    } catch (err: any) {
-      setError("فشل تحميل الإحصائيات")
+    } catch (err) {
       console.error(err)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleApprove = async (item: any) => {
+  const handleApprove = async (item: { type: string; id: string }) => {
     try {
       setActionLoading(true)
       if (item.type === 'trainer') {
@@ -58,7 +54,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleRejectClick = (item: any) => {
+  const handleRejectClick = (item: { type: string; id: string; title: string; description?: string; userId?: string }) => {
     setSelectedRequest(item)
     setRejectionReason("")
     setRejectModalOpen(true)
@@ -253,7 +249,7 @@ export default function AdminDashboard() {
               تأكيد الرفض
             </DialogTitle>
             <DialogDescription>
-              هل أنت متأكد من رغبتك في رفض طلب "{selectedRequest?.title}"؟
+              هل أنت متأكد من رغبتك في رفض طلب &quot;{selectedRequest?.title}&quot;؟
               <br />
               يرجى توضيح سبب الرفض ليتم إرساله إلى مقدم الطلب.
             </DialogDescription>

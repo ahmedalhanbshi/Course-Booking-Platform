@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotifications } from "@/contexts/notification-context"
+import { getFileUrl } from "@/lib/utils"
 
 interface TrainerHeaderProps {
   isSidebarOpen: boolean
@@ -25,7 +26,7 @@ export function TrainerHeader({ isSidebarOpen, onMenuClick }: TrainerHeaderProps
   const { user, logout } = useAuth()
   const { unreadCount } = useNotifications()
   const avatarSrc = user?.avatar
-    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${user.avatar}?t=${Date.now()}`
+    ? `${getFileUrl(user.avatar)}?t=${Date.now()}`
     : undefined
 
   return (
