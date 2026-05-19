@@ -8,6 +8,8 @@ import adminRoutes from './routes/admin.routes';
 import instituteRoutes from './routes/institute.routes';
 import trainerRoutes from './routes/trainer.routes';
 import studentRoutes from './routes/student.routes';
+import notificationRoutes from './routes/notification.routes';
+import publicRoutes from './routes/public.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 import prisma from './config/database';
@@ -63,9 +65,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
-
-import notificationRoutes from './routes/notification.routes';
-import publicRoutes from './routes/public.routes';
 
 // Routes
 app.use('/api/auth', authRoutes);
