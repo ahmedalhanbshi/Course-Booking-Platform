@@ -16,10 +16,9 @@ import {
 } from "@/components/ui/select"
 import { trainerService, ExploreCourse } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
+import { API_BASE_URL as API_BASE } from "@/lib/config"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 const sortOptions = ["الأحدث", "الأقدم", "الأعلى سعراً", "الأقل سعراً"]
 const priceOptions = [

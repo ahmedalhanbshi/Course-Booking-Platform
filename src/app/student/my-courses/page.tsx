@@ -35,11 +35,10 @@ import {
 } from "lucide-react"
 import { Course, Enrollment, User } from "@/types"
 import { studentService } from "@/lib/student-service"
+import { API_BASE_URL as API_BASE } from "@/lib/config"
 
 import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
 import { toast } from "sonner"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 function resolveImage(src: string | null | undefined): string {
   if (!src) return "/images/course-web.png"
