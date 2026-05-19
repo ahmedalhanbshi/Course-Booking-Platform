@@ -148,8 +148,31 @@ class TrainerService {
     }
 
     async getExploreCourses(): Promise<ExploreCoursesData> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: ExploreCoursesData }>('/api/public/courses');
-        return response.data.data;
+        try {
+            const response = await apiClient.get<{ success: boolean; message: string; data: ExploreCoursesData }>('/api/public/courses');
+            return response.data.data;
+        } catch (error: unknown) {
+            // Surface the exact HTTP failure details in browser console for production debugging.
+            if (typeof window !== 'undefined') {
+                const axiosError = error as {
+                    message?: string;
+                    response?: { status?: number; data?: unknown; headers?: unknown };
+                    config?: { url?: string; method?: string; baseURL?: string };
+                };
+                console.error('getExploreCourses failed', {
+                    message: axiosError?.message,
+                    status: axiosError?.response?.status,
+                    data: axiosError?.response?.data,
+                    headers: axiosError?.response?.headers,
+                    request: {
+                        method: axiosError?.config?.method,
+                        baseURL: axiosError?.config?.baseURL,
+                        url: axiosError?.config?.url,
+                    },
+                });
+            }
+            throw error;
+        }
     }
 
     async getDashboard(): Promise<TrainerDashboardData> {

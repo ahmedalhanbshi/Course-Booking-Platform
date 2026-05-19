@@ -33,7 +33,7 @@ interface Config {
         lockTimeMinutes: number;
     };
     cors: {
-        origin: string;
+        origin: string[];
     };
 }
 
@@ -65,6 +65,9 @@ export const config: Config = {
     },
 
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        origin: (process.env.FRONTEND_URL || 'http://localhost:3000')
+            .split(',')
+            .map((origin) => origin.trim())
+            .filter(Boolean),
     },
 };

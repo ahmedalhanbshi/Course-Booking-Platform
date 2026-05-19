@@ -53,26 +53,33 @@ class PublicService {
     }
 
     async getExploreCourses() {
-        const courses = await prisma.course.findMany({
-            where: { status: 'ACTIVE' },
-            orderBy: { createdAt: 'desc' },
-            include: {
-                trainer: { select: { name: true, avatar: true } },
-                institute: {
-                    select: {
-                        name: true,
-                        logo: true,
-                        user: { select: { avatar: true } },
+        let courses: any[] = [];
+        try {
+            courses = await prisma.course.findMany({
+                where: { status: 'ACTIVE' },
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    trainer: { select: { name: true, avatar: true } },
+                    institute: {
+                        select: {
+                            name: true,
+                            logo: true,
+                            user: { select: { avatar: true } },
+                        },
                     },
+                    category: { select: { name: true } },
+                    enrollments: {
+                        where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
+                        select: { id: true },
+                    },
+                    sessions: { select: { id: true, type: true } },
                 },
-                category: { select: { name: true } },
-                enrollments: {
-                    where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PENDING_PAYMENT'] } },
-                    select: { id: true },
-                },
-                sessions: { select: { id: true, type: true } },
-            },
-        });
+            });
+        } catch (error: any) {
+            // If the database is freshly provisioned / partially migrated, fail soft for explore endpoint.
+            if (error?.code !== 'P2021') throw error;
+            courses = [];
+        }
 
         const allStaffIds = [
             ...new Set(courses.flatMap((course) => ((course as any).staffTrainerIds as string[] | undefined) ?? [])),
@@ -89,9 +96,15 @@ class PublicService {
             });
         }
 
-        const categories = await prisma.courseCategory.findMany({
-            orderBy: { name: 'asc' },
-        });
+        let categories: any[] = [];
+        try {
+            categories = await prisma.courseCategory.findMany({
+                orderBy: { name: 'asc' },
+            });
+        } catch (error: any) {
+            if (error?.code !== 'P2021') throw error;
+            categories = [];
+        }
 
         return {
             courses: courses.map((course) => {
