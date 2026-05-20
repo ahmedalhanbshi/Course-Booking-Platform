@@ -23,7 +23,7 @@ export default function TrainerAnnouncements() {
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [announcementToDelete, setAnnouncementToDelete] = useState<string | null>(null)
@@ -89,7 +89,7 @@ export default function TrainerAnnouncements() {
 
     try {
       setSubmitting(true)
-      
+
       const payload: any = {
         title: formData.title,
         message: formData.message,
@@ -99,6 +99,11 @@ export default function TrainerAnnouncements() {
       }
 
       // If specific students are selected, we handle broadcasting
+      const courseStudents = getCourseStudents(formData.courseId);
+      const isAllSelected = formData.selectedStudents.length > 0 && formData.selectedStudents.length === courseStudents.length;
+
+      const finalSelectedStudents = isAllSelected ? [] : formData.selectedStudents;
+
       if (editingId) {
         await trainerService.updateAnnouncement(editingId, {
           title: formData.title,
@@ -106,27 +111,17 @@ export default function TrainerAnnouncements() {
         })
         toast.success("تم تحديث الإعلان")
       } else {
-        if (formData.selectedStudents.length > 0) {
-            // Multi-recipient logic
-            if (formData.selectedStudents.length === 1) {
-                await trainerService.sendStudentAnnouncement({ ...payload, recipientId: formData.selectedStudents[0] })
-            } else {
-                let successCount = 0
-                for (const sId of formData.selectedStudents) {
-                    try {
-                        await trainerService.sendStudentAnnouncement({ ...payload, recipientId: sId })
-                        successCount++
-                    } catch (e) {
-                        console.error(`Failed to send to ${sId}`, e)
-                    }
-                }
-                const isScheduled = !!formData.scheduledAt;
-                toast.success(isScheduled ? `تمت جدولة ${successCount} إعلانات بنجاح` : `تم إرسال ${successCount} إعلانات بنجاح`)
-            }
+        if (finalSelectedStudents.length > 0) {
+          // Send to selected specific students
+          await trainerService.sendStudentAnnouncement({ ...payload, recipientIds: finalSelectedStudents })
+          const isScheduled = !!formData.scheduledAt;
+          const count = finalSelectedStudents.length;
+          toast.success(isScheduled ? `تمت جدولة إعلان لـ ${count} طلاب بنجاح` : `تم إرسال إعلان لـ ${count} طلاب بنجاح`)
         } else {
-            // Send to whole course (or all my students if courseId is 'all')
-            const isScheduled = !!formData.scheduledAt;
-            toast.success(isScheduled ? "تمت جدولة الإعلان بنجاح" : "تم إرسال الإعلان بنجاح")
+          // Send to whole course (or all my students if courseId is 'all')
+          await trainerService.sendStudentAnnouncement(payload)
+          const isScheduled = !!formData.scheduledAt;
+          toast.success(isScheduled ? "تمت جدولة الإعلان بنجاح" : "تم إرسال الإعلان بنجاح")
         }
       }
 
@@ -193,7 +188,7 @@ export default function TrainerAnnouncements() {
   const toggleAllStudents = () => {
     const courseStudents = getCourseStudents(formData.courseId)
     const studentIds = courseStudents.map(s => s.id)
-    
+
     if (formData.selectedStudents.length === studentIds.length && studentIds.length > 0) {
       setFormData(prev => ({ ...prev, selectedStudents: [] }))
     } else {
@@ -255,16 +250,16 @@ export default function TrainerAnnouncements() {
                 <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-bold text-primary">تحديد طلاب من الدورة (اختياري)</Label>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-xs h-7 text-primary hover:text-primary/80"
                       onClick={toggleAllStudents}
                     >
                       {formData.selectedStudents.length === getCourseStudents(formData.courseId).length && getCourseStudents(formData.courseId).length > 0 ? "إلغاء الكل" : "تحديد الكل"}
                     </Button>
                   </div>
-                  
+
                   <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {getCourseStudents(formData.courseId).length > 0 ? (
                       getCourseStudents(formData.courseId).map(student => (
@@ -369,7 +364,7 @@ export default function TrainerAnnouncements() {
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <Table>
@@ -384,43 +379,53 @@ export default function TrainerAnnouncements() {
               </TableHeader>
               <TableBody>
                 {announcements.length > 0 ? (
-                  announcements.map((announcement) => (
-                    <TableRow key={announcement.id}>
-                      <TableCell className="text-right">
-                        <div>
-                          <div className="font-medium">{announcement.title}</div>
-                          <div className="text-sm text-gray-500 line-clamp-1">{announcement.message}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="outline">
-                          {getCourseTitle(announcement.courseId || "")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatDate(announcement.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {announcement.status?.toUpperCase() === 'SENT' ? (
-                          <Badge className="bg-green-100 text-green-800 border-none">مرسل</Badge>
-                        ) : announcement.status?.toUpperCase() === 'SCHEDULED' ? (
-                          <Badge className="bg-blue-100 text-blue-800 border-none">مجدول</Badge>
-                        ) : (
-                          <Badge className="bg-yellow-100 text-yellow-800 border-none">مسودة</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 justify-start">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditClick(announcement)}>
-                            <Pencil className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(announcement.id)}>
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  announcements.map((announcement) => {
+                    const isSelective = announcement.title && announcement.title.includes('\u200B');
+                    const displayTitle = announcement.title ? announcement.title.replace(/\u200B/g, '') : '';
+
+                    return (
+                      <TableRow key={announcement.id}>
+                        <TableCell className="text-right">
+                          <div>
+                            <div className="font-medium flex items-center gap-2">
+                              {displayTitle}
+                              {isSelective && <Badge variant="secondary" className="text-[10px] h-4 px-1 py-0 font-normal">مختارون</Badge>}
+                            </div>
+                            <div className="text-sm text-gray-500 line-clamp-1">{announcement.message}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="outline">
+                            {announcement.recipient?.name
+                              ? `خاص: ${announcement.recipient.name}`
+                              : getCourseTitle(announcement.courseId || "")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatDate(announcement.createdAt)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {announcement.status?.toUpperCase() === 'SENT' ? (
+                            <Badge className="bg-green-100 text-green-800 border-none">مرسل</Badge>
+                          ) : announcement.status?.toUpperCase() === 'SCHEDULED' ? (
+                            <Badge className="bg-blue-100 text-blue-800 border-none">مجدول</Badge>
+                          ) : (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-none">مسودة</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 justify-start">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditClick(announcement)}>
+                              <Pencil className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(announcement.id)}>
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">

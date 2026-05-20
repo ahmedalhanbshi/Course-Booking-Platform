@@ -597,13 +597,13 @@ class TrainerService {
     async createStudentAnnouncement(userId: string, data: {
         title: string;
         message: string;
-        recipientId?: string;
+        recipientIds?: string[];
         courseId?: string;
         category?: string;
         status?: string;
         scheduledAt?: string;
     }) {
-        console.log(`[Announcement-Trainer] Trainer ${userId} initiating announcement to: ${data.recipientId ?? (data.courseId ?? 'ALL')}`);
+        console.log(`[Announcement-Trainer] Trainer ${userId} initiating announcement to: ${data.recipientIds?.length ? data.recipientIds.length + ' students' : (data.courseId ?? 'ALL')}`);
 
         // STRICTLY INDEPENDENT TRAINER LOOKUP: Fetch only courses owned by this specific trainer User ID
         const trainerCourses = await prisma.course.findMany({ 
@@ -622,26 +622,25 @@ class TrainerService {
 
         console.log(`[Announcement-Trainer] Trainer owns ${courseIds.length} targeted courses`);
 
-        if (data.recipientId) {
-            // Target specific student
-            console.log(`[Announcement-Trainer] Verifying enrollment for target student ${data.recipientId}`);
-            const isEnrolled = courseIds.length > 0
-                ? await prisma.enrollment.findFirst({ 
+        if (data.recipientIds && data.recipientIds.length > 0) {
+            // Target specific students
+            console.log(`[Announcement-Trainer] Verifying enrollment for target students`);
+            const enrolledStudents = courseIds.length > 0
+                ? await prisma.enrollment.findMany({ 
                     where: { 
-                        studentId: data.recipientId, 
+                        studentId: { in: data.recipientIds }, 
                         courseId: { in: courseIds },
                         deletedAt: null
-                    } 
+                    },
+                    select: { student: { select: { id: true, name: true, email: true } } },
+                    distinct: ['studentId']
                 })
-                : null;
+                : [];
             
-            if (!isEnrolled) {
-                console.warn(`[Announcement-Trainer] TARGET_ERROR: Student ${data.recipientId} is NOT enrolled in any of trainer ${userId}'s courses`);
-                throw new Error('الطالب المحدد غير مسجل في أي من دوراتك المستقلة');
+            if (enrolledStudents.length === 0) {
+                console.warn(`[Announcement-Trainer] TARGET_ERROR: None of the targeted students are enrolled in any of trainer ${userId}'s courses`);
+                throw new Error('الطلاب المحددين غير مسجلين في أي من دوراتك المستقلة');
             }
-
-            const student = await prisma.user.findUnique({ where: { id: data.recipientId } });
-            if (!student) throw new Error('الطالب المستهدف غير موجود في النظام');
 
             const trainer = await prisma.user.findUnique({ 
                 where: { id: userId },
@@ -654,11 +653,12 @@ class TrainerService {
             // 1. Create Announcement Record
             const announcement = await (prisma.announcement.create as any)({
                 data: {
-                    title: data.title,
+                    title: data.title + (data.recipientIds.length > 1 ? '\u200B' : ''), // Zero-width space to denote selective broadcast
                     message: fullMessage,
-                    targetAudience: 'SINGLE_USER',
+                    targetAudience: data.recipientIds.length === 1 ? 'SINGLE_USER' : 'STUDENTS',
                     senderId: userId,
-                    recipientId: data.recipientId,
+                    recipientId: data.recipientIds.length === 1 ? data.recipientIds[0] : null,
+                    recipientIds: data.recipientIds.length > 1 ? data.recipientIds : [],
                     courseId: data.courseId || null,
                     category: (data.category?.toUpperCase() as any) || 'GENERAL',
                     status: (data.status?.toUpperCase() as any) || (data.scheduledAt ? 'SCHEDULED' : 'SENT'),
@@ -668,36 +668,42 @@ class TrainerService {
                 }
             });
 
-            // 2. Create Platform Notification (Only if SENT)
-            if (announcement.status === 'SENT') {
-                await prisma.notification.create({
-                    data: {
-                        userId: data.recipientId,
-                        type: 'NEW_ANNOUNCEMENT' as any,
-                        title: data.title,
-                        message: fullMessage,
-                        relatedEntityId: announcement.id
-                    }
-                });
-            }
+            // 2. Background Tasks: Notifications & Emails
+            setImmediate(async () => {
+                try {
+                    if (announcement.status === 'SENT') {
+                        await prisma.notification.createMany({
+                            data: enrolledStudents.map((s: any) => ({
+                                userId: s.student.id,
+                                type: 'NEW_ANNOUNCEMENT' as any,
+                                title: data.title,
+                                message: fullMessage,
+                                relatedEntityId: announcement.id
+                            })),
+                            skipDuplicates: true
+                        });
 
-            // 3. Dispatch Email (Only if SENT)
-            if (announcement.status === 'SENT' && student.email) {
-                console.log(`[Announcement-Trainer] Dispatching email to: ${student.email}`);
-                mailerService.sendAnnouncementEmail(
-                    student.email,
-                    student.name,
-                    data.title,
-                    data.message,
-                    {
-                        name: trainer?.name || 'المدرب',
-                        phone: trainer?.phone,
-                        email: trainer?.email
+                        for (const { student } of enrolledStudents as any[]) {
+                            if (student.email) {
+                                mailerService.sendAnnouncementEmail(
+                                    student.email,
+                                    student.name,
+                                    data.title,
+                                    data.message,
+                                    {
+                                        name: trainer?.name || 'المدرب',
+                                        phone: trainer?.phone,
+                                        email: trainer?.email
+                                    }
+                                ).catch((err: any) => console.error(`[Announcement-Trainer] Bulk email error:`, err));
+                            }
+                        }
                     }
-                )
-                    .then(() => console.log(`[Announcement-Trainer] Email delivered successfully`))
-                    .catch((err: any) => console.error(`[Announcement-Trainer] Email delivery FAILED:`, err));
-            }
+                } catch (e) {
+                    console.error('[Announcement-Trainer] Background task failed:', e);
+                }
+            });
+            
             return announcement;
         } else {
             // Target Audience (ALL students of this trainer)
@@ -739,37 +745,42 @@ class TrainerService {
                 distinct: ['studentId']
             });
 
-            console.log(`[Announcement-Trainer] Broadcasting to ${activeStudents.length} students`);
+            console.log(`[Announcement-Trainer] Broadcasting to ${activeStudents.length} students (Running in background)`);
 
             if (activeStudents.length > 0) {
-                // Create platform notifications in bulk
-                await prisma.notification.createMany({
-                    data: activeStudents.map((s: any) => ({ 
-                        userId: s.student.id, 
-                        type: 'NEW_ANNOUNCEMENT' as any, 
-                        title: data.title, 
-                        message: fullMessage, 
-                        relatedEntityId: announcement.id 
-                    })),
-                    skipDuplicates: true
-                });
+                // Background Tasks: Notifications & Emails
+                setImmediate(async () => {
+                    try {
+                        await prisma.notification.createMany({
+                            data: activeStudents.map((s: any) => ({ 
+                                userId: s.student.id, 
+                                type: 'NEW_ANNOUNCEMENT' as any, 
+                                title: data.title, 
+                                message: fullMessage, 
+                                relatedEntityId: announcement.id 
+                            })),
+                            skipDuplicates: true
+                        });
 
-                // Fire-and-forget emails
-                for (const { student } of activeStudents as any[]) {
-                    if (student.email) {
-                        mailerService.sendAnnouncementEmail(
-                            student.email, 
-                            student.name, 
-                            data.title, 
-                            data.message, 
-                            { 
-                                name: trainer?.name || 'المدرب', 
-                                phone: trainer?.phone, 
-                                email: trainer?.email 
+                        for (const { student } of activeStudents as any[]) {
+                            if (student.email) {
+                                mailerService.sendAnnouncementEmail(
+                                    student.email, 
+                                    student.name, 
+                                    data.title, 
+                                    data.message, 
+                                    { 
+                                        name: trainer?.name || 'المدرب', 
+                                        phone: trainer?.phone, 
+                                        email: trainer?.email 
+                                    }
+                                ).catch((e: any) => console.error(`[Announcement-Trainer] Bulk email error:`, e));
                             }
-                        ).catch((e: any) => console.error(`[Announcement-Trainer] Bulk email error:`, e));
+                        }
+                    } catch (e) {
+                        console.error('[Announcement-Trainer] Background task failed:', e);
                     }
-                }
+                });
             }
             return announcement;
         }

@@ -484,14 +484,14 @@ class TrainerController {
                 console.warn(`[Controller-Trainer] Unauthorized access attempt by ${req.user?.role}`);
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
-            const { title, message, recipientId, courseId, category, status, scheduledAt } = req.body;
+            const { title, message, recipientIds, courseId, category, status, scheduledAt } = req.body;
             if (!title || !message) {
                 return sendError(res, 'عنوان ومحتوى الإعلان مطلوبان', 400);
             }
             
             const announcement = await trainerService.createStudentAnnouncement(
                 req.user.userId, 
-                { title, message, recipientId, courseId, category, status, scheduledAt }
+                { title, message, recipientIds, courseId, category, status, scheduledAt }
             );
 
             console.log(`[Controller-Trainer] SUCCESS: Announcement created with ID: ${announcement?.id}`);

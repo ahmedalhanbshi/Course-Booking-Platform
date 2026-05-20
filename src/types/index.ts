@@ -255,6 +255,8 @@ export interface Announcement {
   category?: string;
   status?: string;
   targetAudience?: 'all' | 'students' | 'trainers' | 'institute_admins' | 'platform_admins' | 'course_students' | 'SINGLE_USER' | 'STUDENTS' | 'ALL';
+  recipient?: { id: string; name: string; avatar?: string | null };
+  sender?: { id: string; name: string; avatar?: string | null };
 }
 
 export interface Wishlist {

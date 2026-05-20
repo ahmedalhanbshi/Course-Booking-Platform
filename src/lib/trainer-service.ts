@@ -269,7 +269,7 @@ class TrainerService {
     async sendStudentAnnouncement(data: {
         title: string;
         message: string;
-        recipientId?: string;
+        recipientIds?: string[];
         courseId?: string;
         category?: string;
         status?: string;
