@@ -388,9 +388,9 @@ export default function CreateCoursePage() {
             await trainerService.createCourse(formData);
 
             toast.success(
-                status === 'DRAFT'           ? 'تم حفظ المسودة بنجاح' :
-                status === 'PENDING_MINIMUM' ? 'تم نشر الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد' :
-                                              'تم إنشاء الدورة بنجاح'
+                status === 'DRAFT' ? 'تم حفظ المسودة بنجاح' :
+                    status === 'PENDING_MINIMUM' ? 'تم نشر الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد' :
+                        'تم إنشاء الدورة بنجاح'
             );
             router.push('/trainer/courses');
 
@@ -556,13 +556,13 @@ export default function CreateCoursePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label>أقل عدد مقاعد *</Label>
-                                    <Input type="number" value={courseData.minStudents} 
+                                    <Input type="number" value={courseData.minStudents}
                                         onChange={e => setCourseData({ ...courseData, minStudents: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>أقصى عدد مقاعد *</Label>
-                                    <Input type="number" value={courseData.maxStudents} 
+                                    <Input type="number" value={courseData.maxStudents}
                                         onChange={e => setCourseData({ ...courseData, maxStudents: e.target.value })}
                                     />
                                 </div>
@@ -619,11 +619,10 @@ export default function CreateCoursePage() {
                                                     key={tag.id}
                                                     type="button"
                                                     onClick={() => toggleTag(tag.name)}
-                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all duration-150 ${
-                                                        isSelected
-                                                            ? 'text-white border-transparent shadow-md scale-105'
-                                                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-                                                    }`}
+                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all duration-150 ${isSelected
+                                                        ? 'text-white border-transparent shadow-md scale-105'
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                                        }`}
                                                     style={isSelected ? { backgroundColor: tag.color || '#6366F1', borderColor: tag.color || '#6366F1' } : {}}
                                                 >
                                                     {isSelected && <CheckCircle className="h-3.5 w-3.5" />}
