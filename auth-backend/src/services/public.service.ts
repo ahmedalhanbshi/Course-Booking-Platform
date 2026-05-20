@@ -47,9 +47,17 @@ class PublicService {
     }
 
     async getTags() {
-        return prisma.tag.findMany({
-            orderBy: { name: 'asc' },
-        });
+        try {
+            return await prisma.tag.findMany({
+                orderBy: { name: 'asc' },
+            });
+        } catch (error: any) {
+            // Gracefully handle environments where the tags table is not migrated yet.
+            if (error?.code === 'P2021') {
+                return [];
+            }
+            throw error;
+        }
     }
 
     async getExploreCourses() {

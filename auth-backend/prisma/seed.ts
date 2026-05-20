@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+﻿import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -31,10 +31,10 @@ function createDateTime(days: number, hours: number, minutes: number = 0): Date 
 }
 
 async function main() {
-    console.log('🌱 Starting database seed...\n');
+    console.log('ðŸŒ± Starting database seed...\n');
 
     // Delete all existing data (in correct order due to foreign keys)
-    console.log('🗑️  Clearing existing data...');
+    console.log('ðŸ—‘ï¸  Clearing existing data...');
     await prisma.auditLog.deleteMany();
     await prisma.notification.deleteMany();
     await prisma.announcement.deleteMany();
@@ -46,11 +46,16 @@ async function main() {
     await prisma.room.deleteMany();
     await prisma.course.deleteMany();
     await prisma.courseCategory.deleteMany();
-    await prisma.tag.deleteMany();
+    try {
+        await prisma.tag.deleteMany();
+    } catch (error: any) {
+        if (error?.code !== 'P2021') throw error;
+        console.log('Skipping tag cleanup: table tags does not exist in target database');
+    }
     await prisma.institute.deleteMany();
     await prisma.trainerProfile.deleteMany();
     await prisma.user.deleteMany();
-    console.log('✅ Existing data cleared\n');
+    console.log('âœ… Existing data cleared\n');
 
 
     // Common password for all users
@@ -59,7 +64,7 @@ async function main() {
     // ================================================
     // USERS
     // ================================================
-    console.log('👥 Creating users...');
+    console.log('ðŸ‘¥ Creating users...');
 
     // Platform Admins
     const platformAdmin1 = await prisma.user.create({
@@ -269,12 +274,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 17 users\n');
+    console.log('âœ… Created 17 users\n');
 
     // ================================================
     // TRAINER PROFILES
     // ================================================
-    console.log('👨‍🏫 Creating trainer profiles...');
+    console.log('ðŸ‘¨â€ðŸ« Creating trainer profiles...');
 
     await prisma.trainerProfile.create({
         data: {
@@ -328,12 +333,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 5 trainer profiles\n');
+    console.log('âœ… Created 5 trainer profiles\n');
 
     // ================================================
     // INSTITUTES
     // ================================================
-    console.log('🏛️  Creating institutes...');
+    console.log('ðŸ›ï¸  Creating institutes...');
 
     const institute1 = await prisma.institute.create({
         data: {
@@ -376,12 +381,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 3 institutes\n');
+    console.log('âœ… Created 3 institutes\n');
 
     // ================================================
     // ROOMS
     // ================================================
-    console.log('🚪 Creating rooms...');
+    console.log('ðŸšª Creating rooms...');
 
     const room1 = await prisma.room.create({
         data: {
@@ -438,12 +443,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 5 rooms\n');
+    console.log('âœ… Created 5 rooms\n');
 
     // ================================================
     // COURSE CATEGORIES
     // ================================================
-    console.log('📚 Creating course categories...');
+    console.log('ðŸ“š Creating course categories...');
 
     const catTech = await prisma.courseCategory.create({
         data: {
@@ -477,43 +482,48 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 4 course categories\n');
+    console.log('âœ… Created 4 course categories\n');
 
     // ================================================
     // TAGS
     // ================================================
-    console.log('🏷️  Creating tags...');
+    console.log('ðŸ·ï¸  Creating tags...');
 
-    await prisma.tag.createMany({
-        data: [
-            { name: 'برمجة',            slug: 'programming',   color: '#3B82F6' },
-            { name: 'تصميم',            slug: 'design',        color: '#8B5CF6' },
-            { name: 'لغات',             slug: 'languages',     color: '#10B981' },
-            { name: 'إدارة',            slug: 'management',    color: '#F59E0B' },
-            { name: 'تسويق',            slug: 'marketing',     color: '#EF4444' },
-            { name: 'محاسبة',           slug: 'accounting',    color: '#6366F1' },
-            { name: 'صحة ولياقة',       slug: 'health',        color: '#14B8A6' },
-            { name: 'فنون',             slug: 'arts',          color: '#EC4899' },
-            { name: 'ذكاء اصطناعي',     slug: 'ai',            color: '#F97316' },
-            { name: 'أعمال حرة',        slug: 'freelancing',   color: '#0EA5E9' },
-            { name: 'تطوير ويب',        slug: 'web-dev',       color: '#84CC16' },
-            { name: 'تطوير تطبيقات',    slug: 'mobile-dev',    color: '#06B6D4' },
-            { name: 'شبكات',            slug: 'networking',    color: '#64748B' },
-            { name: 'أمن معلومات',      slug: 'cybersecurity', color: '#DC2626' },
-            { name: 'ريادة أعمال',      slug: 'entrepreneurship', color: '#7C3AED' },
-            { name: 'مبتدئ',            slug: 'beginner',      color: '#22C55E' },
-            { name: 'متقدم',            slug: 'advanced',      color: '#EF4444' },
-            { name: 'عملي',             slug: 'practical',     color: '#F59E0B' },
-        ],
-        skipDuplicates: true,
-    });
+    try {
+        await prisma.tag.createMany({
+                data: [
+                    { name: 'Ø¨Ø±Ù…Ø¬Ø©',            slug: 'programming',   color: '#3B82F6' },
+                    { name: 'ØªØµÙ…ÙŠÙ…',            slug: 'design',        color: '#8B5CF6' },
+                    { name: 'Ù„ØºØ§Øª',             slug: 'languages',     color: '#10B981' },
+                    { name: 'Ø¥Ø¯Ø§Ø±Ø©',            slug: 'management',    color: '#F59E0B' },
+                    { name: 'ØªØ³ÙˆÙŠÙ‚',            slug: 'marketing',     color: '#EF4444' },
+                    { name: 'Ù…Ø­Ø§Ø³Ø¨Ø©',           slug: 'accounting',    color: '#6366F1' },
+                    { name: 'ØµØ­Ø© ÙˆÙ„ÙŠØ§Ù‚Ø©',       slug: 'health',        color: '#14B8A6' },
+                    { name: 'ÙÙ†ÙˆÙ†',             slug: 'arts',          color: '#EC4899' },
+                    { name: 'Ø°ÙƒØ§Ø¡ Ø§ØµØ·Ù†Ø§Ø¹ÙŠ',     slug: 'ai',            color: '#F97316' },
+                    { name: 'Ø£Ø¹Ù…Ø§Ù„ Ø­Ø±Ø©',        slug: 'freelancing',   color: '#0EA5E9' },
+                    { name: 'ØªØ·ÙˆÙŠØ± ÙˆÙŠØ¨',        slug: 'web-dev',       color: '#84CC16' },
+                    { name: 'ØªØ·ÙˆÙŠØ± ØªØ·Ø¨ÙŠÙ‚Ø§Øª',    slug: 'mobile-dev',    color: '#06B6D4' },
+                    { name: 'Ø´Ø¨ÙƒØ§Øª',            slug: 'networking',    color: '#64748B' },
+                    { name: 'Ø£Ù…Ù† Ù…Ø¹Ù„ÙˆÙ…Ø§Øª',      slug: 'cybersecurity', color: '#DC2626' },
+                    { name: 'Ø±ÙŠØ§Ø¯Ø© Ø£Ø¹Ù…Ø§Ù„',      slug: 'entrepreneurship', color: '#7C3AED' },
+                    { name: 'Ù…Ø¨ØªØ¯Ø¦',            slug: 'beginner',      color: '#22C55E' },
+                    { name: 'Ù…ØªÙ‚Ø¯Ù…',            slug: 'advanced',      color: '#EF4444' },
+                    { name: 'Ø¹Ù…Ù„ÙŠ',             slug: 'practical',     color: '#F59E0B' },
+                ],
+                skipDuplicates: true,
+            });
+    } catch (error: any) {
+        if (error?.code !== 'P2021') throw error;
+        console.log('Skipping tags creation: table tags does not exist in target database');
+    }
 
-    console.log('✅ Created 18 tags\n');
+    console.log('âœ… Created 18 tags\n');
 
     // ================================================
     // COURSES
     // ================================================
-    console.log('📖 Creating courses...');
+    console.log('ðŸ“– Creating courses...');
 
     const course1 = await prisma.course.create({
         data: {
@@ -641,12 +651,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 6 courses\n');
+    console.log('âœ… Created 6 courses\n');
 
     // ================================================
     // ROOM BOOKINGS
     // ================================================
-    console.log('📅 Creating room bookings...');
+    console.log('ðŸ“… Creating room bookings...');
 
     const booking1 = await prisma.roomBooking.create({
         data: {
@@ -735,12 +745,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 5 room bookings\n');
+    console.log('âœ… Created 5 room bookings\n');
 
     // ================================================
     // SESSIONS
     // ================================================
-    console.log('🎓 Creating sessions...');
+    console.log('ðŸŽ“ Creating sessions...');
 
     // Sessions for course1 (Full-Stack Web Development)
     await prisma.session.create({
@@ -813,12 +823,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 6 sessions\n');
+    console.log('âœ… Created 6 sessions\n');
 
     // ================================================
     // ENROLLMENTS
     // ================================================
-    console.log('📝 Creating enrollments...');
+    console.log('ðŸ“ Creating enrollments...');
 
     const enrollment1 = await prisma.enrollment.create({
         data: {
@@ -919,7 +929,7 @@ async function main() {
             studentId: student6.id,
             courseId: course1.id,
             status: 'CANCELLED',
-            cancellationReason: 'الطالب طلب الانسحاب لأسباب شخصية',
+            cancellationReason: 'Ø§Ù„Ø·Ø§Ù„Ø¨ Ø·Ù„Ø¨ Ø§Ù„Ø§Ù†Ø³Ø­Ø§Ø¨ Ù„Ø£Ø³Ø¨Ø§Ø¨ Ø´Ø®ØµÙŠØ©',
             enrolledAt: subtractDays(8),
         },
     });
@@ -991,12 +1001,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 18 enrollments\n');
+    console.log('âœ… Created 18 enrollments\n');
 
     // ================================================
     // PAYMENTS
     // ================================================
-    console.log('💰 Creating payments...');
+    console.log('ðŸ’° Creating payments...');
 
     await prisma.payment.create({
         data: {
@@ -1060,12 +1070,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 5 payments\n');
+    console.log('âœ… Created 5 payments\n');
 
     // ================================================
     // WISHLISTS
     // ================================================
-    console.log('⭐ Creating wishlists...');
+    console.log('â­ Creating wishlists...');
 
     await prisma.wishlist.create({
         data: {
@@ -1095,12 +1105,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 4 wishlists\n');
+    console.log('âœ… Created 4 wishlists\n');
 
     // ================================================
     // ANNOUNCEMENTS
     // ================================================
-    console.log('📢 Creating announcements...');
+    console.log('ðŸ“¢ Creating announcements...');
 
     await prisma.announcement.create({
         data: {
@@ -1132,12 +1142,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 3 announcements\n');
+    console.log('âœ… Created 3 announcements\n');
 
     // ================================================
     // NOTIFICATIONS
     // ================================================
-    console.log('🔔 Creating notifications...');
+    console.log('ðŸ”” Creating notifications...');
 
     await prisma.notification.create({
         data: {
@@ -1189,12 +1199,12 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 5 notifications\n');
+    console.log('âœ… Created 5 notifications\n');
 
     // ================================================
     // ROOM BOOKINGS
     // ================================================
-    console.log('📅 Creating room bookings...');
+    console.log('ðŸ“… Creating room bookings...');
 
     const bookingsData = [
         {
@@ -1205,8 +1215,8 @@ async function main() {
             defaultStartTime: new Date('2026-03-01T09:00:00.000Z'),
             defaultEndTime: new Date('2026-03-01T12:00:00.000Z'),
             status: 'PENDING_APPROVAL',
-            purpose: 'دورة برمجة',
-            notes: 'نرجو تجهيز البروجكتر',
+            purpose: 'Ø¯ÙˆØ±Ø© Ø¨Ø±Ù…Ø¬Ø©',
+            notes: 'Ù†Ø±Ø¬Ùˆ ØªØ¬Ù‡ÙŠØ² Ø§Ù„Ø¨Ø±ÙˆØ¬ÙƒØªØ±',
             totalPrice: 1500,
             roomId: room1.id,
             requestedById: trainer1.id,
@@ -1218,7 +1228,7 @@ async function main() {
                         currency: 'YER',
                         status: 'APPROVED',
                         depositSlipImage: '/uploads/slip1.jpg',
-                        notes: 'تم الدفع بالكامل',
+                        notes: 'ØªÙ… Ø§Ù„Ø¯ÙØ¹ Ø¨Ø§Ù„ÙƒØ§Ù…Ù„',
                         reviewedBy: platformAdmin1.id,
                         reviewedAt: new Date(),
                     }
@@ -1233,7 +1243,7 @@ async function main() {
             defaultStartTime: new Date('2026-03-05T14:00:00.000Z'),
             defaultEndTime: new Date('2026-03-05T17:00:00.000Z'),
             status: 'PENDING_PAYMENT',
-            purpose: 'ورشة عمل تصميم',
+            purpose: 'ÙˆØ±Ø´Ø© Ø¹Ù…Ù„ ØªØµÙ…ÙŠÙ…',
             totalPrice: 2000,
             roomId: room2.id,
             requestedById: trainer2.id,
@@ -1245,8 +1255,8 @@ async function main() {
                         currency: 'YER',
                         status: 'REJECTED',
                         depositSlipImage: '/uploads/slip2.jpg',
-                        notes: 'دفعة أولى مرفوضة',
-                        rejectionReason: 'صورة الإيصال غير واضحة',
+                        notes: 'Ø¯ÙØ¹Ø© Ø£ÙˆÙ„Ù‰ Ù…Ø±ÙÙˆØ¶Ø©',
+                        rejectionReason: 'ØµÙˆØ±Ø© Ø§Ù„Ø¥ÙŠØµØ§Ù„ ØºÙŠØ± ÙˆØ§Ø¶Ø­Ø©',
                         reviewedBy: platformAdmin1.id,
                         reviewedAt: new Date(),
                     },
@@ -1255,7 +1265,7 @@ async function main() {
                         currency: 'YER',
                         status: 'PENDING_REVIEW',
                         depositSlipImage: '/uploads/slip3.jpg',
-                        notes: 'إعادة إرسال الإيصال',
+                        notes: 'Ø¥Ø¹Ø§Ø¯Ø© Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¥ÙŠØµØ§Ù„',
                     }
                 ]
             }
@@ -1268,8 +1278,8 @@ async function main() {
             defaultStartTime: new Date('2026-03-20T10:00:00.000Z'),
             defaultEndTime: new Date('2026-03-20T15:00:00.000Z'),
             status: 'APPROVED',
-            purpose: 'اجتماع إدارة',
-            notes: 'تمت الموافقة',
+            purpose: 'Ø§Ø¬ØªÙ…Ø§Ø¹ Ø¥Ø¯Ø§Ø±Ø©',
+            notes: 'ØªÙ…Øª Ø§Ù„Ù…ÙˆØ§ÙÙ‚Ø©',
             totalPrice: 500,
             roomId: room1.id,
             requestedById: trainer1.id,
@@ -1284,8 +1294,8 @@ async function main() {
             defaultStartTime: new Date('2026-04-01T16:00:00.000Z'),
             defaultEndTime: new Date('2026-04-01T20:00:00.000Z'),
             status: 'REJECTED',
-            purpose: 'تدريب داخلي',
-            rejectionReason: 'القاعة محجوزة مسبقاً في هذا الوقت',
+            purpose: 'ØªØ¯Ø±ÙŠØ¨ Ø¯Ø§Ø®Ù„ÙŠ',
+            rejectionReason: 'Ø§Ù„Ù‚Ø§Ø¹Ø© Ù…Ø­Ø¬ÙˆØ²Ø© Ù…Ø³Ø¨Ù‚Ø§Ù‹ ÙÙŠ Ù‡Ø°Ø§ Ø§Ù„ÙˆÙ‚Øª',
             totalPrice: 1200,
             roomId: room1.id,
             requestedById: trainer1.id,
@@ -1298,13 +1308,13 @@ async function main() {
         await prisma.roomBooking.create({ data: data as any });
     }
 
-    console.log('✅ Created 4 room bookings\n');
+    console.log('âœ… Created 4 room bookings\n');
 
 
     // ================================================
     // AUDIT LOGS
     // ================================================
-    console.log('📋 Creating audit logs...');
+    console.log('ðŸ“‹ Creating audit logs...');
 
     await prisma.auditLog.create({
         data: {
@@ -1361,57 +1371,58 @@ async function main() {
         },
     });
 
-    console.log('✅ Created 5 audit logs\n');
+    console.log('âœ… Created 5 audit logs\n');
 
     // ================================================
     // SUMMARY
     // ================================================
-    console.log('📊 Seed Summary:');
+    console.log('ðŸ“Š Seed Summary:');
     console.log('=====================================');
-    console.log('👥 Users: 17');
+    console.log('ðŸ‘¥ Users: 17');
     console.log('   - Platform Admins: 2');
     console.log('   - Institute Admins: 3');
     console.log('   - Trainers: 5');
     console.log('   - Students: 7');
     console.log('');
-    console.log('👨‍🏫 Trainer Profiles: 5');
-    console.log('🏛️  Institutes: 3');
-    console.log('🚪 Rooms: 5');
-    console.log('📚 Course Categories: 4');
-    console.log('📖 Courses: 6');
-    console.log('📅 Room Bookings: 5');
-    console.log('🎓 Sessions: 6');
-    console.log('📝 Enrollments: 18');
-    console.log('💰 Payments: 5');
-    console.log('⭐ Wishlists: 4');
-    console.log('📢 Announcements: 3');
-    console.log('🔔 Notifications: 5');
-    console.log('📋 Audit Logs: 5');
+    console.log('ðŸ‘¨â€ðŸ« Trainer Profiles: 5');
+    console.log('ðŸ›ï¸  Institutes: 3');
+    console.log('ðŸšª Rooms: 5');
+    console.log('ðŸ“š Course Categories: 4');
+    console.log('ðŸ“– Courses: 6');
+    console.log('ðŸ“… Room Bookings: 5');
+    console.log('ðŸŽ“ Sessions: 6');
+    console.log('ðŸ“ Enrollments: 18');
+    console.log('ðŸ’° Payments: 5');
+    console.log('â­ Wishlists: 4');
+    console.log('ðŸ“¢ Announcements: 3');
+    console.log('ðŸ”” Notifications: 5');
+    console.log('ðŸ“‹ Audit Logs: 5');
     console.log('');
-    console.log('📝 Test Credentials:');
+    console.log('ðŸ“ Test Credentials:');
     console.log('   - Password (all users): Test@123456');
     console.log('');
-    console.log('🎯 Scenarios covered:');
-    console.log('   ✅ All user roles and statuses');
-    console.log('   ✅ Trainer profiles (approved, rejected, pending)');
-    console.log('   ✅ Institutes (approved, rejected, pending)');
-    console.log('   ✅ Courses in various statuses (draft, active, completed)');
-    console.log('   ✅ Room bookings (approved, pending, rejected)');
-    console.log('   ✅ Sessions (scheduled, completed, cancelled)');
-    console.log('   ✅ Enrollments (preliminary, pending payment, active, completed, cancelled)');
-    console.log('   ✅ Payments (pending, approved, rejected)');
-    console.log('   ✅ Wishlists, announcements, notifications');
-    console.log('   ✅ Complete audit trail');
+    console.log('ðŸŽ¯ Scenarios covered:');
+    console.log('   âœ… All user roles and statuses');
+    console.log('   âœ… Trainer profiles (approved, rejected, pending)');
+    console.log('   âœ… Institutes (approved, rejected, pending)');
+    console.log('   âœ… Courses in various statuses (draft, active, completed)');
+    console.log('   âœ… Room bookings (approved, pending, rejected)');
+    console.log('   âœ… Sessions (scheduled, completed, cancelled)');
+    console.log('   âœ… Enrollments (preliminary, pending payment, active, completed, cancelled)');
+    console.log('   âœ… Payments (pending, approved, rejected)');
+    console.log('   âœ… Wishlists, announcements, notifications');
+    console.log('   âœ… Complete audit trail');
     console.log('');
     console.log('=====================================');
-    console.log('✨ Database seeding completed successfully!');
+    console.log('âœ¨ Database seeding completed successfully!');
 }
 
 main()
     .catch((e) => {
-        console.error('❌ Error during seed:', e);
+        console.error('âŒ Error during seed:', e);
         process.exit(1);
     })
     .finally(async () => {
         await prisma.$disconnect();
     });
+
