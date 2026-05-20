@@ -298,11 +298,11 @@ export default function EditTrainerCoursePage() {
 
     const isDraft = courseData.status === 'DRAFT' || courseData.status === 'draft'
     const isPendingMinimum = courseData.status === 'PENDING_MINIMUM' || courseData.status === 'pending_minimum'
-    // For PENDING_MINIMUM courses, only unlock the schedule tab if minimum is reached
+    // Keep minimumReached for status messaging, but do not lock navigation between edit tabs.
     const minimumReached = isPendingMinimum
         && Number(courseData.minStudents) > 0
         && Number(courseData.enrolledStudents ?? 0) >= Number(courseData.minStudents)
-    const canSetupSchedule = isDraft || minimumReached
+    const canSetupSchedule = true
 
     return (
         <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12" dir="rtl">
@@ -385,9 +385,7 @@ export default function EditTrainerCoursePage() {
                 <div className="w-full bg-white p-2 rounded-xl shadow-sm border border-gray-100 sticky top-0 z-10">
                     <TabsList className="grid w-full grid-cols-2 h-12 bg-gray-50/50">
                         <TabsTrigger value="info" className="data-[state=active]:bg-white h-10">1. بيانات الدورة</TabsTrigger>
-                        <TabsTrigger value="schedule" className="data-[state=active]:bg-white h-10" disabled={!canSetupSchedule}>
-                            {canSetupSchedule ? "2. الحجز والمواعيد (لتفعيل الدورة)" : "2. الحجز والمواعيد"}
-                        </TabsTrigger>
+                        <TabsTrigger value="schedule" className="data-[state=active]:bg-white h-10 gap-2">2. الحجز والمواعيد</TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -515,15 +513,7 @@ export default function EditTrainerCoursePage() {
 
                 {/* ---- Tab 2: Schedule (DRAFT only) ---- */}
                 <TabsContent value="schedule" className="space-y-6">
-                    {!canSetupSchedule ? (
-                        <Card><CardContent className="py-12 text-center text-gray-500">
-                            <AlertCircle className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                            {isPendingMinimum
-                                ? <p>لا يمكن إعداد الجلسات حتى يكتمل الحد الأدنى من الطلاب المسجلين.</p>
-                                : <p>لا يمكن تعديل الحجز والمواعيد إلا للدورات في حالة المسودة.</p>}
-                        </CardContent></Card>
-                    ) : (
-                        <>
+                    <>
                             <Card>
                                 <CardHeader><CardTitle>طريقة التقديم</CardTitle></CardHeader>
                                 <CardContent>
@@ -747,8 +737,7 @@ export default function EditTrainerCoursePage() {
                                     </Button>
                                 </div>
                             </div>
-                        </>
-                    )}
+                    </>
                 </TabsContent>
             </Tabs>
         </div>
