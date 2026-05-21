@@ -172,6 +172,8 @@ class TrainerService {
 
                 return {
                     id: c.id,
+                    trainerId: c.trainerId,
+                    instituteId: c.instituteId,
                     title: c.title,
                     description: c.description ?? '',
                     shortDescription: c.shortDescription ?? '',
@@ -994,6 +996,8 @@ class TrainerService {
 
         return {
             id: course.id,
+            trainerId: course.trainerId,
+            instituteId: course.instituteId,
             title: course.title,
             category: (course as any).category?.name ?? 'عام',
             shortDescription: course.shortDescription ?? '',

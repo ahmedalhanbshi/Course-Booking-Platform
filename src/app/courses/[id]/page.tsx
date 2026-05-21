@@ -151,7 +151,9 @@ export default function CourseDetailsPage() {
     try {
       setIsLoadingHall(true)
       setHallImageError(false)
-      const data = await studentService.getHallById(hallId)
+      const data = user?.role === "TRAINER"
+        ? await trainerService.getHallById(hallId)
+        : await studentService.getHallById(hallId)
       setHallData(data)
       setIsHallModalOpen(true)
     } catch (err: any) {
@@ -692,6 +694,8 @@ export default function CourseDetailsPage() {
   }
   // ─────────────────────────────────────────────────────────────────────────
 
+  const isCourseOwner = course && user?.id && (course.trainerId === user.id || course.instituteId === user.id)
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="relative overflow-hidden bg-gradient-to-l from-blue-950 via-blue-900 to-slate-900 text-white">
@@ -797,77 +801,88 @@ export default function CourseDetailsPage() {
                     </div>
                   </div>
                 )}
-                {registrationStatus === "NONE" && (
+                {isCourseOwner ? (
                   <Button
-                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
-                    onClick={() => openRegistrationDialog("create")}
-                  >
-                    {(course as any).courseStatus === 'PENDING_MINIMUM' ? 'التسجيل المبدئي' : 'التسجيل'}
-                  </Button>
-                )}
-                {registrationStatus === "PENDING_APPROVAL" && (
-                  <Button
-                    variant="outline"
                     disabled
-                    className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                    className="w-full rounded-full border border-white/40 bg-white/10 text-white hover:bg-white/10 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-80 cursor-not-allowed"
                   >
-                    تم التسجيل — بانتظار المراجعة
+                    أنت صاحب هذه الدورة
                   </Button>
-                )}
-                {registrationStatus === "PRELIMINARY_APPROVED" && (
-                  <Button
-                    variant="outline"
-                    disabled
-                    className="w-full rounded-full border-blue-400/50 bg-blue-500/10 text-white text-base font-semibold h-12 sm:w-auto sm:px-10 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
-                  >
-                    <CheckCircle className="ml-2 h-4 w-4 text-blue-400" />
-                    مقبول مبدئياً — بانتظار اكتمال العدد
-                  </Button>
-                )}
-                {registrationStatus === "REJECTED" && (
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-full border-white/60 bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                    onClick={() => openRegistrationDialog("edit")}
-                  >
-                    تعديل التسجيل المبدئي
-                  </Button>
-                )}
-                {registrationStatus === "APPROVED" && (
-                  <Button
-                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                    onClick={() => setIsPaymentDialogOpen(true)}
-                  >
-                    تأكيد الدفع
-                  </Button>
-                )}
-                {registrationStatus === "PAYMENT_PENDING" && (
-                  <Button
-                    variant="outline"
-                    disabled
-                    className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
-                  >
-                    تم إرسال الدفع
-                  </Button>
-                )}
-                {registrationStatus === "PAYMENT_REJECTED" && (
-                  <Button
-                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                    onClick={() => setIsPaymentDialogOpen(true)}
-                  >
-                    تعديل سند الدفع
-                  </Button>
-                )}
-                {registrationStatus === "ENROLLED" && (
-                  <Button
-                    className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
-                    onClick={() => {
-                      saveEnrollment()
-                      router.push(`/student/courses/${courseId}`)
-                    }}
-                  >
-                    الانتقال إلى الدورة
-                  </Button>
+                ) : (
+                  <>
+                    {registrationStatus === "NONE" && (
+                      <Button
+                        className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-950 animate-cta-pop"
+                        onClick={() => openRegistrationDialog("create")}
+                      >
+                        {(course as any).courseStatus === 'PENDING_MINIMUM' ? 'التسجيل المبدئي' : 'التسجيل'}
+                      </Button>
+                    )}
+                    {registrationStatus === "PENDING_APPROVAL" && (
+                      <Button
+                        variant="outline"
+                        disabled
+                        className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                      >
+                        تم التسجيل — بانتظار المراجعة
+                      </Button>
+                    )}
+                    {registrationStatus === "PRELIMINARY_APPROVED" && (
+                      <Button
+                        variant="outline"
+                        disabled
+                        className="w-full rounded-full border-blue-400/50 bg-blue-500/10 text-white text-base font-semibold h-12 sm:w-auto sm:px-10 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                      >
+                        <CheckCircle className="ml-2 h-4 w-4 text-blue-400" />
+                        مقبول مبدئياً — بانتظار اكتمال العدد
+                      </Button>
+                    )}
+                    {registrationStatus === "REJECTED" && (
+                      <Button
+                        variant="outline"
+                        className="w-full rounded-full border-white/60 bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                        onClick={() => openRegistrationDialog("edit")}
+                      >
+                        تعديل التسجيل المبدئي
+                      </Button>
+                    )}
+                    {registrationStatus === "APPROVED" && (
+                      <Button
+                        className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                        onClick={() => setIsPaymentDialogOpen(true)}
+                      >
+                        تأكيد الدفع
+                      </Button>
+                    )}
+                    {registrationStatus === "PAYMENT_PENDING" && (
+                      <Button
+                        variant="outline"
+                        disabled
+                        className="w-full rounded-full border-white/60 bg-white text-blue-900 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200 opacity-70 cursor-not-allowed"
+                      >
+                        تم إرسال الدفع
+                      </Button>
+                    )}
+                    {registrationStatus === "PAYMENT_REJECTED" && (
+                      <Button
+                        className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                        onClick={() => setIsPaymentDialogOpen(true)}
+                      >
+                        تعديل سند الدفع
+                      </Button>
+                    )}
+                    {registrationStatus === "ENROLLED" && (
+                      <Button
+                        className="w-full rounded-full bg-white text-blue-900 hover:bg-blue-50 text-base font-semibold h-12 sm:w-auto sm:px-10 transition-all duration-200"
+                        onClick={() => {
+                          saveEnrollment()
+                          router.push(`/student/courses/${courseId}`)
+                        }}
+                      >
+                        الانتقال إلى الدورة
+                      </Button>
+                    )}
+                  </>
                 )}
                 <DialogContent
                   dir="rtl"

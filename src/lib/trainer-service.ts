@@ -34,6 +34,8 @@ export interface TrainerDashboardData {
 
 export interface ExploreCourse {
     id: string;
+    trainerId: string | null;
+    instituteId: string | null;
     title: string;
     description: string;
     shortDescription: string;
@@ -58,6 +60,8 @@ export interface ExploreCoursesData {
 
 export interface CourseDetail {
     id: string;
+    trainerId: string | null;
+    instituteId: string | null;
     title: string;
     category: string;
     shortDescription: string;
