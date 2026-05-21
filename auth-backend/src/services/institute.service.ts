@@ -1638,12 +1638,38 @@ class InstituteService {
                 _count: {
                     select: { enrollments: true },
                 },
+                roomBookings: {
+                    include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
+                    orderBy: { createdAt: 'desc' },
+                    take: 1
+                },
+                sessions: {
+                    orderBy: { startTime: 'asc' },
+                    select: {
+                        id: true,
+                        startTime: true,
+                        endTime: true,
+                        topic: true,
+                        location: true,
+                        meetingLink: true,
+                        type: true,
+                        roomId: true,
+                    }
+                }
             },
         });
 
         if (!course) {
             throw new Error("الدورة غير موجودة أو لا تنتمي لهذا المعهد");
         }
+
+        const staffTrainerIds = (course as any).staffTrainerIds as string[] || [];
+        const staffTrainers = staffTrainerIds.length > 0 
+            ? await prisma.instituteStaff.findMany({
+                where: { id: { in: staffTrainerIds } },
+                select: { id: true, name: true, avatar: true }
+              })
+            : [];
 
         return {
             ...course,
@@ -1662,8 +1688,34 @@ class InstituteService {
                 name: "غير محدد",
                 email: null,
             }),
+            trainers: staffTrainers,
             category: course.category?.name || "-",
+            deliveryType: (course as any).sessions?.[0]?.type === 'ONLINE' ? 'online'
+                : (course as any).sessions?.[0]?.type === 'IN_PERSON' ? 'in_person'
+                : (course as any).sessions?.length > 0 ? 'hybrid' : 'online',
+            hallId: (course as any).sessions?.[0]?.roomId ?? null,
             prerequisites: course.prerequisites ? course.prerequisites.split('\n') : [],
+            sessions: ((course as any).sessions ?? []).map((s: any) => ({
+                id: s.id,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                topic: s.topic ?? '',
+                location: s.location ?? '',
+                meetingLink: s.meetingLink ?? '',
+                type: s.type ?? '',
+            })),
+            roomBooking: (course as any).roomBookings?.[0] ? {
+                id: (course as any).roomBookings[0].id,
+                status: (course as any).roomBookings[0].status.toLowerCase(),
+                rejectionReason: (course as any).roomBookings[0].rejectionReason,
+                totalPrice: Number((course as any).roomBookings[0].totalPrice),
+                payment: (course as any).roomBookings[0].payments?.[0] ? {
+                    id: (course as any).roomBookings[0].payments[0].id,
+                    status: (course as any).roomBookings[0].payments[0].status.toLowerCase(),
+                    amount: Number((course as any).roomBookings[0].payments[0].amount),
+                    receipt: (course as any).roomBookings[0].payments[0].depositSlipImage
+                } : null
+            } : null,
         };
     }
 
@@ -1679,12 +1731,29 @@ class InstituteService {
         });
         if (!course) throw new Error("الدورة غير موجودة أو لا تنتمي لهذا المعهد");
 
-        // Validate trainer if provided
-        if (data.trainerId) {
+        // Validate trainers if provided
+        let parsedTrainerIds: string[] = [];
+        if (data.trainerIds) {
+            try {
+                parsedTrainerIds = typeof data.trainerIds === 'string' ? JSON.parse(data.trainerIds) : data.trainerIds;
+                if (!Array.isArray(parsedTrainerIds)) parsedTrainerIds = [];
+            } catch {
+                parsedTrainerIds = [];
+            }
+            if (parsedTrainerIds.length > 0) {
+                const staffTrainers = await prisma.instituteStaff.findMany({
+                    where: { id: { in: parsedTrainerIds }, instituteId: institute.id, status: "ACTIVE" },
+                });
+                if (staffTrainers.length !== parsedTrainerIds.length) {
+                    throw new Error("بعض المدربين المحددين غير موجودين أو غير نشطين");
+                }
+            }
+        } else if (data.trainerId) {
             const staffTrainer = await prisma.instituteStaff.findFirst({
                 where: { id: data.trainerId, instituteId: institute.id, status: "ACTIVE" },
             });
             if (!staffTrainer) throw new Error("المدرب غير موجود أو غير نشط في قائمة مدربي المعهد");
+            parsedTrainerIds = [data.trainerId];
         }
 
         const updateData: any = {
@@ -1700,7 +1769,7 @@ class InstituteService {
             ...(data.endDate && { endDate: new Date(data.endDate) }),
             ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
             ...(data.status && { status: data.status.toUpperCase() }),
-            ...(data.trainerId !== undefined && { staffTrainerIds: [data.trainerId], trainerId: null }),
+            ...((parsedTrainerIds.length > 0 || data.trainerIds !== undefined || data.trainerId !== undefined) && { staffTrainerIds: parsedTrainerIds, trainerId: null }),
             ...(data.bookingTrigger !== undefined && { bookingTrigger: data.bookingTrigger }),
             ...(data.objectives !== undefined && { objectives: data.objectives ?? [] }),
             ...(data.prerequisites !== undefined && { prerequisites: data.prerequisites?.length ? data.prerequisites.join('\n') : null }),

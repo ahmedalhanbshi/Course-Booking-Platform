@@ -65,16 +65,18 @@ class TrainerService {
             },
         });
 
-        const upcomingSessions = upcomingSessionsRaw.map(s => ({
+        const upcomingSessions = upcomingSessionsRaw
+            .filter(s => s.course != null)
+            .map(s => ({
             id: s.id,
             title: s.topic || 'جلسة تدريبية',
-            courseTitle: s.course.title,
+            courseTitle: s.course!.title,
             startTime: s.startTime,
             endTime: s.endTime,
             type: s.type.toLowerCase(),
             room: s.room?.name ?? null,
             meetingLink: s.meetingLink ?? null,
-            enrolledStudents: s.course.enrollments.length,
+            enrolledStudents: s.course!.enrollments.length,
         }));
 
         // Pending room bookings requested by this trainer
@@ -336,6 +338,19 @@ class TrainerService {
                     include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
                     orderBy: { createdAt: 'desc' },
                     take: 1
+                },
+                sessions: {
+                    orderBy: { startTime: 'asc' },
+                    select: {
+                        id: true,
+                        startTime: true,
+                        endTime: true,
+                        topic: true,
+                        location: true,
+                        meetingLink: true,
+                        type: true,
+                        roomId: true,
+                    }
                 }
             },
         });
@@ -356,11 +371,24 @@ class TrainerService {
             minStudents: course.minStudents,
             status: course.status.toLowerCase(),
             enrolledStudents: course._count.enrollments,
-            category: course.category?.name ?? '',
+            category: course.category?.name || "-",
             categoryId: course.categoryId ?? '',
+            deliveryType: (course as any).sessions?.[0]?.type === 'ONLINE' ? 'online'
+                : (course as any).sessions?.[0]?.type === 'IN_PERSON' ? 'in_person'
+                : (course as any).sessions?.length > 0 ? 'hybrid' : 'online',
+            hallId: (course as any).sessions?.[0]?.roomId ?? null,
             prerequisites: course.prerequisites ? course.prerequisites.split('\n').filter(Boolean) : [],
             objectives: course.objectives ?? [],
             tags: course.tags ?? [],
+            sessions: ((course as any).sessions ?? []).map((s: any) => ({
+                id: s.id,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                topic: s.topic ?? '',
+                location: s.location ?? '',
+                meetingLink: s.meetingLink ?? '',
+                type: s.type ?? '',
+            })),
             roomBooking: course.roomBookings[0] ? {
                 id: course.roomBookings[0].id,
                 status: course.roomBookings[0].status.toLowerCase(),
@@ -1766,9 +1794,7 @@ class TrainerService {
                     ? () => mailerService.sendPaymentRejected(student.email!, student.name, courseTitle, reason)
                     : undefined,
                 whaFn: student.phone
-                    ? () => whatsAppService.notifyPaymentRejected
-                        ? (whatsAppService as any).notifyPaymentRejected(student.phone!, student.name, courseTitle, reason)
-                        : Promise.resolve()
+                    ? () => (whatsAppService as any).notifyPaymentRejected?.(student.phone!, student.name, courseTitle, reason) ?? Promise.resolve()
                     : undefined,
             });
 
@@ -2112,18 +2138,20 @@ class TrainerService {
             orderBy: { startTime: 'asc' }
         });
 
-        return sessions.map(s => ({
+        return sessions
+            .filter(s => s.course != null)
+            .map(s => ({
             id: s.id,
             title: s.topic || 'جلسة تدريبية',
             courseId: s.courseId ?? null,
-            courseTitle: s.course.title,
+            courseTitle: s.course!.title,
             startTime: s.startTime,
             endTime: s.endTime,
             type: s.type.toLowerCase(),
             status: s.status.toLowerCase(),
             meetingLink: s.meetingLink,
             location: s.room?.name || s.location || (s.type === 'ONLINE' ? 'أونلاين' : 'غير محدد'),
-            enrolledStudents: s.course.enrollments.length,
+            enrolledStudents: s.course!.enrollments.length,
             roomId: s.roomId ?? null
         }));
     }

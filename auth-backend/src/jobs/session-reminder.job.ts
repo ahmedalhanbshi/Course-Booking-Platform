@@ -44,6 +44,7 @@ export function startSessionReminderJob() {
             });
 
             for (const session of sessions) {
+                if (!session.course) continue;
                 const topic = session.topic || 'جلسة تدريبية';
                 const courseTitle = session.course.title;
 

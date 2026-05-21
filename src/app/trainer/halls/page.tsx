@@ -1,6 +1,6 @@
-﻿"use client"
+"use client"
 
-import React, { useMemo, useState, useEffect, ReactNode } from "react"
+import React, { useMemo, useState, useEffect, ReactNode, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -52,21 +52,23 @@ const featureMap: Record<string, { label: string; icon: ReactNode }> = {
 
 // Local HallImage component removed in favor of shared component
 
-export default function TrainerHallsPage({
-    hideTitle = false,
-    basePath = "/trainer/halls",
-    actionLabel = "عرض التفاصيل",
-    onSelectHall,
-    hallsData,
-    stickyHeader = false,
-}: {
+type TrainerHallsPageProps = {
     hideTitle?: boolean
     basePath?: string
     actionLabel?: string
     onSelectHall?: (hallId: string) => void
     hallsData?: any[]
     stickyHeader?: boolean
-}) {
+}
+
+function TrainerHallsPageContent({
+    hideTitle = false,
+    basePath = "/trainer/halls",
+    actionLabel = "عرض التفاصيل",
+    onSelectHall,
+    hallsData,
+    stickyHeader = false,
+}: TrainerHallsPageProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedType, setSelectedType] = useState("الكل")
     const [selectedCapacity, setSelectedCapacity] = useState("كل السعات")
@@ -323,4 +325,12 @@ export default function TrainerHallsPage({
             </div>
         </section>
     )
+}
+
+export default function TrainerHallsPage(props: TrainerHallsPageProps) {
+  return (
+    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center">جاري التحميل...</div>}>
+      <TrainerHallsPageContent {...props} />
+    </Suspense>
+  )
 }

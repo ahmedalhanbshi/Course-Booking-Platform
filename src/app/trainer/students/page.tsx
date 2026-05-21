@@ -101,7 +101,7 @@ export default function TrainerStudentsPage() {
       await trainerService.sendStudentAnnouncement({
         title: announcementTitle,
         message: announcementMessage,
-        recipientId: announcementTarget ? announcementTarget.id : undefined
+        recipientIds: announcementTarget ? [announcementTarget.id] : undefined
       })
       toast.success("تم إرسال الإعلان بنجاح")
       setIsAnnouncementOpen(false)

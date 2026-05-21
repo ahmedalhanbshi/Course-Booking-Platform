@@ -263,6 +263,7 @@ class InstituteController {
                 tags: safeParseJSON(body.tags, []),
                 sessions: safeParseJSON(body.sessions, undefined),
                 hallId: body.hallId || undefined,
+                trainerIds: body.trainerIds !== undefined ? body.trainerIds : undefined,
             };
 
             const files = req.files as { [fieldname: string]: Express.Multer.File[] };
