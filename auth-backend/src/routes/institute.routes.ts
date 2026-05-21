@@ -56,6 +56,7 @@ router.patch('/courses/:id/activate', instituteController.activateCourse);
 // Metadata
 router.get('/categories', instituteController.getCategories);
 router.post('/categories', instituteController.createCategory);
+router.post('/tags', instituteController.createTag);
 
 // Students & Enrollments
 router.get('/students', instituteController.getStudents);

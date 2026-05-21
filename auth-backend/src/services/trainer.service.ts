@@ -279,6 +279,21 @@ class TrainerService {
     }
 
     /**
+     * Create a new tag
+     */
+    async createTag(name: string) {
+        const slug = name.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-').replace(/(^-|-$)/g, '');
+        // Check if tag already exists
+        const existing = await prisma.tag.findUnique({ where: { name } });
+        if (existing) return existing;
+        
+        return prisma.tag.create({
+            data: { name, slug: slug || `tag-${Date.now()}` },
+            select: { id: true, name: true, color: true }
+        });
+    }
+
+    /**
      * Get all courses created by this trainer
      */
     async getCourses(userId: string) {

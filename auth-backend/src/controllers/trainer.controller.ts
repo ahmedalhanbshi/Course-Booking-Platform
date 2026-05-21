@@ -129,6 +129,22 @@ class TrainerController {
     }
 
     /**
+     * Create a new tag
+     */
+    async createTag(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'TRAINER') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const { name } = req.body;
+            if (!name) return sendError(res, 'يرجى إدخال اسم الوسم', 400);
+
+            const tag = await trainerService.createTag(name);
+            return sendSuccess(res, 'تم إضافة الوسم بنجاح', tag);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
      * Get all active halls for the trainer (or any user) to browse
      */
     async getHalls(req: AuthRequest, res: Response, _next: NextFunction) {

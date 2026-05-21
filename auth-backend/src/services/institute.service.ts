@@ -1825,7 +1825,7 @@ class InstituteService {
                         endDate: sorted[sorted.length - 1].endTime,
                         selectedDays: [],
                         defaultStartTime: sorted[0].startTime,
-                        defaultEndTime: sorted[0].endTime,
+                        defaultEndTime: sorted[sorted.length - 1].endTime,
                         status: 'PENDING_APPROVAL',
                         totalPrice,
                         roomId: room.id,
@@ -1887,6 +1887,25 @@ class InstituteService {
         return prisma.courseCategory.create({
             data: { name: trimmed, slug },
             select: { id: true, name: true },
+        });
+    }
+
+    async createTag(name: string) {
+        if (!name || !name.trim()) throw new Error("اسم الوسم مطلوب");
+        const trimmed = name.trim();
+        const existing = await prisma.tag.findFirst({
+            where: { name: { equals: trimmed, mode: "insensitive" } },
+        });
+        if (existing) return existing;
+        const base = trimmed
+            .toLowerCase()
+            .replace(/\s+/g, "-")
+            .replace(/[^\w\u0600-\u06FF-]/g, "")
+            .substring(0, 40);
+        const slug = `${base}-${Date.now()}`;
+        return prisma.tag.create({
+            data: { name: trimmed, slug },
+            select: { id: true, name: true, color: true }
         });
     }
 

@@ -311,6 +311,19 @@ class InstituteController {
         }
     }
 
+    async createTag(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (!req.user || (req.user.role !== 'INSTITUTE_ADMIN' && req.user.role !== 'TRAINER')) {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { name } = req.body;
+            const tag = await instituteService.createTag(name);
+            return sendSuccess(res, 'تم إضافة الوسم بنجاح', tag);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
     async getHalls(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') {

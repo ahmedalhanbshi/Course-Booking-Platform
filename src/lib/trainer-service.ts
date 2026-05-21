@@ -166,6 +166,11 @@ class TrainerService {
         return response.data.data;
     }
 
+    async createTag(name: string): Promise<any> {
+        const response = await apiClient.post('/api/trainer/tags', { name });
+        return response.data.data;
+    }
+
     /**
      * Get all active halls across all institutes 
      */

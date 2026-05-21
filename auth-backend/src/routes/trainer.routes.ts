@@ -18,6 +18,7 @@ router.get('/schedule', trainerController.getSchedule);
 // Categories
 router.get('/categories', trainerController.getCategories);
 router.post('/categories', trainerController.createCategory);
+router.post('/tags', trainerController.createTag);
 
 // Explore (public course catalog)
 router.get('/explore', trainerController.getExploreCourses);

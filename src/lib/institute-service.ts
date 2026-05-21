@@ -103,6 +103,11 @@ class InstituteService {
         return response.data.data;
     }
 
+    async createTag(name: string): Promise<any> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/tags', { name });
+        return response.data.data;
+    }
+
 
     async createCourse(data: FormData): Promise<any> {
         const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/courses', data, {

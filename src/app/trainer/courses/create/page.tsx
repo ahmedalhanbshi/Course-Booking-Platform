@@ -61,6 +61,9 @@ export default function CreateCoursePage() {
     const [isAddingCategory, setIsAddingCategory] = useState(false)
     const [isCreatingCategory, setIsCreatingCategory] = useState(false)
 
+    const [newTagInput, setNewTagInput] = useState("")
+    const [isCreatingTag, setIsCreatingTag] = useState(false)
+
     const [courseData, setCourseData] = useState({
         title: "",
         categoryId: "",
@@ -138,6 +141,28 @@ export default function CreateCoursePage() {
             toast.error(err?.response?.data?.message || "فشل في إضافة التصنيف")
         } finally {
             setIsCreatingCategory(false)
+        }
+    }
+
+    const handleAddTag = async () => {
+        if (!newTagInput.trim()) return
+        try {
+            setIsCreatingTag(true)
+            const newTag = await trainerService.createTag(newTagInput.trim())
+            setAvailableTags(prev => {
+                const filtered = prev.filter(t => t.id !== newTag.id && t.name !== newTag.name)
+                return [...filtered, newTag].sort((a, b) => a.name.localeCompare(b.name))
+            })
+            setCourseData(prev => ({ 
+                ...prev, 
+                tags: prev.tags.includes(newTag.name) ? prev.tags : [...prev.tags, newTag.name] 
+            }))
+            setNewTagInput("")
+            toast.success(`تم إضافة الوسم "${newTag.name}" بنجاح`)
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "فشل في إضافة الوسم")
+        } finally {
+            setIsCreatingTag(false)
         }
     }
 
@@ -631,8 +656,26 @@ export default function CreateCoursePage() {
                                             )
                                         })}
                                         {availableTags.length === 0 && (
-                                            <p className="text-xs text-gray-400">جاري تحميل الوسوم...</p>
+                                            <p className="text-xs text-gray-400">لا يوجد وسوم...</p>
                                         )}
+                                    </div>
+                                    <div className="flex gap-2 mt-2 pt-2 border-t">
+                                        <Input 
+                                            placeholder="أضف وسم جديد..." 
+                                            value={newTagInput} 
+                                            onChange={e => setNewTagInput(e.target.value)} 
+                                            className="h-8 text-sm"
+                                            onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                                        />
+                                        <Button 
+                                            type="button"
+                                            onClick={handleAddTag} 
+                                            size="sm" 
+                                            variant="secondary"
+                                            disabled={isCreatingTag || !newTagInput.trim()}
+                                        >
+                                            {isCreatingTag ? "يضاف..." : "إضافة"}
+                                        </Button>
                                     </div>
                                     {courseData.tags.length > 0 && (
                                         <div className="pt-2 border-t">
