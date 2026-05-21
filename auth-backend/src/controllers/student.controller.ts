@@ -3,6 +3,8 @@ import { AuthRequest } from '../middleware/authenticate';
 import studentService from '../services/student.service';
 import { sendError, sendSuccess } from '../utils/response';
 
+const canUseLearnerEnrollment = (role?: string) => role === 'STUDENT' || role === 'TRAINER';
+
 class StudentController {
     /**
      * Get dashboard data for the authenticated student
@@ -54,7 +56,7 @@ class StudentController {
      */
     async getEnrollmentStatus(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
-            if (req.user?.role !== 'STUDENT') {
+            if (!canUseLearnerEnrollment(req.user?.role)) {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { courseId } = req.params;
@@ -70,7 +72,7 @@ class StudentController {
      */
     async preRegisterCourse(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
-            if (req.user?.role !== 'STUDENT') {
+            if (!canUseLearnerEnrollment(req.user?.role)) {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { courseId } = req.params;
@@ -92,7 +94,7 @@ class StudentController {
      */
     async submitPaymentProof(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
-            if (req.user?.role !== 'STUDENT') {
+            if (!canUseLearnerEnrollment(req.user?.role)) {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { courseId } = req.params;
@@ -197,7 +199,7 @@ class StudentController {
      */
     async cancelEnrollment(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
-            if (req.user?.role !== 'STUDENT') {
+            if (!canUseLearnerEnrollment(req.user?.role)) {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { enrollmentId } = req.params;

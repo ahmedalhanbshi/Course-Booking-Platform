@@ -609,10 +609,7 @@ export default function CourseDetailsPage() {
       }
 
       try {
-        const [enrollmentData, wishlistData] = await Promise.all([
-          studentService.getEnrollmentStatus(courseId),
-          studentService.getWishlist()
-        ]);
+        const enrollmentData = await studentService.getEnrollmentStatus(courseId)
 
         if (enrollmentData?.status) {
           setRegistrationStatus(enrollmentData.status as RegistrationStatus)
@@ -624,9 +621,11 @@ export default function CourseDetailsPage() {
           setRegistrationStatus("NONE")
         }
 
-        // Check if current course is in wishlist
-        const isInWishlist = wishlistData.some((item: any) => item.id === courseId);
-        setIsFavorite(isInWishlist);
+        if (user.role === "STUDENT") {
+          const wishlistData = await studentService.getWishlist()
+          const isInWishlist = wishlistData.some((item: any) => item.id === courseId)
+          setIsFavorite(isInWishlist)
+        }
       } catch {
         // ignore
       }

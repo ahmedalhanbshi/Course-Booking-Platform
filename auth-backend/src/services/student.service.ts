@@ -320,6 +320,10 @@ class StudentService {
         const course = await prisma.course.findUnique({ where: { id: courseId } });
         if (!course) throw new Error("الدورة غير موجودة");
 
+        if (course.trainerId === userId) {
+            throw new Error("لا يمكنك التسجيل في دورة تملكها");
+        }
+
         // Check if already enrolled
         const existingEnrollment = await prisma.enrollment.findUnique({
             where: {
